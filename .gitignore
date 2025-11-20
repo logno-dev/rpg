@@ -1,0 +1,10 @@
+node_modules
+.DS_Store
+dist
+.solid
+.vinxi
+.output
+.vercel
+.env
+.env.local
+*.log
