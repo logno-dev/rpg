@@ -970,7 +970,10 @@ export async function getRegion(regionId: number): Promise<Region | null> {
 // Abilities
 export async function getCharacterAbilities(characterId: number): Promise<any[]> {
   const result = await db.execute({
-    sql: `SELECT abilities.*, character_abilities.last_used_at
+    sql: `SELECT 
+            abilities.*,
+            character_abilities.last_used_at,
+            abilities.id as ability_id
           FROM character_abilities
           JOIN abilities ON character_abilities.ability_id = abilities.id
           WHERE character_abilities.character_id = ?
@@ -1260,5 +1263,101 @@ export async function failDungeon(characterId: number): Promise<void> {
     sql: 'UPDATE character_dungeon_progress SET status = ?, updated_at = unixepoch() WHERE character_id = ? AND status = ?',
     args: ['failed', characterId, 'active'],
   });
+}
+
+// Hotbar functions
+export async function getHotbar(characterId: number) {
+  'use server';
+  const result = await db.execute({
+    sql: `
+      SELECT 
+        h.*,
+        a.name as ability_name,
+        a.description as ability_description,
+        a.type as ability_type,
+        a.mana_cost,
+        a.cooldown,
+        i.name as item_name,
+        i.description as item_description,
+        i.health_restore,
+        i.mana_restore,
+        inv.quantity as item_quantity
+      FROM character_hotbar h
+      LEFT JOIN abilities a ON h.ability_id = a.id
+      LEFT JOIN items i ON h.item_id = i.id
+      LEFT JOIN character_inventory inv ON inv.character_id = h.character_id AND inv.item_id = h.item_id
+      WHERE h.character_id = ?
+      ORDER BY h.slot ASC
+    `,
+    args: [characterId],
+  });
+
+  return result.rows as any[];
+}
+
+export async function setHotbarSlot(characterId: number, slot: number, type: 'ability' | 'consumable', abilityId?: number, itemId?: number) {
+  'use server';
+  
+  console.log('[setHotbarSlot] Called with:', { characterId, slot, type, abilityId, itemId });
+  
+  // Delete existing slot
+  await db.execute({
+    sql: 'DELETE FROM character_hotbar WHERE character_id = ? AND slot = ?',
+    args: [characterId, slot],
+  });
+  
+  console.log('[setHotbarSlot] Deleted existing slot');
+
+  // Insert new slot if provided
+  if ((type === 'ability' && abilityId) || (type === 'consumable' && itemId)) {
+    await db.execute({
+      sql: `
+        INSERT INTO character_hotbar (character_id, slot, type, ability_id, item_id)
+        VALUES (?, ?, ?, ?, ?)
+      `,
+      args: [characterId, slot, type, abilityId || null, itemId || null],
+    });
+    console.log('[setHotbarSlot] Inserted new slot');
+  } else {
+    console.log('[setHotbarSlot] Skipped insert - condition not met:', { 
+      typeCheck: type === 'ability' ? !!abilityId : !!itemId 
+    });
+  }
+}
+
+export async function clearHotbarSlot(characterId: number, slot: number) {
+  'use server';
+  await db.execute({
+    sql: 'DELETE FROM character_hotbar WHERE character_id = ? AND slot = ?',
+    args: [characterId, slot],
+  });
+}
+
+// Ability Effects System
+export async function getAbilityEffects(abilityId: number) {
+  'use server';
+  const result = await db.execute({
+    sql: 'SELECT * FROM ability_effects WHERE ability_id = ? ORDER BY effect_order ASC',
+    args: [abilityId],
+  });
+  return result.rows as any[];
+}
+
+export async function getAbilitiesWithEffects(characterId: number) {
+  'use server';
+  const abilities = await getCharacterAbilities(characterId);
+  
+  // Fetch effects for each ability
+  const abilitiesWithEffects = await Promise.all(
+    abilities.map(async (ability: any) => {
+      const effects = await getAbilityEffects(ability.ability_id || ability.id);
+      return {
+        ...ability,
+        effects,
+      };
+    })
+  );
+  
+  return abilitiesWithEffects;
 }
 

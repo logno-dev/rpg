@@ -54,10 +54,30 @@ type Dungeon = {
   boss_level?: number;
 };
 
+type HotbarSlot = {
+  slot: number;
+  type?: 'ability' | 'consumable';
+  ability_id?: number;
+  item_id?: number;
+  ability_name?: string;
+  item_name?: string;
+  ability_description?: string;
+  item_description?: string;
+  mana_cost?: number;
+  cooldown?: number;
+  health_restore?: number;
+  mana_restore?: number;
+  item_quantity?: number;
+  // Full ability/item data for combat use
+  abilityData?: AbilityWithCooldown;
+  itemData?: InventoryItem;
+};
+
 type CharacterStore = {
   character: Character | null;
   inventory: InventoryItem[];
   abilities: AbilityWithCooldown[];
+  hotbar: HotbarSlot[];
   regions: Region[];
   currentRegion: Region | null;
   merchants: Merchant[];
@@ -71,6 +91,7 @@ type CharacterContextValue = [
     setCharacter: (character: Character) => void;
     setInventory: (inventory: InventoryItem[]) => void;
     setAbilities: (abilities: AbilityWithCooldown[]) => void;
+    setHotbar: (hotbar: HotbarSlot[]) => void;
     setRegions: (regions: Region[]) => void;
     setCurrentRegion: (region: Region) => void;
     setMerchants: (merchants: Merchant[]) => void;
@@ -98,6 +119,7 @@ export const CharacterProvider: ParentComponent<{ initialData?: Partial<Characte
     character: props.initialData?.character || null,
     inventory: props.initialData?.inventory || [],
     abilities: props.initialData?.abilities || [],
+    hotbar: props.initialData?.hotbar || [],
     regions: props.initialData?.regions || [],
     currentRegion: props.initialData?.currentRegion || null,
     merchants: props.initialData?.merchants || [],
@@ -116,6 +138,10 @@ export const CharacterProvider: ParentComponent<{ initialData?: Partial<Characte
 
     setAbilities: (abilities: AbilityWithCooldown[]) => {
       setStore("abilities", abilities);
+    },
+
+    setHotbar: (hotbar: HotbarSlot[]) => {
+      setStore("hotbar", hotbar);
     },
 
     setRegions: (regions: Region[]) => {

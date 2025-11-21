@@ -1,11 +1,12 @@
 import { createAsync, useParams, redirect, revalidate } from "@solidjs/router";
 import { createSignal, Show, For, createEffect, onCleanup, createMemo, on, onMount } from "solid-js";
 import { getUser } from "~/lib/auth";
-import { getCharacter, getInventory, getAllRegions, getRegion, getCharacterAbilities, getMerchantsInRegion, getDungeonsInRegion, getActiveDungeon } from "~/lib/game";
+import { getCharacter, getInventory, getAllRegions, getRegion, getCharacterAbilities, getMerchantsInRegion, getDungeonsInRegion, getActiveDungeon, getHotbar, getAbilitiesWithEffects } from "~/lib/game";
 import { db, type Mob, type Item, type Region, type NamedMob } from "~/lib/db";
 import { CombatEngine } from "~/components/CombatEngine";
 import { HealthRegen } from "~/components/HealthRegen";
 import { ActiveEffectsDisplay } from "~/components/ActiveEffectsDisplay";
+import { HotbarManager } from "~/components/HotbarManager";
 import { useCharacter } from "~/lib/CharacterContext";
 import { useActiveEffects } from "~/lib/ActiveEffectsContext";
 
@@ -21,7 +22,8 @@ async function getGameData(characterId: number) {
 
   const inventory = await getInventory(characterId);
   const regions = await getAllRegions(character.level, characterId);
-  const abilities = await getCharacterAbilities(characterId);
+  const abilities = await getAbilitiesWithEffects(characterId);
+  const hotbar = await getHotbar(characterId);
   
   // Ensure character has a current region set (default to 1 if null)
   const regionId = character.current_region ?? 1;
@@ -33,10 +35,10 @@ async function getGameData(characterId: number) {
   if (!currentRegion) {
     // Fallback to first region if somehow the region doesn't exist
     const fallbackRegion = regions[0];
-    return { character, inventory, regions, currentRegion: fallbackRegion, abilities, merchants: [], dungeons: [], activeDungeonProgress: null };
+    return { character, inventory, regions, currentRegion: fallbackRegion, abilities, merchants: [], dungeons: [], activeDungeonProgress: null, hotbar: [] };
   }
 
-  return { character, inventory, regions, currentRegion, abilities, merchants, dungeons, activeDungeonProgress };
+  return { character, inventory, regions, currentRegion, abilities, merchants, dungeons, activeDungeonProgress, hotbar };
 }
 
 export default function GamePage() {
@@ -46,7 +48,7 @@ export default function GamePage() {
   const [store, actions] = useCharacter();
   const [effectsStore, effectsActions] = useActiveEffects();
 
-  const [view, setView] = createSignal<"adventure" | "inventory" | "stats">("adventure");
+  const [view, setView] = createSignal<"adventure" | "inventory" | "stats" | "hotbar">("adventure");
   const [availableMobs, setAvailableMobs] = createSignal<Mob[]>([]);
   const [activeMob, setActiveMob] = createSignal<Mob | null>(null);
   const [activeNamedMobId, setActiveNamedMobId] = createSignal<number | null>(null);
@@ -127,6 +129,7 @@ export default function GamePage() {
   const currentRegion = () => store.currentRegion;
   const currentInventory = () => store.inventory;
   const currentAbilities = () => store.abilities;
+  const currentHotbar = () => store.hotbar;
   
   // Initialize CharacterContext from server data
   createEffect(() => {
@@ -138,6 +141,7 @@ export default function GamePage() {
       actions.setCharacter(gameData.character);
       actions.setInventory(gameData.inventory);
       actions.setAbilities(gameData.abilities);
+      actions.setHotbar(gameData.hotbar || []);
       actions.setRegions(gameData.regions);
       actions.setCurrentRegion(gameData.currentRegion);
       actions.setMerchants(gameData.merchants || []);
@@ -263,6 +267,58 @@ export default function GamePage() {
     });
 
     return bonuses;
+  });
+
+  // Convert hotbar to combat-ready hotbar actions
+  const hotbarActions = createMemo(() => {
+    const hotbar = currentHotbar();
+    const abilities = currentAbilities();
+    const inventory = currentInventory();
+    
+    console.log('[hotbarActions] Computing...', { 
+      hotbarSlots: hotbar.length, 
+      abilities: abilities.length, 
+      inventory: inventory.length 
+    });
+    
+    return hotbar
+      .filter((slot: any) => slot.type) // Only include assigned slots
+      .map((slot: any) => {
+        if (slot.type === 'ability' && slot.ability_id) {
+          const ability = abilities.find((a: any) => a.ability_id === slot.ability_id || a.id === slot.ability_id);
+          console.log('[hotbarActions] Matching ability for slot', slot.slot, ':', {
+            lookingFor: slot.ability_id,
+            found: ability?.name || 'NOT FOUND',
+            availableAbilities: abilities.map((a: any) => ({ id: a.id, ability_id: a.ability_id, name: a.name }))
+          });
+          return {
+            slot: slot.slot,
+            type: 'ability' as const,
+            ability: ability || null,
+          };
+        } else if (slot.type === 'consumable' && slot.item_id) {
+          const item = inventory.find((i: any) => i.item_id === slot.item_id);
+          return {
+            slot: slot.slot,
+            type: 'consumable' as const,
+            item: item ? {
+              id: item.id,
+              name: item.name,
+              health_restore: item.health_restore || 0,
+              mana_restore: item.mana_restore || 0,
+              quantity: item.quantity || 0,
+            } : null,
+          };
+        }
+        return null;
+      })
+      .filter((action: any) => action && (action.ability || action.item)) as any[];
+  });
+  
+  // Debug hotbar actions
+  createEffect(() => {
+    const actions = hotbarActions();
+    console.log('[hotbarActions] Computed actions:', actions);
   });
 
   // Calculate total stats including equipment
@@ -1459,9 +1515,6 @@ export default function GamePage() {
               </div>
             </div>
 
-            {/* Active Effects */}
-            <ActiveEffectsDisplay />
-
             {/* Navigation */}
             <div class="card">
               <div class="button-group">
@@ -1483,8 +1536,17 @@ export default function GamePage() {
                 >
                   Stats
                 </button>
+                <button
+                  class={view() === "hotbar" ? "button" : "button secondary"}
+                  onClick={() => setView("hotbar")}
+                >
+                  Hotbar
+                </button>
               </div>
             </div>
+
+            {/* Active Effects */}
+            <ActiveEffectsDisplay />
 
             {/* Combat Engine - Always mounted but hidden when not in use */}
             <Show when={activeMob()}>
@@ -1539,9 +1601,15 @@ export default function GamePage() {
                   equippedArmor={equippedArmor()}
                   currentHealth={currentHealth()}
                   currentMana={currentMana()}
-                  abilities={data()!.abilities || []}
+                  hotbarActions={hotbarActions()}
                   onCombatEnd={handleCombatEnd}
                   onHealthChange={handleHealthChange}
+                  onUseConsumable={async (itemId) => {
+                    const item = currentInventory().find((i: any) => i.id === itemId);
+                    if (item) {
+                      await handleUseItem(itemId, item.name, item.health_restore || 0, item.mana_restore || 0);
+                    }
+                  }}
                 />
               </div>
             </Show>
@@ -2239,6 +2307,23 @@ export default function GamePage() {
                   </div>
                 </Show>
               </div>
+            </Show>
+
+            {/* Hotbar View */}
+            <Show when={view() === "hotbar"}>
+              <HotbarManager
+                characterId={characterId()}
+                abilities={currentAbilities()}
+                consumables={currentInventory().filter((i: any) => 
+                  i.type === 'consumable' && 
+                  (i.health_restore > 0 || i.mana_restore > 0) &&
+                  !i.teaches_ability_id
+                )}
+                onHotbarChange={async () => {
+                  console.log('[Game] Hotbar changed, refetching data...');
+                  await refetchData();
+                }}
+              />
             </Show>
 
             {/* Victory Modal */}
@@ -3012,12 +3097,12 @@ export default function GamePage() {
                     <div style={{ 
                       display: "flex", 
                       "justify-content": "space-between", 
-                      "align-items": "center",
+                      "align-items": "start",
                       "margin-bottom": "1.5rem",
                       "padding-bottom": "1rem",
                       "border-bottom": "2px solid var(--bg-light)"
                     }}>
-                      <div>
+                      <div style={{ flex: "1" }}>
                         <h2 style={{ 
                           color: "var(--warning)", 
                           "font-size": "1.75rem",
@@ -3041,14 +3126,32 @@ export default function GamePage() {
                             💫 {merchantDiscountPercent()}% Charisma Discount Active!
                           </div>
                         </Show>
+                        <div style={{ 
+                          "margin-top": "0.75rem",
+                          "font-size": "1.25rem", 
+                          "font-weight": "bold",
+                          color: "var(--warning)"
+                        }}>
+                          💰 {currentGold()} Gold
+                        </div>
                       </div>
-                      <div style={{ 
-                        "font-size": "1.25rem", 
-                        "font-weight": "bold",
-                        color: "var(--warning)"
-                      }}>
-                        💰 {currentGold()} Gold
-                      </div>
+                      <button
+                        class="btn btn-secondary"
+                        style={{
+                          "min-width": "auto",
+                          padding: "0.5rem 1rem",
+                          "margin-left": "1rem",
+                          "font-size": "1.25rem",
+                          "line-height": "1"
+                        }}
+                        onClick={() => {
+                          setShowMerchantModal(false);
+                          setActiveMerchant(null);
+                          setMerchantInventory([]);
+                        }}
+                      >
+                        ✕
+                      </button>
                     </div>
 
                     <div class="item-grid">

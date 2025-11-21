@@ -229,3 +229,79 @@ export type CharacterNamedMobDefeat = {
   named_mob_id: number;
   defeated_at: number;
 };
+
+export type HotbarSlot = {
+  id: number;
+  character_id: number;
+  slot: number; // 1-8
+  type: 'ability' | 'consumable';
+  ability_id: number | null;
+  item_id: number | null;
+  created_at: number;
+  updated_at: number;
+};
+
+export type AbilityEffect = {
+  id: number;
+  ability_id: number;
+  effect_order: number;
+  effect_type: 'damage' | 'heal' | 'buff' | 'debuff' | 'dot' | 'hot' | 'drain' | 'shield';
+  target: 'self' | 'enemy' | 'ally';
+  
+  // Instant values
+  value_min: number;
+  value_max: number;
+  
+  // Periodic effects
+  is_periodic: number;
+  tick_interval: number;
+  tick_count: number;
+  tick_value: number;
+  
+  // Stat modifications
+  stat_affected: string | null;
+  stat_scaling: string | null;
+  scaling_factor: number;
+  
+  // Duration
+  duration: number;
+  
+  // Conditions
+  chance: number;
+  requires_buff: string | null;
+  
+  // Special
+  drain_percent: number;
+  shield_amount: number;
+  stacks_max: number;
+  
+  created_at: number;
+};
+
+export type ActiveEffect = {
+  id: string;
+  name: string;
+  source: 'ability' | 'item';
+  effect_type: 'dot' | 'hot' | 'buff' | 'debuff' | 'shield';
+  target: 'self' | 'enemy';
+  
+  // For DOT/HOT
+  tick_value?: number;
+  tick_interval?: number;
+  ticks_remaining?: number;
+  next_tick_at?: number;
+  
+  // For buffs/debuffs
+  stat?: string;
+  amount?: number;
+  
+  // For shields
+  shield_remaining?: number;
+  
+  // Common
+  duration: number;
+  expires_at: number;
+  stacks: number;
+  stat_scaling?: string;
+  scaling_factor?: number;
+};

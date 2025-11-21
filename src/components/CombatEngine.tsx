@@ -1,6 +1,7 @@
 import { createSignal, onMount, onCleanup, For, Show, createEffect, onCleanup as onCleanupEffect } from "solid-js";
-import type { Character, Mob, Item, Ability } from "~/lib/db";
+import type { Character, Mob, Item, Ability, AbilityEffect, ActiveEffect } from "~/lib/db";
 import { useActiveEffects } from "~/lib/ActiveEffectsContext";
+import { EffectProcessor } from "~/lib/EffectProcessor";
 
 type CombatState = {
   characterHealth: number;
@@ -16,6 +17,20 @@ type CombatState = {
 
 type AbilityWithCooldown = Ability & {
   last_used_at: number;
+  effects?: AbilityEffect[]; // Preloaded effects
+};
+
+type HotbarAction = {
+  slot: number;
+  type: 'ability' | 'consumable';
+  ability?: AbilityWithCooldown;
+  item?: {
+    id: number;
+    name: string;
+    health_restore: number;
+    mana_restore: number;
+    quantity: number;
+  };
 };
 
 type CombatEngineProps = {
@@ -25,9 +40,10 @@ type CombatEngineProps = {
   equippedArmor: Item[];
   currentHealth: number; // External health state (from potions, etc.)
   currentMana: number; // External mana state
-  abilities: AbilityWithCooldown[]; // Character's learned abilities
+  hotbarActions: HotbarAction[]; // Hotbar configured actions (abilities + consumables)
   onCombatEnd: (result: 'victory' | 'defeat', finalState: CombatState) => void;
   onHealthChange: (health: number, mana: number) => void;
+  onUseConsumable?: (itemId: number) => Promise<void>;
 };
 
 const TICK_INTERVAL = 100; // 100ms per tick
@@ -102,6 +118,11 @@ export function CombatEngine(props: CombatEngineProps) {
   // Track ability cooldowns in combat (in seconds)
   const [abilityCooldowns, setAbilityCooldowns] = createSignal<Map<number, number>>(new Map());
   const [currentMana, setCurrentMana] = createSignal(props.currentMana);
+  
+  // Track active combat effects (DOTs, HOTs, debuffs on enemy)
+  const [activeDots, setActiveDots] = createSignal<ActiveEffect[]>([]);
+  const [activeHots, setActiveHots] = createSignal<ActiveEffect[]>([]);
+  const [activeDebuffs, setActiveDebuffs] = createSignal<ActiveEffect[]>([]);
   
   // Flag to prevent sync loops when we update health internally
   let isInternalHealthUpdate = false;
@@ -249,8 +270,65 @@ export function CombatEngine(props: CombatEngineProps) {
       let newState = { ...currentState };
       const newLog = [...currentState.log];
 
-      // Calculate ability effects
-      if (ability.category === 'damage') {
+      // NEW EFFECT SYSTEM: Process if effects are loaded
+      if (ability.effects && ability.effects.length > 0) {
+        console.log(`[useAbility] Processing ${ability.effects.length} effects for ${ability.name}`);
+        
+        ability.effects.forEach((effect: AbilityEffect) => {
+          const result = EffectProcessor.processInstantEffect(effect, props.character, props.mob.defense);
+          
+          // Apply instant damage
+          if (result.damage) {
+            newState.mobHealth = Math.max(0, newState.mobHealth - result.damage);
+            newLog.push(`You cast ${ability.name} for ${result.damage} damage!`);
+            
+            if (newState.mobHealth <= 0) {
+              newState.isActive = false;
+              newState.result = 'victory';
+              newLog.push(`Victory! You defeated ${props.mob.name}!`);
+              setTimeout(() => props.onCombatEnd('victory', newState), 0);
+            }
+          }
+          
+          // Apply instant healing
+          if (result.healing) {
+            const oldHealth = newState.characterHealth;
+            const maxHealth = getActualMaxHealth();
+            const newHealth = Math.min(maxHealth, oldHealth + result.healing);
+            const actualHealing = newHealth - oldHealth;
+            
+            newState.characterHealth = newHealth;
+            updatedHealth = newHealth;
+            didHeal = true;
+            newLog.push(`You cast ${ability.name} and restore ${actualHealing} HP!`);
+          }
+          
+          // Create active effects (DOT, HOT, buff, debuff)
+          const activeEffect = EffectProcessor.createActiveEffect(effect, ability.name, props.character);
+          if (activeEffect) {
+            if (activeEffect.effect_type === 'dot') {
+              setActiveDots(EffectProcessor.addOrStackEffect(activeDots(), activeEffect));
+              newLog.push(`Applied ${ability.name} DOT!`);
+            } else if (activeEffect.effect_type === 'hot') {
+              setActiveHots(EffectProcessor.addOrStackEffect(activeHots(), activeEffect));
+              newLog.push(`Applied ${ability.name} HoT!`);
+            } else if (activeEffect.effect_type === 'buff') {
+              effectsActions.addEffect({
+                name: activeEffect.name,
+                stat: activeEffect.stat!,
+                amount: activeEffect.amount!,
+                duration: activeEffect.duration,
+              });
+              newLog.push(`${ability.name}: +${activeEffect.amount} ${activeEffect.stat} for ${activeEffect.duration}s`);
+            } else if (activeEffect.effect_type === 'debuff') {
+              setActiveDebuffs(EffectProcessor.addOrStackEffect(activeDebuffs(), activeEffect));
+              newLog.push(`${ability.name}: Debuff applied!`);
+            }
+          }
+        });
+      } 
+      // LEGACY SYSTEM: Fallback for abilities without effects loaded
+      else if (ability.category === 'damage') {
         // Calculate damage with stat scaling
         const baseDamage = Math.floor(Math.random() * (ability.damage_max - ability.damage_min + 1)) + ability.damage_min;
         const statValue = ability.primary_stat ? props.character[ability.primary_stat as keyof Character] as number : 10;
@@ -432,6 +510,42 @@ export function CombatEngine(props: CombatEngineProps) {
           }
         }
 
+        // Process active DOTs/HOTs/Debuffs
+        const processedDots = EffectProcessor.updateActiveEffects(activeDots(), (effect, tickDamage) => {
+          // Apply DOT tick damage to mob
+          const actualDamage = Math.max(1, tickDamage);
+          newState.mobHealth = Math.max(0, newState.mobHealth - actualDamage);
+          newState.log = [...newState.log, `🔥 ${effect.name} deals ${actualDamage} damage!`];
+          
+          // Check if mob died from DOT
+          if (newState.mobHealth <= 0) {
+            newState.isActive = false;
+            newState.result = 'victory';
+            newState.log = [...newState.log, `Victory! You defeated ${props.mob.name}!`];
+            setTimeout(() => props.onCombatEnd('victory', newState), 0);
+            clearInterval(intervalId);
+          }
+        });
+        setActiveDots(processedDots);
+
+        const processedHots = EffectProcessor.updateActiveEffects(activeHots(), (effect, tickHealing) => {
+          // Apply HOT tick healing to character
+          const maxHealth = getActualMaxHealth();
+          const actualHealing = Math.max(1, tickHealing);
+          const newHealth = Math.min(maxHealth, newState.characterHealth + actualHealing);
+          const healingApplied = newHealth - newState.characterHealth;
+          
+          if (healingApplied > 0) {
+            newState.characterHealth = newHealth;
+            newState.log = [...newState.log, `💚 ${effect.name} restores ${healingApplied} HP!`];
+            props.onHealthChange(newHealth, currentMana());
+          }
+        });
+        setActiveHots(processedHots);
+
+        const processedDebuffs = EffectProcessor.updateActiveEffects(activeDebuffs(), () => {});
+        setActiveDebuffs(processedDebuffs);
+
         // Check if character should attack
         if (newCharTicks >= currentState.characterAttackTicks) {
           const weaponDamageMin = props.equippedWeapon?.damage_min || 1;
@@ -504,6 +618,39 @@ export function CombatEngine(props: CombatEngineProps) {
     }, TICK_INTERVAL);
   });
 
+  // Keyboard shortcuts for hotbar (1-8)
+  onMount(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Only handle if combat is active and not typing in an input
+      if (!state().isActive) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      
+      const key = parseInt(e.key);
+      if (key >= 1 && key <= 8) {
+        e.preventDefault();
+        const action = props.hotbarActions.find(a => a.slot === key);
+        if (action) {
+          if (action.type === 'ability' && action.ability) {
+            const check = canUseAbility(action.ability);
+            if (check.canUse) {
+              useAbility(action.ability);
+            }
+          } else if (action.type === 'consumable' && action.item && props.onUseConsumable) {
+            if (action.item.quantity > 0) {
+              props.onUseConsumable(action.item.id);
+            }
+          }
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    
+    onCleanup(() => {
+      window.removeEventListener('keydown', handleKeyPress);
+    });
+  });
+
   onCleanup(() => {
     if (intervalId) {
       clearInterval(intervalId);
@@ -531,6 +678,31 @@ export function CombatEngine(props: CombatEngineProps) {
         <div class="progress-bar">
           <div class="progress-fill danger" style={{ width: `${mobHealthPercent()}%` }} />
         </div>
+        
+        {/* Active DOTs on Enemy */}
+        <Show when={activeDots().length > 0}>
+          <div style={{ 
+            "margin-top": "0.5rem", 
+            display: "flex", 
+            gap: "0.5rem", 
+            "flex-wrap": "wrap" 
+          }}>
+            <For each={activeDots()}>
+              {(dot) => (
+                <span style={{ 
+                  "font-size": "0.75rem",
+                  padding: "0.25rem 0.5rem",
+                  background: "rgba(220, 38, 38, 0.2)",
+                  border: "1px solid var(--danger)",
+                  "border-radius": "4px",
+                  color: "var(--danger)"
+                }}>
+                  🔥 {dot.name} ({dot.ticks_remaining} ticks)
+                </span>
+              )}
+            </For>
+          </div>
+        </Show>
       </div>
 
       {/* Attack Timers */}
@@ -551,69 +723,128 @@ export function CombatEngine(props: CombatEngineProps) {
         </div>
       </Show>
 
-      {/* Abilities */}
-      <Show when={props.abilities.length > 0 && state().isActive}>
+      {/* Hotbar Actions */}
+      <Show when={props.hotbarActions.length > 0 && state().isActive}>
         <div style={{ "margin-bottom": "1rem" }}>
           <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)", "margin-bottom": "0.5rem" }}>
-            Abilities
+            Action Bar (Press 1-8)
           </div>
-          <div style={{ display: "flex", gap: "0.5rem", "flex-wrap": "wrap" }}>
-            <For each={props.abilities}>
-              {(ability) => {
-                const check = () => canUseAbility(ability);
-                const cooldown = () => abilityCooldowns().get(ability.id) || 0;
-                const isDisabled = () => !check().canUse;
+          <div style={{ 
+            display: "grid", 
+            "grid-template-columns": "repeat(auto-fit, minmax(140px, 1fr))",
+            gap: "0.5rem"
+          }}>
+            <For each={props.hotbarActions}>
+              {(action) => {
+                // Handle abilities
+                const isAbility = () => action.type === 'ability' && action.ability;
+                const check = () => isAbility() ? canUseAbility(action.ability!) : { canUse: true };
+                const cooldown = () => isAbility() ? (abilityCooldowns().get(action.ability!.id) || 0) : 0;
+                const isDisabled = () => {
+                  if (action.type === 'consumable') {
+                    return !action.item || action.item.quantity === 0;
+                  }
+                  return !check().canUse;
+                };
                 
-                // Determine ability color based on type
-                const getAbilityColor = () => {
-                  if (ability.category === 'damage') return 'var(--danger)';
-                  if (ability.category === 'heal') return 'var(--success)';
+                // Determine action color based on type
+                const getActionColor = () => {
+                  if (action.type === 'consumable') return 'var(--success)';
+                  if (action.ability?.category === 'damage') return 'var(--danger)';
+                  if (action.ability?.category === 'heal') return 'var(--success)';
                   return 'var(--accent)';
                 };
+                
+                const handleClick = async () => {
+                  if (action.type === 'ability' && action.ability) {
+                    useAbility(action.ability);
+                  } else if (action.type === 'consumable' && action.item && props.onUseConsumable) {
+                    await props.onUseConsumable(action.item.id);
+                  }
+                };
+                
+                const name = () => action.type === 'ability' ? action.ability?.name : action.item?.name;
+                const description = () => action.type === 'ability' ? action.ability?.description : '';
                 
                 return (
                   <button
                     class="button"
-                    onClick={() => useAbility(ability)}
+                    onClick={handleClick}
                     disabled={isDisabled()}
                     style={{
                       position: "relative",
                       padding: "0.75rem",
-                      "min-width": "80px",
-                      background: isDisabled() ? "var(--bg-light)" : getAbilityColor(),
+                      width: "100%",
+                      background: isDisabled() ? "var(--bg-light)" : getActionColor(),
                       opacity: isDisabled() ? 0.5 : 1,
                       cursor: isDisabled() ? "not-allowed" : "pointer",
                       "font-size": "0.875rem",
                       display: "flex",
                       "flex-direction": "column",
                       "align-items": "center",
-                      gap: "0.25rem"
+                      gap: "0.25rem",
+                      "min-height": "80px"
                     }}
-                    title={`${ability.name}\n${ability.description || ''}\n\n${
-                      ability.category === 'damage' 
-                        ? `Damage: ${ability.damage_min}-${ability.damage_max}` 
-                        : ability.category === 'heal'
-                        ? `Healing: ${ability.healing}`
-                        : ''
+                    title={`${name()}\n${description() || ''}\n\n${
+                      action.type === 'ability' && action.ability ? (
+                        action.ability.category === 'damage' 
+                          ? `Damage: ${action.ability.damage_min}-${action.ability.damage_max}` 
+                          : action.ability.category === 'heal'
+                          ? `Healing: ${action.ability.healing}`
+                          : ''
+                      ) : action.type === 'consumable' && action.item ? (
+                        `HP: +${action.item.health_restore || 0} MP: +${action.item.mana_restore || 0}`
+                      ) : ''
                     }\n${
-                      ability.type === 'spell' ? `Mana: ${ability.mana_cost}` : `Cooldown: ${ability.cooldown}s`
+                      action.type === 'ability' && action.ability ? (
+                        action.ability.type === 'spell' ? `Mana: ${action.ability.mana_cost}` : `Cooldown: ${action.ability.cooldown}s`
+                      ) : action.type === 'consumable' && action.item ? (
+                        `Quantity: ${action.item.quantity}`
+                      ) : ''
                     }${
-                      ability.primary_stat && ability.stat_scaling > 0
-                        ? `\nScales with ${ability.primary_stat} (${Math.floor(ability.stat_scaling * 100)}%)`
+                      action.type === 'ability' && action.ability?.primary_stat && action.ability.stat_scaling > 0
+                        ? `\nScales with ${action.ability.primary_stat} (${Math.floor(action.ability.stat_scaling * 100)}%)`
                         : ''
                     }`}
                   >
-                    <div style={{ "font-weight": "bold" }}>{ability.name}</div>
-                    <Show when={ability.type === 'spell'}>
+                    {/* Slot number badge */}
+                    <div style={{
+                      position: "absolute",
+                      top: "4px",
+                      left: "4px",
+                      width: "18px",
+                      height: "18px",
+                      background: "var(--bg-dark)",
+                      "border-radius": "3px",
+                      display: "flex",
+                      "align-items": "center",
+                      "justify-content": "center",
+                      "font-size": "0.7rem",
+                      "font-weight": "bold"
+                    }}>
+                      {action.slot}
+                    </div>
+                    
+                    <div style={{ "font-weight": "bold" }}>{name()}</div>
+                    
+                    <Show when={action.type === 'ability' && action.ability?.type === 'spell'}>
                       <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)" }}>
-                        {ability.mana_cost} mana
+                        {action.ability?.mana_cost} mana
                       </div>
                     </Show>
-                    <Show when={ability.type === 'ability' && cooldown() === 0}>
+                    
+                    <Show when={action.type === 'ability' && action.ability?.type === 'ability' && cooldown() === 0}>
                       <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)" }}>
-                        {ability.cooldown}s cooldown
+                        {action.ability?.cooldown}s cooldown
                       </div>
                     </Show>
+                    
+                    <Show when={action.type === 'consumable' && action.item}>
+                      <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)" }}>
+                        x{action.item?.quantity || 0}
+                      </div>
+                    </Show>
+                    
                     <Show when={cooldown() > 0}>
                       <div style={{ 
                         "font-size": "1rem", 
@@ -623,6 +854,7 @@ export function CombatEngine(props: CombatEngineProps) {
                         {Math.ceil(cooldown())}s
                       </div>
                     </Show>
+                    
                     <Show when={!check().canUse && !cooldown() && check().reason}>
                       <div style={{ "font-size": "0.75rem", color: "var(--danger)" }}>
                         {check().reason}
