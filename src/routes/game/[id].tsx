@@ -2122,7 +2122,7 @@ export default function GamePage() {
                         </Show>
 
                         <div style={{ display: "flex", gap: "0.5rem", "margin-top": "0.5rem", "flex-wrap": "wrap" }}>
-                          <Show when={invItem.type === 'consumable' && invItem.teaches_ability_id}>
+                          <Show when={(invItem.type === 'consumable' || invItem.type === 'scroll') && invItem.teaches_ability_id}>
                             <button
                               class="button"
                               style={{ flex: 1, "min-width": "100px", background: "var(--accent)", color: "var(--bg-dark)" }}
