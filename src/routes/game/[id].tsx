@@ -1,5 +1,5 @@
 import { createAsync, useParams, redirect, revalidate } from "@solidjs/router";
-import { createSignal, Show, For, createEffect, onCleanup, createMemo, on } from "solid-js";
+import { createSignal, Show, For, createEffect, onCleanup, createMemo, on, onMount } from "solid-js";
 import { getUser } from "~/lib/auth";
 import { getCharacter, getInventory, getAllRegions, getRegion, getCharacterAbilities, getMerchantsInRegion, getDungeonsInRegion, getActiveDungeon } from "~/lib/game";
 import { db, type Mob, type Item, type Region, type NamedMob } from "~/lib/db";
@@ -53,6 +53,9 @@ export default function GamePage() {
   const [combatLog, setCombatLog] = createSignal<string[]>([]);
   const [isRoaming, setIsRoaming] = createSignal(false);
   const [isTraveling, setIsTraveling] = createSignal(false);
+  
+  // Sticky header state
+  const [isScrolled, setIsScrolled] = createSignal(false);
   
   // Combat log auto-scroll state
   let adventureLogRef: HTMLDivElement | undefined;
@@ -1265,6 +1268,19 @@ export default function GamePage() {
     setAdventureLogUserScrolledUp(!isAtBottom);
   };
 
+  // Scroll detection for sticky header
+  onMount(() => {
+    const handleScroll = () => {
+      // Show sticky header after scrolling down 200px
+      setIsScrolled(window.scrollY > 200);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    
+    // Cleanup
+    return () => window.removeEventListener('scroll', handleScroll);
+  });
+
   return (
     <div>
       <div class="header">
@@ -1275,6 +1291,88 @@ export default function GamePage() {
           </a>
         </div>
       </div>
+
+      {/* Sticky Character Stats Header */}
+      <Show when={isScrolled() && data()}>
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          background: "var(--bg-dark)",
+          "border-bottom": "2px solid var(--accent)",
+          "z-index": 999,
+          padding: "0.75rem 1rem",
+          "box-shadow": "0 2px 10px rgba(0, 0, 0, 0.5)",
+          animation: "slideDown 0.3s ease-out"
+        }}>
+          <div style={{
+            "max-width": "1200px",
+            margin: "0 auto",
+            display: "grid",
+            "grid-template-columns": "auto 1fr 1fr auto",
+            gap: "1rem",
+            "align-items": "center"
+          }}>
+            {/* Character Name & Level */}
+            <div style={{ 
+              "white-space": "nowrap",
+              "font-weight": "bold"
+            }}>
+              {currentCharacter()?.name} <span style={{ color: "var(--text-secondary)" }}>Lv.{currentCharacter()?.level}</span>
+            </div>
+
+            {/* Health Bar */}
+            <div>
+              <div style={{ 
+                "font-size": "0.75rem", 
+                color: "var(--text-secondary)", 
+                "margin-bottom": "0.25rem",
+                display: "flex",
+                "justify-content": "space-between"
+              }}>
+                <span>HP</span>
+                <span>{currentHealth()}/{currentMaxHealth()}</span>
+              </div>
+              <div class="progress-bar" style={{ height: "8px" }}>
+                <div
+                  class="progress-fill health"
+                  style={{ width: `${(currentHealth() / currentMaxHealth()) * 100}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Mana Bar */}
+            <div>
+              <div style={{ 
+                "font-size": "0.75rem", 
+                color: "var(--text-secondary)", 
+                "margin-bottom": "0.25rem",
+                display: "flex",
+                "justify-content": "space-between"
+              }}>
+                <span>MP</span>
+                <span>{currentMana()}/{currentMaxMana()}</span>
+              </div>
+              <div class="progress-bar" style={{ height: "8px" }}>
+                <div
+                  class="progress-fill mana"
+                  style={{ width: `${(currentMana() / currentMaxMana()) * 100}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Gold */}
+            <div style={{ 
+              "white-space": "nowrap",
+              "font-weight": "bold",
+              color: "var(--warning)"
+            }}>
+              💰 {currentGold()}
+            </div>
+          </div>
+        </div>
+      </Show>
 
       <Show when={data()}>
         <div class="container">

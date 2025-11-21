@@ -253,6 +253,18 @@ label {
   color: var(--accent);
 }
 
+/* Sticky header animation */
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 @media (max-width: 768px) {
   .stat-grid {
     grid-template-columns: repeat(2, 1fr);
