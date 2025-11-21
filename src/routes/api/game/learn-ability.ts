@@ -115,19 +115,40 @@ export async function POST(event: APIEvent) {
     
     // Get updated inventory
     const inventoryResult = await db.execute({
-      sql: `SELECT character_inventory.id, character_inventory.quantity, character_inventory.equipped,
-            items.*
+      sql: `SELECT 
+            character_inventory.id, 
+            character_inventory.quantity, 
+            character_inventory.equipped,
+            items.*,
+            abilities.required_level as ability_required_level,
+            abilities.required_strength as ability_required_strength,
+            abilities.required_dexterity as ability_required_dexterity,
+            abilities.required_intelligence as ability_required_intelligence,
+            abilities.required_wisdom as ability_required_wisdom,
+            abilities.required_charisma as ability_required_charisma
             FROM character_inventory
             JOIN items ON character_inventory.item_id = items.id
+            LEFT JOIN abilities ON items.teaches_ability_id = abilities.id
             WHERE character_inventory.character_id = ?
             ORDER BY items.type, items.name`,
       args: [characterId],
     });
 
+    // Map the ability_ prefixed columns back to required_ for scrolls
+    const inventory = inventoryResult.rows.map((row: any) => ({
+      ...row,
+      required_level: row.ability_required_level || row.required_level,
+      required_strength: row.ability_required_strength || row.required_strength,
+      required_dexterity: row.ability_required_dexterity || row.required_dexterity,
+      required_intelligence: row.ability_required_intelligence || row.required_intelligence,
+      required_wisdom: row.ability_required_wisdom || row.required_wisdom,
+      required_charisma: row.ability_required_charisma || row.required_charisma,
+    }));
+
     return json({ 
       success: true, 
       ability,
-      inventory: inventoryResult.rows,
+      inventory,
       message: `Learned ${ability.name}!`
     });
   } catch (error: any) {

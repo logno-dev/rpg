@@ -2125,10 +2125,18 @@ export default function GamePage() {
                           <Show when={(invItem.type === 'consumable' || invItem.type === 'scroll') && invItem.teaches_ability_id}>
                             <button
                               class="button"
-                              style={{ flex: 1, "min-width": "100px", background: "var(--accent)", color: "var(--bg-dark)" }}
+                              style={{ 
+                                flex: 1, 
+                                "min-width": "100px", 
+                                background: meetsRequirements(invItem) ? "var(--accent)" : "var(--bg-light)", 
+                                color: meetsRequirements(invItem) ? "var(--bg-dark)" : "var(--text-secondary)",
+                                opacity: meetsRequirements(invItem) ? 1 : 0.5,
+                                cursor: meetsRequirements(invItem) ? "pointer" : "not-allowed"
+                              }}
                               onClick={() => handleLearnAbility(invItem.id, invItem.name)}
+                              disabled={!meetsRequirements(invItem)}
                             >
-                              Learn
+                              {meetsRequirements(invItem) ? "Learn" : "Can't Learn"}
                             </button>
                           </Show>
                           <Show when={invItem.type === 'consumable' && (invItem.health_restore || invItem.mana_restore)}>

@@ -638,12 +638,12 @@ export async function getInventory(characterId: number): Promise<Array<Inventory
     sql: `SELECT 
       character_inventory.*, 
       items.*,
-      abilities.required_level,
-      abilities.required_strength,
-      abilities.required_dexterity,
-      abilities.required_intelligence,
-      abilities.required_wisdom,
-      abilities.required_charisma
+      abilities.required_level as ability_required_level,
+      abilities.required_strength as ability_required_strength,
+      abilities.required_dexterity as ability_required_dexterity,
+      abilities.required_intelligence as ability_required_intelligence,
+      abilities.required_wisdom as ability_required_wisdom,
+      abilities.required_charisma as ability_required_charisma
       FROM character_inventory 
       JOIN items ON character_inventory.item_id = items.id 
       LEFT JOIN abilities ON items.teaches_ability_id = abilities.id
@@ -652,7 +652,18 @@ export async function getInventory(characterId: number): Promise<Array<Inventory
     args: [characterId],
   });
 
-  return result.rows as any[];
+  // Map the ability_ prefixed columns back to required_ for consistency
+  const rows = result.rows.map((row: any) => ({
+    ...row,
+    required_level: row.ability_required_level || row.required_level,
+    required_strength: row.ability_required_strength || row.required_strength,
+    required_dexterity: row.ability_required_dexterity || row.required_dexterity,
+    required_intelligence: row.ability_required_intelligence || row.required_intelligence,
+    required_wisdom: row.ability_required_wisdom || row.required_wisdom,
+    required_charisma: row.ability_required_charisma || row.required_charisma,
+  }));
+
+  return rows as any[];
 }
 
 export async function addItemToInventory(characterId: number, itemId: number, quantity: number = 1): Promise<void> {
