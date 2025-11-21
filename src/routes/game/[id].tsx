@@ -2813,30 +2813,49 @@ export default function GamePage() {
                 >
                   {/* Fixed Header */}
                   <div style={{ 
-                    display: "flex", 
-                    "justify-content": "space-between", 
-                    "align-items": "center",
+                    position: "relative",
                     padding: "1.5rem",
                     "padding-bottom": "1rem",
                     "border-bottom": "2px solid var(--bg-light)",
                     "flex-shrink": 0,
                     background: "var(--bg-dark)"
                   }}>
-                    <h2 style={{ margin: 0 }}>Travel to a Region</h2>
+                    {/* Close button in top right corner */}
                     <button
-                      class="button secondary"
                       style={{
-                        "min-width": "auto",
-                        padding: "0.5rem 1rem",
-                        "margin-left": "1rem",
+                        position: "absolute",
+                        top: "0.75rem",
+                        right: "0.75rem",
+                        width: "32px",
+                        height: "32px",
+                        "border-radius": "50%",
+                        background: "var(--bg-light)",
+                        border: "1px solid var(--text-secondary)",
+                        color: "var(--text)",
+                        display: "flex",
+                        "align-items": "center",
+                        "justify-content": "center",
+                        cursor: "pointer",
                         "font-size": "1.25rem",
                         "line-height": "1",
-                        "flex-shrink": 0
+                        padding: "0",
+                        transition: "all 0.2s ease"
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "var(--danger)";
+                        e.currentTarget.style.borderColor = "var(--danger)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "var(--bg-light)";
+                        e.currentTarget.style.borderColor = "var(--text-secondary)";
                       }}
                       onClick={() => setShowTravelModal(false)}
                     >
                       ✕
                     </button>
+                    
+                    {/* Title spans full width */}
+                    <h2 style={{ margin: 0, "padding-right": "2.5rem" }}>Travel to a Region</h2>
                   </div>
 
                   {/* Scrollable Content */}
@@ -3377,16 +3396,53 @@ export default function GamePage() {
                   >
                     {/* Fixed Header */}
                     <div style={{ 
-                      display: "flex", 
-                      "justify-content": "space-between", 
-                      "align-items": "start",
+                      position: "relative",
                       padding: "1.5rem",
                       "padding-bottom": "1rem",
                       "border-bottom": "2px solid var(--bg-light)",
                       "flex-shrink": 0,
                       background: "var(--bg-dark)"
                     }}>
-                      <div style={{ flex: "1" }}>
+                      {/* Close button in top right corner */}
+                      <button
+                        style={{
+                          position: "absolute",
+                          top: "0.75rem",
+                          right: "0.75rem",
+                          width: "32px",
+                          height: "32px",
+                          "border-radius": "50%",
+                          background: "var(--bg-light)",
+                          border: "1px solid var(--text-secondary)",
+                          color: "var(--text)",
+                          display: "flex",
+                          "align-items": "center",
+                          "justify-content": "center",
+                          cursor: "pointer",
+                          "font-size": "1.25rem",
+                          "line-height": "1",
+                          padding: "0",
+                          transition: "all 0.2s ease"
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = "var(--danger)";
+                          e.currentTarget.style.borderColor = "var(--danger)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "var(--bg-light)";
+                          e.currentTarget.style.borderColor = "var(--text-secondary)";
+                        }}
+                        onClick={() => {
+                          setShowMerchantModal(false);
+                          setActiveMerchant(null);
+                          setMerchantInventory([]);
+                        }}
+                      >
+                        ✕
+                      </button>
+                      
+                      {/* Content spans full width */}
+                      <div style={{ "padding-right": "2.5rem" }}>
                         <h2 style={{ 
                           color: "var(--warning)", 
                           "font-size": "1.75rem",
@@ -3394,7 +3450,11 @@ export default function GamePage() {
                         }}>
                           {merchant().name}
                         </h2>
-                        <p style={{ color: "var(--text-secondary)", margin: 0 }}>
+                        <p style={{ 
+                          color: "var(--text-secondary)", 
+                          margin: 0,
+                          "font-size": "0.875rem"
+                        }}>
                           {merchant().description}
                         </p>
                         <Show when={merchantDiscountPercent() > 0}>
@@ -3419,24 +3479,6 @@ export default function GamePage() {
                           💰 {currentGold()} Gold
                         </div>
                       </div>
-                      <button
-                        class="button secondary"
-                        style={{
-                          "min-width": "auto",
-                          padding: "0.5rem 1rem",
-                          "margin-left": "1rem",
-                          "font-size": "1.25rem",
-                          "line-height": "1",
-                          "flex-shrink": 0
-                        }}
-                        onClick={() => {
-                          setShowMerchantModal(false);
-                          setActiveMerchant(null);
-                          setMerchantInventory([]);
-                        }}
-                      >
-                        ✕
-                      </button>
                     </div>
 
                     {/* Scrollable Content */}
