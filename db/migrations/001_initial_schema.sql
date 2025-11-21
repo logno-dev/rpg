@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS items (
     damage_min INTEGER DEFAULT 0,
     damage_max INTEGER DEFAULT 0,
     armor INTEGER DEFAULT 0,
+    attack_speed REAL DEFAULT 1.0, -- attacks per second (base 1.0)
     
     -- Other properties
     value INTEGER DEFAULT 0,
@@ -91,6 +92,7 @@ CREATE TABLE IF NOT EXISTS mobs (
     damage_min INTEGER NOT NULL,
     damage_max INTEGER NOT NULL,
     defense INTEGER DEFAULT 0,
+    attack_speed REAL DEFAULT 1.0, -- attacks per second
     
     -- Rewards
     experience_reward INTEGER NOT NULL,

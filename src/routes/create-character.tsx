@@ -1,37 +1,6 @@
 import { createSignal, Show } from "solid-js";
-import { useNavigate } from "@solidjs/router";
-import { action, redirect, createAsync } from "@solidjs/router";
+import { useNavigate, redirect, createAsync } from "@solidjs/router";
 import { getUser } from "~/lib/auth";
-import { createCharacter } from "~/lib/game";
-
-const createCharacterAction = action(async (formData: FormData) => {
-  "use server";
-  const user = await getUser();
-  if (!user) throw redirect("/");
-
-  const name = formData.get("name") as string;
-  const strength = parseInt(formData.get("strength") as string);
-  const dexterity = parseInt(formData.get("dexterity") as string);
-  const constitution = parseInt(formData.get("constitution") as string);
-  const intelligence = parseInt(formData.get("intelligence") as string);
-  const wisdom = parseInt(formData.get("wisdom") as string);
-  const charisma = parseInt(formData.get("charisma") as string);
-
-  try {
-    const character = await createCharacter(user.id, name, {
-      strength,
-      dexterity,
-      constitution,
-      intelligence,
-      wisdom,
-      charisma,
-    });
-
-    return redirect(`/game/${character.id}`);
-  } catch (error: any) {
-    return { error: error.message };
-  }
-});
 
 async function checkAuth() {
   "use server";
@@ -55,6 +24,7 @@ export default function CreateCharacter() {
   const [wisdom, setWisdom] = createSignal(BASE_STATS);
   const [charisma, setCharisma] = createSignal(BASE_STATS);
   const [error, setError] = createSignal("");
+  const [loading, setLoading] = createSignal(false);
 
   const pointsUsed = () =>
     strength() +
@@ -79,16 +49,36 @@ export default function CreateCharacter() {
       return;
     }
 
-    const form = e.target as HTMLFormElement;
-    const formData = new FormData(form);
+    setLoading(true);
 
     try {
-      const result = await createCharacterAction(formData);
-      if (result?.error) {
-        setError(result.error);
+      const response = await fetch('/api/character/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: name(),
+          strength: strength(),
+          dexterity: dexterity(),
+          constitution: constitution(),
+          intelligence: intelligence(),
+          wisdom: wisdom(),
+          charisma: charisma(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'An error occurred');
+      } else {
+        navigate(`/game/${data.characterId}`);
       }
     } catch (err: any) {
       setError(err.message || "An error occurred");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -121,6 +111,7 @@ export default function CreateCharacter() {
                 placeholder="Enter character name"
                 minLength={3}
                 maxLength={20}
+                disabled={loading()}
               />
             </div>
 
@@ -147,7 +138,7 @@ export default function CreateCharacter() {
                       type="button"
                       class="button secondary"
                       onClick={() => setStrength(Math.max(5, strength() - 1))}
-                      disabled={!canDecrease(strength())}
+                      disabled={!canDecrease(strength()) || loading()}
                       style={{ padding: "0.5rem 1rem" }}
                     >
                       -
@@ -159,14 +150,13 @@ export default function CreateCharacter() {
                       type="button"
                       class="button secondary"
                       onClick={() => setStrength(Math.min(25, strength() + 1))}
-                      disabled={!canIncrease(strength())}
+                      disabled={!canIncrease(strength()) || loading()}
                       style={{ padding: "0.5rem 1rem" }}
                     >
                       +
                     </button>
                   </div>
                 </div>
-                <input type="hidden" name="strength" value={strength()} />
               </div>
 
               {/* Dexterity */}
@@ -180,7 +170,7 @@ export default function CreateCharacter() {
                       type="button"
                       class="button secondary"
                       onClick={() => setDexterity(Math.max(5, dexterity() - 1))}
-                      disabled={!canDecrease(dexterity())}
+                      disabled={!canDecrease(dexterity()) || loading()}
                       style={{ padding: "0.5rem 1rem" }}
                     >
                       -
@@ -192,14 +182,13 @@ export default function CreateCharacter() {
                       type="button"
                       class="button secondary"
                       onClick={() => setDexterity(Math.min(25, dexterity() + 1))}
-                      disabled={!canIncrease(dexterity())}
+                      disabled={!canIncrease(dexterity()) || loading()}
                       style={{ padding: "0.5rem 1rem" }}
                     >
                       +
                     </button>
                   </div>
                 </div>
-                <input type="hidden" name="dexterity" value={dexterity()} />
               </div>
 
               {/* Constitution */}
@@ -213,7 +202,7 @@ export default function CreateCharacter() {
                       type="button"
                       class="button secondary"
                       onClick={() => setConstitution(Math.max(5, constitution() - 1))}
-                      disabled={!canDecrease(constitution())}
+                      disabled={!canDecrease(constitution()) || loading()}
                       style={{ padding: "0.5rem 1rem" }}
                     >
                       -
@@ -225,14 +214,13 @@ export default function CreateCharacter() {
                       type="button"
                       class="button secondary"
                       onClick={() => setConstitution(Math.min(25, constitution() + 1))}
-                      disabled={!canIncrease(constitution())}
+                      disabled={!canIncrease(constitution()) || loading()}
                       style={{ padding: "0.5rem 1rem" }}
                     >
                       +
                     </button>
                   </div>
                 </div>
-                <input type="hidden" name="constitution" value={constitution()} />
               </div>
 
               {/* Intelligence */}
@@ -246,7 +234,7 @@ export default function CreateCharacter() {
                       type="button"
                       class="button secondary"
                       onClick={() => setIntelligence(Math.max(5, intelligence() - 1))}
-                      disabled={!canDecrease(intelligence())}
+                      disabled={!canDecrease(intelligence()) || loading()}
                       style={{ padding: "0.5rem 1rem" }}
                     >
                       -
@@ -258,14 +246,13 @@ export default function CreateCharacter() {
                       type="button"
                       class="button secondary"
                       onClick={() => setIntelligence(Math.min(25, intelligence() + 1))}
-                      disabled={!canIncrease(intelligence())}
+                      disabled={!canIncrease(intelligence()) || loading()}
                       style={{ padding: "0.5rem 1rem" }}
                     >
                       +
                     </button>
                   </div>
                 </div>
-                <input type="hidden" name="intelligence" value={intelligence()} />
               </div>
 
               {/* Wisdom */}
@@ -279,7 +266,7 @@ export default function CreateCharacter() {
                       type="button"
                       class="button secondary"
                       onClick={() => setWisdom(Math.max(5, wisdom() - 1))}
-                      disabled={!canDecrease(wisdom())}
+                      disabled={!canDecrease(wisdom()) || loading()}
                       style={{ padding: "0.5rem 1rem" }}
                     >
                       -
@@ -291,14 +278,13 @@ export default function CreateCharacter() {
                       type="button"
                       class="button secondary"
                       onClick={() => setWisdom(Math.min(25, wisdom() + 1))}
-                      disabled={!canIncrease(wisdom())}
+                      disabled={!canIncrease(wisdom()) || loading()}
                       style={{ padding: "0.5rem 1rem" }}
                     >
                       +
                     </button>
                   </div>
                 </div>
-                <input type="hidden" name="wisdom" value={wisdom()} />
               </div>
 
               {/* Charisma */}
@@ -312,7 +298,7 @@ export default function CreateCharacter() {
                       type="button"
                       class="button secondary"
                       onClick={() => setCharisma(Math.max(5, charisma() - 1))}
-                      disabled={!canDecrease(charisma())}
+                      disabled={!canDecrease(charisma()) || loading()}
                       style={{ padding: "0.5rem 1rem" }}
                     >
                       -
@@ -324,14 +310,13 @@ export default function CreateCharacter() {
                       type="button"
                       class="button secondary"
                       onClick={() => setCharisma(Math.min(25, charisma() + 1))}
-                      disabled={!canIncrease(charisma())}
+                      disabled={!canIncrease(charisma()) || loading()}
                       style={{ padding: "0.5rem 1rem" }}
                     >
                       +
                     </button>
                   </div>
                 </div>
-                <input type="hidden" name="charisma" value={charisma()} />
               </div>
             </div>
 
@@ -339,9 +324,9 @@ export default function CreateCharacter() {
               type="submit"
               class="button"
               style={{ width: "100%" }}
-              disabled={pointsRemaining() !== 0 || !name()}
+              disabled={pointsRemaining() !== 0 || !name() || loading()}
             >
-              Create Character
+              {loading() ? "Creating..." : "Create Character"}
             </button>
           </form>
         </div>

@@ -1,14 +1,8 @@
-import { createAsync, redirect, action } from "@solidjs/router";
+import { createAsync, redirect } from "@solidjs/router";
 import { For, Show } from "solid-js";
-import { getUser, logout } from "~/lib/auth";
+import { getUser } from "~/lib/auth";
 import { getCharactersByUser } from "~/lib/game";
 import { A, useNavigate } from "@solidjs/router";
-
-const logoutAction = action(async () => {
-  "use server";
-  await logout();
-  return redirect("/");
-});
 
 async function getUserCharacters() {
   "use server";
@@ -26,7 +20,12 @@ export default function CharacterSelect() {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
-    await logoutAction();
+    try {
+      await fetch('/api/logout', { method: 'POST' });
+      navigate('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   return (

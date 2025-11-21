@@ -1,56 +1,60 @@
 import { createSignal, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { action, redirect } from "@solidjs/router";
-import { login, register, getUser } from "~/lib/auth";
-
-const loginAction = action(async (formData: FormData) => {
-  "use server";
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-
-  try {
-    await login(email, password);
-    return redirect("/character-select");
-  } catch (error: any) {
-    return { error: error.message };
-  }
-});
-
-const registerAction = action(async (formData: FormData) => {
-  "use server";
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-
-  try {
-    await register(email, password);
-    return redirect("/character-select");
-  } catch (error: any) {
-    return { error: error.message };
-  }
-});
 
 export default function Home() {
   const [isRegister, setIsRegister] = createSignal(false);
   const [error, setError] = createSignal("");
+  const [loading, setLoading] = createSignal(false);
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: Event) => {
+  const handleSubmit = async (e: SubmitEvent) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
     const form = e.target as HTMLFormElement;
-    const formData = new FormData(form);
+    
+    // Read values directly from input elements (FormData doesn't work with SolidJS SSR)
+    const emailInput = form.querySelector('input[name="email"]') as HTMLInputElement;
+    const passwordInput = form.querySelector('input[name="password"]') as HTMLInputElement;
+    
+    const email = emailInput?.value || '';
+    const password = passwordInput?.value || '';
+
+    console.log('Email:', email);
+    console.log('Password length:', password?.length);
+
+    if (!email || !password) {
+      setError('Please enter email and password');
+      setLoading(false);
+      return;
+    }
 
     try {
-      const result = isRegister() 
-        ? await registerAction(formData)
-        : await loginAction(formData);
+      const payload = { email, password };
+      console.log('Sending payload to server...');
 
-      if (result?.error) {
-        setError(result.error);
+      const response = await fetch(isRegister() ? '/api/register' : '/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'An error occurred');
+      } else {
+        // Success - navigate to character select
+        navigate('/character-select');
       }
     } catch (err: any) {
+      console.error('Submit error:', err);
       setError(err.message || "An error occurred");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -78,6 +82,7 @@ export default function Home() {
                 name="email"
                 required
                 placeholder="your@email.com"
+                disabled={loading()}
               />
             </div>
 
@@ -89,11 +94,12 @@ export default function Home() {
                 required
                 placeholder="••••••••"
                 minLength={6}
+                disabled={loading()}
               />
             </div>
 
-            <button type="submit" class="button" style={{ width: "100%" }}>
-              {isRegister() ? "Register" : "Login"}
+            <button type="submit" class="button" style={{ width: "100%" }} disabled={loading()}>
+              {loading() ? "Loading..." : isRegister() ? "Register" : "Login"}
             </button>
           </form>
 
@@ -102,6 +108,8 @@ export default function Home() {
               class="button secondary"
               onClick={() => setIsRegister(!isRegister())}
               style={{ width: "100%" }}
+              disabled={loading()}
+              type="button"
             >
               {isRegister()
                 ? "Already have an account? Login"

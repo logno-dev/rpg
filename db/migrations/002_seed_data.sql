@@ -1,10 +1,10 @@
 -- Seed basic items
-INSERT INTO items (name, description, type, slot, rarity, damage_min, damage_max, value) VALUES
-('Rusty Sword', 'A worn sword, barely holding together', 'weapon', 'weapon', 'common', 3, 7, 10),
-('Iron Sword', 'A reliable iron blade', 'weapon', 'weapon', 'common', 8, 15, 50),
-('Steel Sword', 'A well-crafted steel weapon', 'weapon', 'weapon', 'uncommon', 15, 25, 150),
-('Wooden Staff', 'A simple wooden staff', 'weapon', 'weapon', 'common', 2, 5, 15),
-('Mage Staff', 'A staff imbued with magic', 'weapon', 'weapon', 'uncommon', 5, 10, 100);
+INSERT INTO items (name, description, type, slot, rarity, damage_min, damage_max, attack_speed, value) VALUES
+('Rusty Sword', 'A worn sword, barely holding together', 'weapon', 'weapon', 'common', 3, 7, 1.0, 10),
+('Iron Sword', 'A reliable iron blade', 'weapon', 'weapon', 'common', 8, 15, 1.2, 50),
+('Steel Sword', 'A well-crafted steel weapon', 'weapon', 'weapon', 'uncommon', 15, 25, 1.1, 150),
+('Wooden Staff', 'A simple wooden staff', 'weapon', 'weapon', 'common', 2, 5, 0.8, 15),
+('Mage Staff', 'A staff imbued with magic', 'weapon', 'weapon', 'uncommon', 5, 10, 0.9, 100);
 
 INSERT INTO items (name, description, type, slot, rarity, armor, constitution_bonus, value) VALUES
 ('Cloth Armor', 'Basic cloth protection', 'armor', 'chest', 'common', 2, 1, 20),
@@ -23,15 +23,15 @@ INSERT INTO items (name, description, type, slot, rarity, stackable, value) VALU
 ('Bread', 'Restores 20 health', 'consumable', null, 'common', 1, 5);
 
 -- Seed basic mobs
-INSERT INTO mobs (name, level, area, max_health, damage_min, damage_max, defense, experience_reward, gold_min, gold_max, aggressive) VALUES
-('Giant Rat', 1, 'plains', 25, 2, 5, 0, 10, 1, 5, 1),
-('Goblin', 2, 'forest', 40, 4, 8, 1, 20, 3, 10, 1),
-('Wolf', 3, 'forest', 60, 6, 12, 2, 35, 5, 15, 1),
-('Skeleton', 4, 'dungeon', 80, 8, 15, 3, 50, 8, 20, 1),
-('Orc', 5, 'mountains', 120, 12, 20, 5, 75, 15, 35, 1),
-('Wild Boar', 2, 'plains', 50, 5, 10, 2, 25, 4, 12, 0),
-('Forest Spider', 3, 'forest', 45, 7, 13, 1, 40, 6, 18, 1),
-('Cave Troll', 6, 'dungeon', 200, 15, 30, 8, 120, 25, 60, 1);
+INSERT INTO mobs (name, level, area, max_health, damage_min, damage_max, defense, attack_speed, experience_reward, gold_min, gold_max, aggressive) VALUES
+('Giant Rat', 1, 'plains', 25, 2, 5, 0, 1.4, 10, 1, 5, 1),
+('Goblin', 2, 'forest', 40, 4, 8, 1, 1.1, 20, 3, 10, 1),
+('Wolf', 3, 'forest', 60, 6, 12, 2, 1.3, 35, 5, 15, 1),
+('Skeleton', 4, 'dungeon', 80, 8, 15, 3, 0.9, 50, 8, 20, 1),
+('Orc', 5, 'mountains', 120, 12, 20, 5, 0.8, 75, 15, 35, 1),
+('Wild Boar', 2, 'plains', 50, 5, 10, 2, 1.0, 25, 4, 12, 0),
+('Forest Spider', 3, 'forest', 45, 7, 13, 1, 1.5, 40, 6, 18, 1),
+('Cave Troll', 6, 'dungeon', 200, 15, 30, 8, 0.7, 120, 25, 60, 1);
 
 -- Seed mob loot drops
 -- Giant Rat drops
