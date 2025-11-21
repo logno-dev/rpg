@@ -2328,8 +2328,18 @@ export default function GamePage() {
                   !i.teaches_ability_id
                 )}
                 onHotbarChange={async () => {
-                  console.log('[Game] Hotbar changed, refetching data...');
-                  await refetchData();
+                  console.log('[Game] Hotbar changed, updating context...');
+                  // Fetch updated hotbar
+                  try {
+                    const response = await fetch(`/api/game/get-hotbar?characterId=${characterId()}`);
+                    const result = await response.json();
+                    if (result.hotbar) {
+                      actions.setHotbar(result.hotbar);
+                      console.log('[Game] Hotbar updated in context');
+                    }
+                  } catch (error) {
+                    console.error('[Game] Failed to update hotbar:', error);
+                  }
                 }}
               />
             </Show>
