@@ -754,11 +754,17 @@ export default function GamePage() {
       
       console.log('[LEARN ABILITY] Learned:', result.ability.name);
       
-      // Use server-confirmed data
+      // Use server-confirmed inventory data immediately
       setOptimisticInventory(result.inventory);
+      actions.setInventory(result.inventory);
       
-      // Refetch to get updated abilities
-      await refetchData();
+      // Add the newly learned ability directly to context
+      actions.addAbility({
+        ...result.ability,
+        last_used_at: 0,
+      });
+      
+      console.log('[LEARN ABILITY] Ability added to context');
       
       // Show success modal
       setLearnAbilityData({
