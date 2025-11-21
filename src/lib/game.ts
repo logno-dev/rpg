@@ -635,9 +635,18 @@ export async function getActiveCombat(characterId: number): Promise<CombatSessio
 // Inventory Management
 export async function getInventory(characterId: number): Promise<Array<InventoryItem & { item: Item }>> {
   const result = await db.execute({
-    sql: `SELECT character_inventory.*, items.* 
+    sql: `SELECT 
+      character_inventory.*, 
+      items.*,
+      abilities.required_level,
+      abilities.required_strength,
+      abilities.required_dexterity,
+      abilities.required_intelligence,
+      abilities.required_wisdom,
+      abilities.required_charisma
       FROM character_inventory 
       JOIN items ON character_inventory.item_id = items.id 
+      LEFT JOIN abilities ON items.teaches_ability_id = abilities.id
       WHERE character_inventory.character_id = ?
       ORDER BY items.type, items.name`,
     args: [characterId],

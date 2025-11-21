@@ -3072,7 +3072,7 @@ export default function GamePage() {
                     "align-items": "center", 
                     "justify-content": "center",
                     "z-index": 1000,
-                    padding: "1rem",
+                    padding: "3rem 1rem",
                     overflow: "auto"
                   }}
                   onClick={() => {
@@ -3089,8 +3089,9 @@ export default function GamePage() {
                       background: "var(--bg-dark)",
                       border: "2px solid var(--warning)",
                       "box-shadow": "0 0 30px rgba(251, 191, 36, 0.3)",
-                      "max-height": "90vh",
-                      "overflow-y": "auto"
+                      "max-height": "calc(100vh - 6rem)",
+                      "overflow-y": "auto",
+                      margin: "auto"
                     }}
                     onClick={(e) => e.stopPropagation()}
                   >
