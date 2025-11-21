@@ -335,7 +335,18 @@ export default function GamePage() {
   const totalStats = createMemo(() => {
     const char = currentCharacter();
     const bonuses = equipmentBonuses();
-    if (!char) return bonuses;
+    
+    // Return default values if character or bonuses not loaded yet
+    if (!char || !bonuses) {
+      return {
+        strength: 10,
+        dexterity: 10,
+        constitution: 10,
+        intelligence: 10,
+        wisdom: 10,
+        charisma: 10,
+      };
+    }
     
     // Include active effect bonuses
     const conBonus = effectsActions.getTotalStatBonus('constitution');
