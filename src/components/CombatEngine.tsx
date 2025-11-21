@@ -124,6 +124,14 @@ export function CombatEngine(props: CombatEngineProps) {
   const [activeHots, setActiveHots] = createSignal<ActiveEffect[]>([]);
   const [activeDebuffs, setActiveDebuffs] = createSignal<ActiveEffect[]>([]);
   
+  // Track Thorns effect (damage reflection)
+  const [thornsEffect, setThornsEffect] = createSignal<{
+    name: string;
+    reflectPercent: number;
+    duration: number;
+    expiresAt: number;
+  } | null>(null);
+  
   // Flag to prevent sync loops when we update health internally
   let isInternalHealthUpdate = false;
   
@@ -323,6 +331,18 @@ export function CombatEngine(props: CombatEngineProps) {
             } else if (activeEffect.effect_type === 'debuff') {
               setActiveDebuffs(EffectProcessor.addOrStackEffect(activeDebuffs(), activeEffect));
               newLog.push(`${ability.name}: Debuff applied!`);
+            } else if (activeEffect.effect_type === 'shield') {
+              // Thorns/Shield effect - check for damage reflection
+              // Thorns abilities should have stat_affected = 'thorns' and amount = reflect %
+              if (activeEffect.stat_affected === 'thorns' && activeEffect.amount) {
+                setThornsEffect({
+                  name: ability.name,
+                  reflectPercent: activeEffect.amount,
+                  duration: activeEffect.duration,
+                  expiresAt: Date.now() + (activeEffect.duration * 1000),
+                });
+                newLog.push(`${ability.name}: Reflecting ${activeEffect.amount}% damage for ${activeEffect.duration}s!`);
+              }
             }
           }
         });
@@ -597,6 +617,29 @@ export function CombatEngine(props: CombatEngineProps) {
           newState.log = [...newState.log, `${props.mob.name} attacks for ${damage} damage!`];
           newState.mobTicks = 0;
           newState.mobAttackTicks = nextAttackTicks;
+          
+          // Check for Thorns effect (damage reflection)
+          const currentThorns = thornsEffect();
+          if (currentThorns && Date.now() < currentThorns.expiresAt) {
+            const reflectedDamage = Math.floor(damage * (currentThorns.reflectPercent / 100));
+            if (reflectedDamage > 0) {
+              newState.mobHealth = Math.max(0, newState.mobHealth - reflectedDamage);
+              newState.log = [...newState.log, `⚡ ${currentThorns.name} reflects ${reflectedDamage} damage!`];
+              
+              // Check if mob died from reflected damage
+              if (newState.mobHealth <= 0) {
+                newState.isActive = false;
+                newState.result = 'victory';
+                newState.log = [...newState.log, `Victory! ${props.mob.name} was defeated by reflected damage!`];
+                setTimeout(() => props.onCombatEnd('victory', newState), 0);
+                clearInterval(intervalId);
+                return newState;
+              }
+            }
+          } else if (currentThorns && Date.now() >= currentThorns.expiresAt) {
+            // Thorns expired, clear it
+            setThornsEffect(null);
+          }
 
           // Update parent component with new health (preserve current mana)
           props.onHealthChange(newCharHealth, currentMana());
@@ -704,6 +747,45 @@ export function CombatEngine(props: CombatEngineProps) {
           </div>
         </Show>
       </div>
+      
+      {/* Active Thorns Effect on Character */}
+      <Show when={thornsEffect() && Date.now() < thornsEffect()!.expiresAt}>
+        {(effect) => (
+          <div style={{ 
+            "margin-bottom": "1rem",
+            padding: "0.75rem",
+            background: "rgba(96, 165, 250, 0.1)",
+            border: "2px solid var(--accent)",
+            "border-radius": "6px"
+          }}>
+            <div style={{ 
+              display: "flex", 
+              "justify-content": "space-between", 
+              "align-items": "center" 
+            }}>
+              <span style={{ 
+                "font-weight": "bold",
+                color: "var(--accent)"
+              }}>
+                ⚡ {effect().name}
+              </span>
+              <span style={{ 
+                "font-size": "0.875rem",
+                color: "var(--text-secondary)"
+              }}>
+                Reflecting {effect().reflectPercent}% damage
+              </span>
+            </div>
+            <div style={{ 
+              "margin-top": "0.25rem",
+              "font-size": "0.75rem",
+              color: "var(--text-secondary)"
+            }}>
+              {Math.ceil((effect().expiresAt - Date.now()) / 1000)}s remaining
+            </div>
+          </div>
+        )}
+      </Show>
 
       {/* Attack Timers */}
       <Show when={state().isActive}>

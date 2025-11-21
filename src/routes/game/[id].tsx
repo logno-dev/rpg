@@ -91,6 +91,16 @@ export default function GamePage() {
   } | null>(null);
   const [sellQuantity, setSellQuantity] = createSignal(1);
   
+  // Drop confirmation modal state
+  const [showDropModal, setShowDropModal] = createSignal(false);
+  const [dropItemData, setDropItemData] = createSignal<{
+    inventoryItemId: number;
+    itemName: string;
+    quantity: number;
+    maxQuantity: number;
+  } | null>(null);
+  const [dropQuantity, setDropQuantity] = createSignal(1);
+  
   // Learn ability modal state
   const [showLearnModal, setShowLearnModal] = createSignal(false);
   const [learnAbilityData, setLearnAbilityData] = createSignal<{
@@ -435,6 +445,16 @@ export default function GamePage() {
       // Update CharacterContext immediately
       if (result.character) {
         actions.setCharacter(result.character);
+      }
+      
+      // Update current region immediately
+      if (result.region) {
+        actions.setCurrentRegion(result.region);
+      }
+      
+      // Update regions list if provided (in case one was unlocked)
+      if (result.regions) {
+        actions.setRegions(result.regions);
       }
       
       // Clear any active encounters
@@ -791,6 +811,12 @@ export default function GamePage() {
     setSellQuantity(quantity); // Default to selling all
     setShowSellModal(true);
   };
+  
+  const handleDropClick = (inventoryItemId: number, itemName: string, quantity: number) => {
+    setDropItemData({ inventoryItemId, itemName, quantity, maxQuantity: quantity });
+    setDropQuantity(quantity); // Default to dropping all
+    setShowDropModal(true);
+  };
 
   const handleSellConfirm = async () => {
     const sellData = sellItemData();
@@ -852,6 +878,62 @@ export default function GamePage() {
       alert('Failed to sell item: ' + error.message);
       setOptimisticInventory(null);
       setOptimisticGold(null);
+    }
+  };
+  
+  const handleDropConfirm = async () => {
+    const dropData = dropItemData();
+    if (!dropData) return;
+    
+    const quantityToDrop = dropQuantity();
+    setShowDropModal(false);
+    
+    try {
+      console.log('[DROP] Dropping item:', dropData.itemName, 'quantity:', quantityToDrop);
+      
+      // Optimistically update inventory
+      const baseInventory = currentInventory();
+      const newInventory = baseInventory
+        .map((i: any) => {
+          if (i.id === dropData.inventoryItemId) {
+            const remainingQty = i.quantity - quantityToDrop;
+            if (remainingQty <= 0) return null; // Will be filtered out
+            return { ...i, quantity: remainingQty };
+          }
+          return i;
+        })
+        .filter(Boolean); // Remove nulls
+      setOptimisticInventory(newInventory);
+      
+      const response = await fetch('/api/game/drop-item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          characterId: characterId(), 
+          inventoryItemId: dropData.inventoryItemId, 
+          quantity: quantityToDrop 
+        }),
+      });
+      
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || 'Failed to drop item');
+      }
+      
+      const result = await response.json();
+      
+      console.log('[DROP] Dropped', quantityToDrop, 'x', dropData.itemName);
+      
+      // Use server-confirmed inventory
+      setOptimisticInventory(result.inventory);
+      
+      setDropItemData(null);
+      setDropQuantity(1);
+      
+    } catch (error: any) {
+      console.error('[DROP] Error:', error);
+      alert('Failed to drop item: ' + error.message);
+      setOptimisticInventory(null);
     }
   };
 
@@ -2178,6 +2260,15 @@ export default function GamePage() {
                               Sell ({Math.floor(invItem.value * 0.4) * invItem.quantity}g)
                             </button>
                           </Show>
+                          <Show when={!invItem.value || invItem.value === 0}>
+                            <button
+                              class="button danger"
+                              style={{ flex: 1, "min-width": "100px" }}
+                              onClick={() => handleDropClick(invItem.id, invItem.name, invItem.quantity)}
+                            >
+                              Drop
+                            </button>
+                          </Show>
                         </div>
                       </div>
                     )}
@@ -2704,7 +2795,7 @@ export default function GamePage() {
                   "align-items": "center", 
                   "justify-content": "center",
                   "z-index": 1000,
-                  padding: "1rem"
+                  padding: "3rem 1rem"
                 }}
                 onClick={() => setShowTravelModal(false)}
               >
@@ -2713,12 +2804,47 @@ export default function GamePage() {
                   style={{ 
                     "max-width": "600px",
                     width: "100%",
-                    "max-height": "80vh",
-                    "overflow-y": "auto"
+                    "max-height": "calc(100vh - 6rem)",
+                    display: "flex",
+                    "flex-direction": "column",
+                    overflow: "hidden"
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <h2 style={{ "margin-bottom": "1rem" }}>Travel to a Region</h2>
+                  {/* Fixed Header */}
+                  <div style={{ 
+                    display: "flex", 
+                    "justify-content": "space-between", 
+                    "align-items": "center",
+                    padding: "1.5rem",
+                    "padding-bottom": "1rem",
+                    "border-bottom": "2px solid var(--bg-light)",
+                    "flex-shrink": 0,
+                    background: "var(--bg-dark)"
+                  }}>
+                    <h2 style={{ margin: 0 }}>Travel to a Region</h2>
+                    <button
+                      class="button secondary"
+                      style={{
+                        "min-width": "auto",
+                        padding: "0.5rem 1rem",
+                        "margin-left": "1rem",
+                        "font-size": "1.25rem",
+                        "line-height": "1",
+                        "flex-shrink": 0
+                      }}
+                      onClick={() => setShowTravelModal(false)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Scrollable Content */}
+                  <div style={{ 
+                    "overflow-y": "auto",
+                    padding: "1.5rem",
+                    flex: "1"
+                  }}>
                   
                   <div style={{ display: "flex", "flex-direction": "column", gap: "1rem" }}>
                     <For each={data()!.regions}>
@@ -2832,14 +2958,7 @@ export default function GamePage() {
                       }}
                     </For>
                   </div>
-
-                  <button
-                    class="button secondary"
-                    onClick={() => setShowTravelModal(false)}
-                    style={{ width: "100%", "margin-top": "1rem" }}
-                  >
-                    Close
-                  </button>
+                  </div>
                 </div>
               </div>
             </Show>
@@ -2997,6 +3116,142 @@ export default function GamePage() {
               )}
             </Show>
 
+            {/* Drop Confirmation Modal */}
+            <Show when={showDropModal() && dropItemData()}>
+              {(data) => (
+                <div 
+                  style={{ 
+                    position: "fixed", 
+                    top: 0, 
+                    left: 0, 
+                    right: 0, 
+                    bottom: 0, 
+                    background: "rgba(0, 0, 0, 0.85)", 
+                    display: "flex", 
+                    "align-items": "center", 
+                    "justify-content": "center",
+                    "z-index": 1000,
+                    padding: "1rem"
+                  }}
+                  onClick={() => {
+                    setShowDropModal(false);
+                    setDropItemData(null);
+                  }}
+                >
+                  <div 
+                    class="card"
+                    style={{ 
+                      "max-width": "400px",
+                      width: "100%",
+                      background: "var(--bg-dark)",
+                      border: "2px solid var(--danger)",
+                      "box-shadow": "0 0 20px rgba(220, 38, 38, 0.3)"
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <h2 style={{ 
+                      color: "var(--danger)", 
+                      "text-align": "center",
+                      "font-size": "1.5rem",
+                      "margin-bottom": "1rem"
+                    }}>
+                      Drop Item?
+                    </h2>
+                    
+                    <div style={{ 
+                      "text-align": "center",
+                      "margin-bottom": "1.5rem"
+                    }}>
+                      <div style={{ 
+                        "font-size": "1.1rem",
+                        "font-weight": "bold",
+                        "margin-bottom": "0.5rem"
+                      }}>
+                        {data().itemName}
+                      </div>
+                      <div style={{ 
+                        "font-size": "0.875rem", 
+                        color: "var(--text-secondary)",
+                        "margin-bottom": "1rem"
+                      }}>
+                        {data().maxQuantity > 1 ? `Available: ${data().maxQuantity}` : 'This action cannot be undone'}
+                      </div>
+                      
+                      <Show when={data().maxQuantity > 1}>
+                        <div style={{
+                          display: "flex",
+                          "align-items": "center",
+                          "justify-content": "center",
+                          gap: "1rem",
+                          "margin-bottom": "1rem"
+                        }}>
+                          <button
+                            class="button secondary"
+                            onClick={() => setDropQuantity(Math.max(1, dropQuantity() - 1))}
+                            disabled={dropQuantity() <= 1}
+                            style={{ padding: "0.5rem 1rem", "font-size": "1.25rem" }}
+                          >
+                            −
+                          </button>
+                          <div style={{ 
+                            "font-size": "1.5rem",
+                            "font-weight": "bold",
+                            "min-width": "80px",
+                            "text-align": "center"
+                          }}>
+                            {dropQuantity()}
+                          </div>
+                          <button
+                            class="button secondary"
+                            onClick={() => setDropQuantity(Math.min(data().maxQuantity, dropQuantity() + 1))}
+                            disabled={dropQuantity() >= data().maxQuantity}
+                            style={{ padding: "0.5rem 1rem", "font-size": "1.25rem" }}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </Show>
+                      
+                      <div style={{
+                        padding: "1rem",
+                        background: "rgba(220, 38, 38, 0.1)",
+                        "border-radius": "6px",
+                        border: "1px solid var(--danger)"
+                      }}>
+                        <div style={{ 
+                          "font-size": "0.875rem", 
+                          color: "var(--danger)",
+                          "font-weight": "bold"
+                        }}>
+                          ⚠️ This item will be permanently destroyed
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "1rem" }}>
+                      <button
+                        class="button secondary"
+                        onClick={() => {
+                          setShowDropModal(false);
+                          setDropItemData(null);
+                        }}
+                        style={{ flex: 1 }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        class="button danger"
+                        onClick={handleDropConfirm}
+                        style={{ flex: 1 }}
+                      >
+                        Drop
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </Show>
+
             {/* Learn Ability Modal */}
             <Show when={showLearnModal() && learnAbilityData()}>
               {(data) => (
@@ -3096,8 +3351,7 @@ export default function GamePage() {
                     "align-items": "center", 
                     "justify-content": "center",
                     "z-index": 1000,
-                    padding: "3rem 1rem",
-                    overflow: "auto"
+                    padding: "3rem 1rem"
                   }}
                   onClick={() => {
                     setShowMerchantModal(false);
@@ -3114,18 +3368,23 @@ export default function GamePage() {
                       border: "2px solid var(--warning)",
                       "box-shadow": "0 0 30px rgba(251, 191, 36, 0.3)",
                       "max-height": "calc(100vh - 6rem)",
-                      "overflow-y": "auto",
-                      margin: "auto"
+                      margin: "auto",
+                      display: "flex",
+                      "flex-direction": "column",
+                      overflow: "hidden"
                     }}
                     onClick={(e) => e.stopPropagation()}
                   >
+                    {/* Fixed Header */}
                     <div style={{ 
                       display: "flex", 
                       "justify-content": "space-between", 
                       "align-items": "start",
-                      "margin-bottom": "1.5rem",
+                      padding: "1.5rem",
                       "padding-bottom": "1rem",
-                      "border-bottom": "2px solid var(--bg-light)"
+                      "border-bottom": "2px solid var(--bg-light)",
+                      "flex-shrink": 0,
+                      background: "var(--bg-dark)"
                     }}>
                       <div style={{ flex: "1" }}>
                         <h2 style={{ 
@@ -3161,13 +3420,14 @@ export default function GamePage() {
                         </div>
                       </div>
                       <button
-                        class="btn btn-secondary"
+                        class="button secondary"
                         style={{
                           "min-width": "auto",
                           padding: "0.5rem 1rem",
                           "margin-left": "1rem",
                           "font-size": "1.25rem",
-                          "line-height": "1"
+                          "line-height": "1",
+                          "flex-shrink": 0
                         }}
                         onClick={() => {
                           setShowMerchantModal(false);
@@ -3178,6 +3438,13 @@ export default function GamePage() {
                         ✕
                       </button>
                     </div>
+
+                    {/* Scrollable Content */}
+                    <div style={{ 
+                      "overflow-y": "auto",
+                      padding: "1.5rem",
+                      flex: "1"
+                    }}>
 
                     <div class="item-grid">
                       <For each={merchantInventory()}>
@@ -3306,18 +3573,7 @@ export default function GamePage() {
                         )}
                       </For>
                     </div>
-
-                    <button
-                      class="button secondary"
-                      onClick={() => {
-                        setShowMerchantModal(false);
-                        setActiveMerchant(null);
-                        setMerchantInventory([]);
-                      }}
-                      style={{ width: "100%", "margin-top": "1.5rem" }}
-                    >
-                      Close
-                    </button>
+                    </div>
                   </div>
                 </div>
               )}
