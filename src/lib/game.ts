@@ -13,8 +13,11 @@ function calculateMaxHealth(level: number, constitution: number): number {
   return baseHealth + levelBonus + constitutionBonus;
 }
 
-function calculateMaxMana(intelligence: number): number {
-  return 50 + (intelligence - 10) * 3;
+function calculateMaxMana(level: number, intelligence: number): number {
+  const baseMana = 50;
+  const levelBonus = level * 10; // +10 mana per level
+  const intelligenceBonus = (intelligence - 10) * 5; // +5 mana per INT point
+  return baseMana + levelBonus + intelligenceBonus;
 }
 
 // Get total stats including equipment bonuses
@@ -72,14 +75,11 @@ export async function createCharacter(
   }
 
   // Calculate derived stats using new formula
-  // Base + (Level × 20) + (CON - 10) × 8
+  // Health: Base + (Level × 20) + (CON - 10) × 8
+  // Mana: Base + (Level × 10) + (INT - 10) × 5
   // New characters start at level 1
-  const baseHealth = 100;
-  const levelBonus = 1 * 20; // Level 1
-  const constitutionBonus = (stats.constitution - 10) * 8;
-  const maxHealth = baseHealth + levelBonus + constitutionBonus;
-  
-  const maxMana = 50 + (stats.intelligence - 10) * 3;
+  const maxHealth = calculateMaxHealth(1, stats.constitution);
+  const maxMana = calculateMaxMana(1, stats.intelligence);
 
   const result = await db.execute({
     sql: `INSERT INTO characters 
@@ -200,8 +200,9 @@ export async function assignStatPoints(
 
   if (stats.intelligence) {
     const newIntelligence = character.intelligence + stats.intelligence;
-    const newBaseMaxMana = 50 + (newIntelligence - 10) * 3;
-    const manaIncrease = stats.intelligence * 3;
+    // New formula: Base + (Level × 10) + (INT - 10) × 5
+    const newBaseMaxMana = calculateMaxMana(character.level, newIntelligence);
+    const manaIncrease = stats.intelligence * 5; // +5 mana per INT point
     updates.push('max_mana = ?', 'current_mana = current_mana + ?');
     args.push(newBaseMaxMana, manaIncrease);
   }
@@ -496,14 +497,15 @@ export async function processCombatRound(
 
     if (newExp >= expNeeded) {
       // On level up, increase max_health and max_mana based on new level
-      // New formula: Base + (Level × 20) + (CON - 10) × 8
+      // Health: Base + (Level × 20) + (CON - 10) × 8
+      // Mana: Base + (Level × 10) + (INT - 10) × 5
       const newLevel = character.level + 1;
-      const newBaseMaxHealth = 100 + (newLevel * 20) + (character.constitution - 10) * 8;
-      const newBaseMaxMana = 50 + (character.intelligence - 10) * 3;
+      const newBaseMaxHealth = calculateMaxHealth(newLevel, character.constitution);
+      const newBaseMaxMana = calculateMaxMana(newLevel, character.intelligence);
       
-      // Give +20 HP and proportional mana increase on level up
-      const healthIncrease = 20; // From level bonus
-      const manaIncrease = 0; // Mana doesn't scale with level
+      // Give +20 HP and +10 mana per level
+      const healthIncrease = 20;
+      const manaIncrease = 10;
       
       await db.execute({
         sql: `UPDATE characters 
@@ -518,7 +520,7 @@ export async function processCombatRound(
         args: [POINTS_PER_LEVEL, newBaseMaxHealth, healthIncrease, newBaseMaxMana, manaIncrease, character.id],
       });
       log.push(`LEVEL UP! You are now level ${newLevel}! You have ${POINTS_PER_LEVEL} stat points to assign.`);
-      log.push(`Your maximum health increased by ${healthIncrease}!`);
+      log.push(`Your maximum health increased by ${healthIncrease} and mana by ${manaIncrease}!`);
     }
 
     // Roll for loot (only for regular mobs, not named mobs in dungeons)
@@ -805,7 +807,7 @@ export async function useItem(characterId: number, inventoryItemId: number): Pro
   
   // Calculate actual max health/mana using the new formula WITH equipment bonuses
   const actualMaxHealth = calculateMaxHealth(character.level, totalStats.constitution);
-  const actualMaxMana = calculateMaxMana(totalStats.intelligence);
+  const actualMaxMana = calculateMaxMana(character.level, totalStats.intelligence);
   
   // Calculate new health and mana values (capped at actual max)
   const newHealth = Math.min(actualMaxHealth, character.current_health + (invItem.health_restore || 0));

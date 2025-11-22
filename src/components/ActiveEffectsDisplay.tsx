@@ -1,7 +1,12 @@
 import { For, Show, createSignal, onMount, onCleanup } from "solid-js";
 import { useActiveEffects } from "~/lib/ActiveEffectsContext";
+import type { ActiveEffect } from "~/lib/db";
 
-export function ActiveEffectsDisplay() {
+type ActiveEffectsDisplayProps = {
+  combatHots?: ActiveEffect[];
+};
+
+export function ActiveEffectsDisplay(props: ActiveEffectsDisplayProps = {}) {
   const [effectsStore] = useActiveEffects();
   const [currentTime, setCurrentTime] = createSignal(Date.now());
 
@@ -32,7 +37,7 @@ export function ActiveEffectsDisplay() {
         "align-items": "flex-start"
       }}>
         <Show 
-          when={effectsStore.effects.length > 0}
+          when={effectsStore.effects.length > 0 || (props.combatHots && props.combatHots.length > 0)}
           fallback={
             <div style={{ 
               color: "var(--text-secondary)", 
@@ -45,6 +50,7 @@ export function ActiveEffectsDisplay() {
             </div>
           }
         >
+          {/* Stat Buffs */}
           <For each={effectsStore.effects}>
             {(effect) => {
               const timeRemaining = () => Math.max(0, Math.ceil((effect.expiresAt - currentTime()) / 1000));
@@ -81,7 +87,56 @@ export function ActiveEffectsDisplay() {
                   <div style={{ position: "relative", "z-index": 1 }}>
                     <div>{effect.name}</div>
                     <div style={{ "font-size": "0.75rem", opacity: 0.9 }}>
-                      +{effect.amount} {effect.stat} · {timeRemaining()}s
+                      <Show when={effect.stat && effect.amount} fallback={
+                        <span>Active · {timeRemaining()}s</span>
+                      }>
+                        +{effect.amount} {effect.stat} · {timeRemaining()}s
+                      </Show>
+                    </div>
+                  </div>
+                </div>
+              );
+            }}
+          </For>
+          
+          {/* HOTs from Combat */}
+          <For each={props.combatHots || []}>
+            {(hot) => {
+              const timeRemaining = () => Math.max(0, Math.ceil((hot.expires_at - currentTime()) / 1000));
+              const progressPercent = () => ((hot.expires_at - currentTime()) / (hot.duration * 1000)) * 100;
+              
+              return (
+                <div
+                  style={{
+                    padding: "0.5rem 0.75rem",
+                    background: "var(--success)",
+                    color: "white",
+                    "border-radius": "6px",
+                    "font-size": "0.875rem",
+                    "font-weight": "bold",
+                    position: "relative",
+                    overflow: "hidden",
+                    "min-width": "120px",
+                  }}
+                >
+                  {/* Background progress bar */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      bottom: 0,
+                      width: `${progressPercent()}%`,
+                      background: "rgba(255, 255, 255, 0.2)",
+                      transition: "width 0.1s linear",
+                    }}
+                  />
+                  
+                  {/* Content */}
+                  <div style={{ position: "relative", "z-index": 1 }}>
+                    <div>💚 {hot.name}</div>
+                    <div style={{ "font-size": "0.75rem", opacity: 0.9 }}>
+                      {hot.ticks_remaining} heal{hot.ticks_remaining !== 1 ? 's' : ''} remaining · {timeRemaining()}s
                     </div>
                   </div>
                 </div>

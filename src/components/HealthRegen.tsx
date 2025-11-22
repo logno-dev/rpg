@@ -39,11 +39,8 @@ export function HealthRegen(props: HealthRegenProps) {
     
     // Check if we need health regen
     if (currentH >= maxH) {
-      console.log('[HEALTH REGEN] Health full, no regen needed');
       return;
     }
-
-    console.log('[HEALTH REGEN] Starting health regen - Health:', currentH, '/', maxH, 'InCombat:', inCombat);
 
     healthIntervalId = window.setInterval(() => {
       const currentHealth = props.currentHealth();
@@ -54,7 +51,6 @@ export function HealthRegen(props: HealthRegenProps) {
 
       // Stop if health is full
       if (currentHealth >= maxHealth) {
-        console.log('[HEALTH REGEN] Health full, stopping health regen');
         if (healthIntervalId !== undefined) {
           clearInterval(healthIntervalId);
           healthIntervalId = undefined;
@@ -69,8 +65,6 @@ export function HealthRegen(props: HealthRegenProps) {
       const healthRegenRate = baseHealthRegen + constitutionBonus;
 
       const newHealth = Math.min(maxHealth, currentHealth + healthRegenRate);
-
-      console.log('[HEALTH REGEN] Health tick:', currentHealth, '->', newHealth, '(max:', maxHealth, ')');
 
       // Update health (keep mana the same)
       props.onRegenTick(Math.round(newHealth), currentMana);
@@ -91,15 +85,8 @@ export function HealthRegen(props: HealthRegenProps) {
     
     // Check if we need mana regen (only out of combat)
     if (currentM >= maxM || inCombat) {
-      if (currentM >= maxM) {
-        console.log('[MANA REGEN] Mana full, no regen needed');
-      } else {
-        console.log('[MANA REGEN] In combat, mana regen disabled');
-      }
       return;
     }
-
-    console.log('[MANA REGEN] Starting mana regen - Mana:', currentM, '/', maxM);
 
     manaIntervalId = window.setInterval(() => {
       const currentMana = props.currentMana();
@@ -110,7 +97,6 @@ export function HealthRegen(props: HealthRegenProps) {
 
       // Stop if mana is full or entered combat
       if (currentMana >= maxMana || isInCombat) {
-        console.log('[MANA REGEN] Stopping mana regen - Full:', currentMana >= maxMana, 'Combat:', isInCombat);
         if (manaIntervalId !== undefined) {
           clearInterval(manaIntervalId);
           manaIntervalId = undefined;
@@ -125,8 +111,6 @@ export function HealthRegen(props: HealthRegenProps) {
       const manaRegenRate = baseManaRegen + wisdomBonus;
 
       const newMana = Math.min(maxMana, currentMana + manaRegenRate);
-
-      console.log('[MANA REGEN] Mana tick:', currentMana, '->', newMana, '(max:', maxMana, ')');
 
       // Update mana (keep health the same)
       props.onRegenTick(currentHealth, Math.round(newMana));

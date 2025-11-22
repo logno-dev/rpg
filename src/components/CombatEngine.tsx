@@ -44,6 +44,7 @@ type CombatEngineProps = {
   onCombatEnd: (result: 'victory' | 'defeat', finalState: CombatState) => void;
   onHealthChange: (health: number, mana: number) => void;
   onUseConsumable?: (itemId: number) => Promise<void>;
+  onActiveHotsChange?: (hots: ActiveEffect[]) => void;
 };
 
 const TICK_INTERVAL = 100; // 100ms per tick
@@ -124,6 +125,13 @@ export function CombatEngine(props: CombatEngineProps) {
   const [activeHots, setActiveHots] = createSignal<ActiveEffect[]>([]);
   const [activeDebuffs, setActiveDebuffs] = createSignal<ActiveEffect[]>([]);
   
+  // Notify parent when HOTs change
+  createEffect(() => {
+    if (props.onActiveHotsChange) {
+      props.onActiveHotsChange(activeHots());
+    }
+  });
+  
   // Track Thorns effect (damage reflection)
   const [thornsEffect, setThornsEffect] = createSignal<{
     name: string;
@@ -194,7 +202,6 @@ export function CombatEngine(props: CombatEngineProps) {
     // Only update if external health is different and combat is active
     // AND we didn't just update it internally (prevent sync loops)
     if (currentState.isActive && externalHealth !== currentState.characterHealth && !isInternalHealthUpdate) {
-      console.log('[COMBAT] Syncing external health change:', currentState.characterHealth, '->', externalHealth);
       setState({
         ...currentState,
         characterHealth: externalHealth
@@ -280,7 +287,7 @@ export function CombatEngine(props: CombatEngineProps) {
 
       // NEW EFFECT SYSTEM: Process if effects are loaded
       if (ability.effects && ability.effects.length > 0) {
-        console.log(`[useAbility] Processing ${ability.effects.length} effects for ${ability.name}`);
+        console.log(`[useAbility] Processing ${ability.effects.length} effects for ${ability.name}`, ability.effects);
         
         ability.effects.forEach((effect: AbilityEffect) => {
           const result = EffectProcessor.processInstantEffect(effect, props.character, props.mob.defense);
@@ -349,6 +356,7 @@ export function CombatEngine(props: CombatEngineProps) {
       } 
       // LEGACY SYSTEM: Fallback for abilities without effects loaded
       else if (ability.category === 'damage') {
+        console.warn(`[useAbility] LEGACY SYSTEM: ${ability.name} has no effects loaded!`, ability);
         // Calculate damage with stat scaling
         const baseDamage = Math.floor(Math.random() * (ability.damage_max - ability.damage_min + 1)) + ability.damage_min;
         const statValue = ability.primary_stat ? props.character[ability.primary_stat as keyof Character] as number : 10;
@@ -435,8 +443,6 @@ export function CombatEngine(props: CombatEngineProps) {
     // IMPORTANT: For healing, we must use updatedHealth, not state().characterHealth
     // because setState is async and state() may not have updated yet!
     const healthToReport = didHeal && updatedHealth !== null ? updatedHealth : state().characterHealth;
-    
-    console.log('[ABILITY] Notifying parent:', { didHeal, updatedHealth, stateHealth: state().characterHealth, reporting: healthToReport });
     
     // Set flag to prevent sync loop
     isInternalHealthUpdate = true;
@@ -740,7 +746,7 @@ export function CombatEngine(props: CombatEngineProps) {
                   "border-radius": "4px",
                   color: "var(--danger)"
                 }}>
-                  🔥 {dot.name} ({dot.ticks_remaining} ticks)
+                  🔥 {dot.name} ({dot.ticks_remaining} hit{dot.ticks_remaining !== 1 ? 's' : ''} remaining)
                 </span>
               )}
             </For>

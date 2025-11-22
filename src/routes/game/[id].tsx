@@ -108,6 +108,9 @@ export default function GamePage() {
     message: string;
   } | null>(null);
   
+  // Active HOTs from combat (for Active Effects display)
+  const [combatHots, setCombatHots] = createSignal<any[]>([]);
+  
   // Merchant modal state
   const [showMerchantModal, setShowMerchantModal] = createSignal(false);
   const [activeMerchant, setActiveMerchant] = createSignal<any | null>(null);
@@ -212,11 +215,8 @@ export default function GamePage() {
       if (lastSyncedHealthValue === 0 && lastSyncedManaValue === 0) {
         lastSyncedHealthValue = health;
         lastSyncedManaValue = mana;
-        console.log('[SYNC] Initialized with health:', health, 'mana:', mana);
         return;
       }
-      
-      console.log('[SYNC] Health/mana changed, scheduling sync:', health, mana);
       
       // Clear existing timer
       const timer = syncTimer();
@@ -285,22 +285,17 @@ export default function GamePage() {
     const abilities = currentAbilities();
     const inventory = currentInventory();
     
-    console.log('[hotbarActions] Computing...', { 
-      hotbarSlots: hotbar.length, 
-      abilities: abilities.length, 
-      inventory: inventory.length 
-    });
-    
     return hotbar
       .filter((slot: any) => slot.type) // Only include assigned slots
       .map((slot: any) => {
         if (slot.type === 'ability' && slot.ability_id) {
           const ability = abilities.find((a: any) => a.ability_id === slot.ability_id || a.id === slot.ability_id);
-          console.log('[hotbarActions] Matching ability for slot', slot.slot, ':', {
-            lookingFor: slot.ability_id,
-            found: ability?.name || 'NOT FOUND',
-            availableAbilities: abilities.map((a: any) => ({ id: a.id, ability_id: a.ability_id, name: a.name }))
-          });
+          
+          // Only log if ability is missing effects
+          if (ability && (!ability.effects || ability.effects.length === 0)) {
+            console.warn('[hotbarActions] Ability missing effects:', ability.name, ability);
+          }
+          
           return {
             slot: slot.slot,
             type: 'ability' as const,
@@ -323,12 +318,6 @@ export default function GamePage() {
         return null;
       })
       .filter((action: any) => action && (action.ability || action.item)) as any[];
-  });
-  
-  // Debug hotbar actions
-  createEffect(() => {
-    const actions = hotbarActions();
-    console.log('[hotbarActions] Computed actions:', actions);
   });
 
   // Calculate total stats including equipment
@@ -387,8 +376,14 @@ export default function GamePage() {
     const stats = totalStats();
     if (!char) return 50;
     
-    // Base max mana + (intelligence - 10) * 3
-    return 50 + (stats.intelligence - 10) * 3;
+    // New formula: Base + (Level × 10) + (INT - 10) × 5
+    // This scales mana with both level progression and intelligence
+    // Example: Level 15, 30 INT = 50 + 150 + 100 = 300 Mana
+    const baseMana = 50;
+    const levelBonus = char.level * 10;
+    const intelligenceBonus = (stats.intelligence - 10) * 5;
+    
+    return baseMana + levelBonus + intelligenceBonus;
   });
 
   // Track previous constitution bonus to detect changes (outside combat)
@@ -553,13 +548,11 @@ export default function GamePage() {
   };
 
   const handleHealthChange = (health: number, mana: number) => {
-    console.log('[HEALTH CHANGE] Updating health:', health, 'mana:', mana);
     actions.updateHealth(health, mana);
     // Sync will happen automatically via the createEffect watching currentHealth/currentMana
   };
 
   const handleRegenTick = (health: number, mana: number) => {
-    console.log('[REGEN TICK] Updating health:', health, 'mana:', mana, 'in combat:', !!activeMob());
     actions.updateHealth(health, mana);
     // Sync will happen automatically via the createEffect with debouncing
   };
@@ -572,7 +565,6 @@ export default function GamePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ characterId: characterId(), health, mana }),
       });
-      console.log('[SYNC] Successfully synced to server:', health, mana);
       // Track what we just synced to avoid sync loops
       lastSyncedHealthValue = health;
       lastSyncedManaValue = mana;
@@ -642,6 +634,7 @@ export default function GamePage() {
         setTimeout(() => {
           setActiveMob(null);
           setActiveNamedMobId(null);
+          setCombatHots([]); // Clear HOTs when combat ends
         }, 100);
 
         // Update inventory in CharacterContext from server response
@@ -677,6 +670,7 @@ export default function GamePage() {
         setTimeout(() => {
           setActiveMob(null);
           setActiveNamedMobId(null);
+          setCombatHots([]); // Clear HOTs when combat ends
         }, 100);
 
         // Update inventory optimistically from server response
@@ -1066,8 +1060,12 @@ export default function GamePage() {
         const effectBonus = effectsActions.getTotalStatBonus('intelligence');
         const totalIntelligence = updatedStats.intelligence + equipBonuses.intelligence + effectBonus;
         
-        // Calculate new max mana with all bonuses
-        updatedStats.max_mana = 50 + (totalIntelligence - 10) * 3;
+        // Calculate new max mana with all bonuses using new formula
+        // Mana: Base + (Level × 10) + (INT - 10) × 5
+        const baseMana = 50;
+        const levelBonus = updatedStats.level * 10;
+        const intelligenceBonus = (totalIntelligence - 10) * 5;
+        updatedStats.max_mana = baseMana + levelBonus + intelligenceBonus;
         
         // Update current mana proportionally
         const manaPercent = character.current_mana / character.max_mana;
@@ -1645,7 +1643,7 @@ export default function GamePage() {
             </div>
 
             {/* Active Effects */}
-            <ActiveEffectsDisplay />
+            <ActiveEffectsDisplay combatHots={combatHots()} />
 
             {/* Combat Engine - Always mounted but hidden when not in use */}
             <Show when={activeMob()}>
@@ -1703,6 +1701,7 @@ export default function GamePage() {
                   hotbarActions={hotbarActions()}
                   onCombatEnd={handleCombatEnd}
                   onHealthChange={handleHealthChange}
+                  onActiveHotsChange={setCombatHots}
                   onUseConsumable={async (itemId) => {
                     const item = currentInventory().find((i: any) => i.id === itemId);
                     if (item) {
