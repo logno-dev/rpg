@@ -170,25 +170,6 @@ export default function GamePage() {
       actions.setMerchants(gameData.merchants || []);
       actions.setDungeons(gameData.dungeons || []);
       
-      setIsInitialized(true);
-    } else if (gameData && isInitialized()) {
-      console.log('[DATA] Route data updated but already initialized - preserving CharacterContext');
-      // After initial load, CharacterContext is the source of truth
-      // We only update it directly via API responses, not from stale route cache
-      // The ONLY thing we might want to update is health/mana from server if it's more authoritative
-      // But since we handle regen client-side, we don't even need that
-      
-      // HOWEVER: We do need to preserve health/mana from client during route refetches
-      const existingChar = store.character;
-      if (existingChar && gameData.character) {
-        // Sync server's max_health/max_mana in case they changed from level up
-        const updatedChar = { ...existingChar };
-        updatedChar.max_health = gameData.character.max_health;
-        updatedChar.max_mana = gameData.character.max_mana;
-        actions.setCharacter(updatedChar);
-      }
-    }
-      
       // Set active dungeon if there is one
       if (gameData.activeDungeonProgress) {
         setActiveDungeon(gameData.activeDungeonProgress);
@@ -212,14 +193,6 @@ export default function GamePage() {
             total: gameData.activeDungeonProgress.total_encounters
           });
         }
-      } else if (!activeMob()) {
-        // Only clear dungeon state when NOT in active combat
-        // This prevents race conditions when data refetches during dungeon combat
-        setActiveDungeon(null);
-        // Only clear session if server says no active dungeon (handles abandon case)
-        if (!gameData.activeDungeonProgress) {
-          actions.setDungeonSession(null);
-        }
       }
       
       console.log('[DATA] CharacterContext initialized:', {
@@ -229,6 +202,41 @@ export default function GamePage() {
         inventory: gameData.inventory.length,
         abilities: gameData.abilities.length
       });
+      
+      setIsInitialized(true);
+    } else if (gameData && isInitialized()) {
+      console.log('[DATA] Route data updated but already initialized - preserving CharacterContext');
+      // After initial load, CharacterContext is the source of truth
+      // We only update it directly via API responses, not from stale route cache
+      
+      // Sync server's max_health/max_mana in case they changed from level up
+      const existingChar = store.character;
+      if (existingChar && gameData.character) {
+        const updatedChar = { ...existingChar };
+        updatedChar.max_health = gameData.character.max_health;
+        updatedChar.max_mana = gameData.character.max_mana;
+        actions.setCharacter(updatedChar);
+      }
+      
+      // Check for dungeon status changes
+      if (gameData.activeDungeonProgress && !store.dungeonSession) {
+        // Dungeon started externally, sync it
+        setActiveDungeon(gameData.activeDungeonProgress);
+        actions.setDungeonSession({
+          id: gameData.activeDungeonProgress.id,
+          dungeon_id: gameData.activeDungeonProgress.dungeon_id,
+          current_encounter: gameData.activeDungeonProgress.current_encounter,
+          total_encounters: gameData.activeDungeonProgress.total_encounters,
+          session_health: gameData.activeDungeonProgress.session_health,
+          session_mana: gameData.activeDungeonProgress.session_mana,
+          boss_mob_id: gameData.activeDungeonProgress.boss_mob_id,
+          dungeon_name: gameData.activeDungeonProgress.dungeon_name
+        });
+      } else if (!gameData.activeDungeonProgress && store.dungeonSession && !activeMob()) {
+        // Dungeon ended externally (abandoned), clear it
+        setActiveDungeon(null);
+        actions.setDungeonSession(null);
+      }
     }
   });
   
