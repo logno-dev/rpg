@@ -967,9 +967,9 @@ export default function GamePage() {
       
       console.log('[SELL] Sold for', result.goldGained, 'gold. Server returned', result.inventory.length, 'items');
       
-      // Use server-confirmed inventory and gold - keep as optimistic
-      setOptimisticInventory(result.inventory);
-      setOptimisticGold(result.character.gold);
+      // Update CharacterContext with server-confirmed data
+      actions.setCharacter(result.character);
+      actions.setInventory(result.inventory);
       
       setSellItemData(null);
       setSellQuantity(1);
@@ -2625,6 +2625,7 @@ export default function GamePage() {
                   (i.health_restore > 0 || i.mana_restore > 0) &&
                   !i.teaches_ability_id
                 )}
+                hotbar={currentHotbar()}
                 onHotbarChange={async () => {
                   console.log('[Game] Hotbar changed, updating context...');
                   // Fetch updated hotbar

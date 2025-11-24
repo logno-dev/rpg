@@ -17,58 +17,47 @@ type Props = {
   characterId: number;
   abilities: any[];
   consumables: any[];
+  hotbar: HotbarSlot[];
   onHotbarChange?: () => void;
 };
 
 export function HotbarManager(props: Props) {
-  const [hotbar, setHotbar] = createSignal<HotbarSlot[]>([
-    { slot: 1 },
-    { slot: 2 },
-    { slot: 3 },
-    { slot: 4 },
-    { slot: 5 },
-    { slot: 6 },
-    { slot: 7 },
-    { slot: 8 },
-  ]);
-  
   const [selectedSlot, setSelectedSlot] = createSignal<number | null>(null);
   const [assignMode, setAssignMode] = createSignal<'ability' | 'consumable' | null>(null);
   const [isSaving, setIsSaving] = createSignal(false);
 
-  onMount(async () => {
-    await loadHotbar();
-  });
-
-  const loadHotbar = async () => {
-    try {
-      const response = await fetch(`/api/game/get-hotbar?characterId=${props.characterId}`);
-      const data = await response.json();
-      
-      if (data.hotbar) {
-        const newHotbar = [...hotbar()];
-        data.hotbar.forEach((item: any) => {
-          const slotIndex = item.slot - 1;
-          if (slotIndex >= 0 && slotIndex < 8) {
-            newHotbar[slotIndex] = {
-              slot: item.slot,
-              type: item.type,
-              id: item.ability_id || item.item_id,
-              name: item.ability_name || item.item_name,
-              description: item.ability_description || item.item_description,
-              manaCost: item.mana_cost,
-              healthRestore: item.health_restore,
-              manaRestore: item.mana_restore,
-              quantity: item.item_quantity,
-            };
-          }
-        });
-        setHotbar(newHotbar);
+  // Create hotbar memo that converts props.hotbar to the format we need
+  const hotbar = createMemo(() => {
+    const slots: HotbarSlot[] = [
+      { slot: 1 },
+      { slot: 2 },
+      { slot: 3 },
+      { slot: 4 },
+      { slot: 5 },
+      { slot: 6 },
+      { slot: 7 },
+      { slot: 8 },
+    ];
+    
+    props.hotbar.forEach((item: any) => {
+      const slotIndex = item.slot - 1;
+      if (slotIndex >= 0 && slotIndex < 8) {
+        slots[slotIndex] = {
+          slot: item.slot,
+          type: item.type,
+          id: item.ability_id || item.item_id,
+          name: item.ability_name || item.item_name,
+          description: item.ability_description || item.item_description,
+          manaCost: item.mana_cost,
+          healthRestore: item.health_restore,
+          manaRestore: item.mana_restore,
+          quantity: item.item_quantity,
+        };
       }
-    } catch (error) {
-      console.error('Failed to load hotbar:', error);
-    }
-  };
+    });
+    
+    return slots;
+  });
 
   const handleSlotClick = (slot: number) => {
     setSelectedSlot(slot);
@@ -101,11 +90,10 @@ export function HotbarManager(props: Props) {
         throw new Error(result.error || 'Failed to assign ability');
       }
       
-      await loadHotbar();
       setSelectedSlot(null);
       setAssignMode(null);
       
-      // Notify parent of hotbar change
+      // Notify parent of hotbar change - parent will update CharacterContext
       if (props.onHotbarChange) {
         props.onHotbarChange();
       }
@@ -134,11 +122,10 @@ export function HotbarManager(props: Props) {
         }),
       });
       
-      await loadHotbar();
       setSelectedSlot(null);
       setAssignMode(null);
       
-      // Notify parent of hotbar change
+      // Notify parent of hotbar change - parent will update CharacterContext
       if (props.onHotbarChange) {
         props.onHotbarChange();
       }
@@ -162,10 +149,9 @@ export function HotbarManager(props: Props) {
         }),
       });
       
-      await loadHotbar();
       setSelectedSlot(null);
       
-      // Notify parent of hotbar change
+      // Notify parent of hotbar change - parent will update CharacterContext
       if (props.onHotbarChange) {
         props.onHotbarChange();
       }
