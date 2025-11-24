@@ -1,7 +1,7 @@
 import { createSignal, Show, For, onMount } from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
 import { getUser } from "~/lib/auth";
-import { isGM, getAllPlayers, getAllMobs, getAllItems, getAllRegions, getAllAbilities, getAllMerchants, updateMob, deleteMob, createMob, updateItem, deleteItem, createItem, getAllMobLoot, getAllRegionRareLoot, createMobLoot, updateMobLoot, deleteMobLoot, createRegionRareLoot, updateRegionRareLoot, deleteRegionRareLoot, createAbility, updateAbility, deleteAbility, createRegion, updateRegion, deleteRegion, createMerchant, updateMerchant, deleteMerchant, getAllRegionMobs, createRegionMob, updateRegionMob, deleteRegionMob, getAllMerchantInventory, createMerchantInventory, updateMerchantInventory, deleteMerchantInventory } from "~/lib/gm";
+import { isGM, getAllPlayers, getAllMobs, getAllItems, getAllRegions, getAllAbilities, getAllMerchants, updateMob, deleteMob, createMob, updateItem, deleteItem, createItem, getAllMobLoot, getAllRegionRareLoot, createMobLoot, updateMobLoot, deleteMobLoot, createRegionRareLoot, updateRegionRareLoot, deleteRegionRareLoot, createAbility, updateAbility, deleteAbility, createRegion, updateRegion, deleteRegion, createMerchant, updateMerchant, deleteMerchant, getAllRegionMobs, createRegionMob, updateRegionMob, deleteRegionMob, getAllMerchantInventory, createMerchantInventory, updateMerchantInventory, deleteMerchantInventory, getAbilityEffects, createAbilityEffect, updateAbilityEffect, deleteAbilityEffect } from "~/lib/gm";
 
 export default function GMPage() {
   const navigate = useNavigate();
@@ -19,6 +19,7 @@ export default function GMPage() {
   const [regionRareLoot, setRegionRareLoot] = createSignal<any[]>([]);
   const [regionMobs, setRegionMobs] = createSignal<any[]>([]);
   const [merchantInventory, setMerchantInventory] = createSignal<any[]>([]);
+  const [abilityEffects, setAbilityEffects] = createSignal<any[]>([]);
   
   // Edit modal state
   const [editingMob, setEditingMob] = createSignal<any | null>(null);
@@ -30,6 +31,8 @@ export default function GMPage() {
   const [editingMerchant, setEditingMerchant] = createSignal<any | null>(null);
   const [editingRegionMob, setEditingRegionMob] = createSignal<any | null>(null);
   const [editingMerchantInv, setEditingMerchantInv] = createSignal<any | null>(null);
+  const [editingAbilityEffect, setEditingAbilityEffect] = createSignal<any | null>(null);
+  const [selectedAbilityForEffects, setSelectedAbilityForEffects] = createSignal<number | null>(null);
   const [showMobModal, setShowMobModal] = createSignal(false);
   const [showItemModal, setShowItemModal] = createSignal(false);
   const [showMobLootModal, setShowMobLootModal] = createSignal(false);
@@ -39,11 +42,24 @@ export default function GMPage() {
   const [showMerchantModal, setShowMerchantModal] = createSignal(false);
   const [showRegionMobModal, setShowRegionMobModal] = createSignal(false);
   const [showMerchantInvModal, setShowMerchantInvModal] = createSignal(false);
+  const [showAbilityEffectModal, setShowAbilityEffectModal] = createSignal(false);
   const [calcLevel, setCalcLevel] = createSignal(1);
   const [selectedMobForLoot, setSelectedMobForLoot] = createSignal<number | null>(null);
   const [selectedRegionForLoot, setSelectedRegionForLoot] = createSignal<number | null>(null);
   const [selectedRegionForMobs, setSelectedRegionForMobs] = createSignal<number | null>(null);
   const [selectedMerchantForInv, setSelectedMerchantForInv] = createSignal<number | null>(null);
+  
+  // Search filters
+  const [searchPlayers, setSearchPlayers] = createSignal("");
+  const [searchMobs, setSearchMobs] = createSignal("");
+  const [searchItems, setSearchItems] = createSignal("");
+  const [searchRegions, setSearchRegions] = createSignal("");
+  const [searchAbilities, setSearchAbilities] = createSignal("");
+  const [searchMerchants, setSearchMerchants] = createSignal("");
+  const [searchMobLoot, setSearchMobLoot] = createSignal("");
+  const [searchRegionLoot, setSearchRegionLoot] = createSignal("");
+  const [searchRegionMobs, setSearchRegionMobs] = createSignal("");
+  const [searchMerchantInventory, setSearchMerchantInventory] = createSignal("");
   
   // Helper to check if XP is balanced
   const getXPStatus = (mobLevel: number, xp: number) => {
@@ -275,6 +291,52 @@ export default function GMPage() {
     } catch (err) {
       console.error('Error saving ability:', err);
       alert('Failed to save ability');
+    }
+  };
+  
+  // Handle ability effects edit/delete
+  const handleEditAbilityEffect = (effect: any) => {
+    setEditingAbilityEffect({...effect});
+  };
+  
+  const handleDeleteAbilityEffect = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this effect?')) return;
+    try {
+      await deleteAbilityEffect(id);
+      const abilityId = selectedAbilityForEffects();
+      if (abilityId) {
+        const effects = await getAbilityEffects(abilityId);
+        setAbilityEffects(effects as any);
+      }
+    } catch (err) {
+      console.error('Error deleting effect:', err);
+      alert('Failed to delete effect');
+    }
+  };
+  
+  const handleSaveAbilityEffect = async (e: Event) => {
+    e.preventDefault();
+    const effect = editingAbilityEffect();
+    if (!effect) return;
+    
+    try {
+      if (effect.id) {
+        await updateAbilityEffect(effect.id, effect);
+      } else {
+        const abilityId = selectedAbilityForEffects();
+        if (!abilityId) return;
+        effect.ability_id = abilityId;
+        await createAbilityEffect(effect);
+      }
+      setEditingAbilityEffect(null);
+      const abilityId = selectedAbilityForEffects();
+      if (abilityId) {
+        const effects = await getAbilityEffects(abilityId);
+        setAbilityEffects(effects as any);
+      }
+    } catch (err) {
+      console.error('Error saving effect:', err);
+      alert('Failed to save effect');
     }
   };
   
@@ -570,6 +632,15 @@ export default function GMPage() {
           <Show when={activeTab() === "players"}>
             <div class="card">
               <h2>Players</h2>
+              <div style={{ "margin-bottom": "1rem" }}>
+                <input 
+                  type="text" 
+                  placeholder="Search by username, character, or region..." 
+                  value={searchPlayers()}
+                  onInput={(e) => setSearchPlayers(e.currentTarget.value)}
+                  style={{ width: "100%", padding: "0.5rem" }}
+                />
+              </div>
               <Show when={players()}>
                 <div style={{ overflow: "auto", "max-height": "600px" }}>
                   <table style={{ width: "100%", "border-collapse": "collapse" }}>
@@ -586,7 +657,15 @@ export default function GMPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      <For each={players()}>
+                      <For each={players().filter((p: any) => {
+                        const search = searchPlayers().toLowerCase();
+                        if (!search) return true;
+                        return (
+                          p.username?.toLowerCase().includes(search) ||
+                          p.character_name?.toLowerCase().includes(search) ||
+                          p.current_region?.toLowerCase().includes(search)
+                        );
+                      })}>
                         {(player: any) => (
                           <tr style={{ "border-bottom": "1px solid var(--bg-light)" }}>
                             <td style={{ padding: "0.5rem" }}>{player.username}</td>
@@ -685,6 +764,15 @@ export default function GMPage() {
                   Add Mob
                 </button>
               </div>
+              <div style={{ "margin-bottom": "1rem" }}>
+                <input 
+                  type="text" 
+                  placeholder="Search by name, level, or region..." 
+                  value={searchMobs()}
+                  onInput={(e) => setSearchMobs(e.currentTarget.value)}
+                  style={{ width: "100%", padding: "0.5rem" }}
+                />
+              </div>
               <Show when={mobs()}>
                 <div style={{ overflow: "auto", "max-height": "600px" }}>
                   <table style={{ width: "100%", "border-collapse": "collapse", "font-size": "0.9rem" }}>
@@ -702,7 +790,15 @@ export default function GMPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      <For each={mobs()}>
+                      <For each={mobs().filter((m: any) => {
+                        const search = searchMobs().toLowerCase();
+                        if (!search) return true;
+                        return (
+                          m.name?.toLowerCase().includes(search) ||
+                          m.level?.toString().includes(search) ||
+                          m.region_id?.toString().includes(search)
+                        );
+                      })}>
                         {(mob: any) => (
                           <tr style={{ "border-bottom": "1px solid var(--bg-light)" }}>
                             <td style={{ padding: "0.5rem" }}>{mob.name}</td>
@@ -773,6 +869,15 @@ export default function GMPage() {
                   Add Item
                 </button>
               </div>
+              <div style={{ "margin-bottom": "1rem" }}>
+                <input 
+                  type="text" 
+                  placeholder="Search by name or type..." 
+                  value={searchItems()}
+                  onInput={(e) => setSearchItems(e.currentTarget.value)}
+                  style={{ width: "100%", padding: "0.5rem" }}
+                />
+              </div>
               <Show when={items()}>
                 <div style={{ overflow: "auto", "max-height": "600px" }}>
                   <table style={{ width: "100%", "border-collapse": "collapse", "font-size": "0.85rem" }}>
@@ -789,7 +894,14 @@ export default function GMPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      <For each={items()}>
+                      <For each={items().filter((i: any) => {
+                        const search = searchItems().toLowerCase();
+                        if (!search) return true;
+                        return (
+                          i.name?.toLowerCase().includes(search) ||
+                          i.type?.toLowerCase().includes(search)
+                        );
+                      })}>
                         {(item: any) => (
                           <tr style={{ "border-bottom": "1px solid var(--bg-light)" }}>
                             <td style={{ padding: "0.5rem" }}>{item.name}</td>
@@ -853,6 +965,15 @@ export default function GMPage() {
                   Add Ability
                 </button>
               </div>
+              <div style={{ "margin-bottom": "1rem" }}>
+                <input 
+                  type="text" 
+                  placeholder="Search by name, type, or category..." 
+                  value={searchAbilities()}
+                  onInput={(e) => setSearchAbilities(e.currentTarget.value)}
+                  style={{ width: "100%", padding: "0.5rem" }}
+                />
+              </div>
               <Show when={abilities()}>
                 <div style={{ overflow: "auto", "max-height": "600px" }}>
                   <table style={{ width: "100%", "border-collapse": "collapse", "font-size": "0.9rem" }}>
@@ -869,7 +990,15 @@ export default function GMPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      <For each={abilities()}>
+                      <For each={abilities().filter((a: any) => {
+                        const search = searchAbilities().toLowerCase();
+                        if (!search) return true;
+                        return (
+                          a.name?.toLowerCase().includes(search) ||
+                          a.type?.toLowerCase().includes(search) ||
+                          a.category?.toLowerCase().includes(search)
+                        );
+                      })}>
                         {(ability: any) => (
                           <tr style={{ "border-bottom": "1px solid var(--bg-light)" }}>
                             <td style={{ padding: "0.5rem" }}>{ability.name}</td>
@@ -886,6 +1015,18 @@ export default function GMPage() {
                                 onClick={() => handleEditAbility(ability)}
                               >
                                 Edit
+                              </button>
+                              <button 
+                                class="button" 
+                                style={{ padding: "0.25rem 0.5rem", "font-size": "0.8rem", background: "var(--accent)", "margin-right": "0.25rem" }}
+                                onClick={async () => {
+                                  setSelectedAbilityForEffects(ability.id);
+                                  const effects = await getAbilityEffects(ability.id);
+                                  setAbilityEffects(effects as any);
+                                  setShowAbilityEffectModal(true);
+                                }}
+                              >
+                                Effects
                               </button>
                               <button 
                                 class="button" 
@@ -920,9 +1061,25 @@ export default function GMPage() {
                   Add Region
                 </button>
               </div>
+              <div style={{ "margin-bottom": "1rem" }}>
+                <input 
+                  type="text" 
+                  placeholder="Search by name or description..." 
+                  value={searchRegions()}
+                  onInput={(e) => setSearchRegions(e.currentTarget.value)}
+                  style={{ width: "100%", padding: "0.5rem" }}
+                />
+              </div>
               <Show when={regions()}>
                 <div style={{ display: "grid", gap: "1rem", overflow: "auto", "max-height": "600px" }}>
-                  <For each={regions()}>
+                  <For each={regions().filter((r: any) => {
+                    const search = searchRegions().toLowerCase();
+                    if (!search) return true;
+                    return (
+                      r.name?.toLowerCase().includes(search) ||
+                      r.description?.toLowerCase().includes(search)
+                    );
+                  })}>
                     {(region: any) => (
                       <div style={{ 
                         padding: "1rem", 
@@ -1222,6 +1379,15 @@ export default function GMPage() {
                   Add Merchant
                 </button>
               </div>
+              <div style={{ "margin-bottom": "1rem" }}>
+                <input 
+                  type="text" 
+                  placeholder="Search by name, description, or region..." 
+                  value={searchMerchants()}
+                  onInput={(e) => setSearchMerchants(e.currentTarget.value)}
+                  style={{ width: "100%", padding: "0.5rem" }}
+                />
+              </div>
               <Show when={merchants()}>
                 <div style={{ overflow: "auto", "max-height": "600px" }}>
                   <table style={{ width: "100%", "border-collapse": "collapse" }}>
@@ -1234,7 +1400,15 @@ export default function GMPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      <For each={merchants()}>
+                      <For each={merchants().filter((m: any) => {
+                        const search = searchMerchants().toLowerCase();
+                        if (!search) return true;
+                        return (
+                          m.name?.toLowerCase().includes(search) ||
+                          m.description?.toLowerCase().includes(search) ||
+                          m.region_name?.toLowerCase().includes(search)
+                        );
+                      })}>
                         {(merchant: any) => (
                           <tr style={{ "border-bottom": "1px solid var(--bg-light)" }}>
                             <td style={{ padding: "0.5rem" }}>{merchant.name}</td>
@@ -1778,6 +1952,26 @@ export default function GMPage() {
                   <input type="number" value={editingItem()?.charisma_bonus || 0} 
                          onInput={(e) => setEditingItem({...editingItem()!, charisma_bonus: parseInt(e.currentTarget.value)})} />
                 </div>
+                
+                <div style={{ "grid-column": "1 / -1", "margin-top": "0.5rem" }}>
+                  <h4 style={{ "font-size": "1rem", "margin-bottom": "0.5rem", color: "var(--accent)" }}>Scroll Settings</h4>
+                </div>
+                
+                <div style={{ "grid-column": "1 / -1" }}>
+                  <label>Teaches Ability (for scrolls)</label>
+                  <select value={editingItem()?.teaches_ability_id || ''} 
+                          onChange={(e) => setEditingItem({...editingItem()!, teaches_ability_id: e.currentTarget.value ? parseInt(e.currentTarget.value) : null})}>
+                    <option value="">None - Not a scroll</option>
+                    <For each={abilities().sort((a: any, b: any) => a.name.localeCompare(b.name))}>
+                      {(ability: any) => (
+                        <option value={ability.id}>{ability.name} (Lvl {ability.required_level})</option>
+                      )}
+                    </For>
+                  </select>
+                  <small style={{ display: "block", "font-size": "0.75rem", color: "var(--text-secondary)", "margin-top": "0.25rem" }}>
+                    Set this to make the item a scroll that teaches an ability when used
+                  </small>
+                </div>
               </div>
               <div style={{ display: "flex", gap: "1rem", "margin-top": "1.5rem" }}>
                 <button type="submit" class="button primary" style={{ flex: 1 }}>Save</button>
@@ -1963,6 +2157,288 @@ export default function GMPage() {
                 <button type="button" class="button secondary" style={{ flex: 1 }} onClick={() => setShowAbilityModal(false)}>Cancel</button>
               </div>
             </form>
+          </div>
+        </div>
+      </Show>
+      
+      {/* Ability Effects Modal */}
+      <Show when={showAbilityEffectModal()}>
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.7)", display: "flex",
+          "align-items": "center", "justify-content": "center", "z-index": 1000
+        }} onClick={() => setShowAbilityEffectModal(false)}>
+          <div class="card" style={{ "max-width": "900px", width: "95%", "max-height": "90vh", overflow: "auto" }} 
+               onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center", "margin-bottom": "1rem" }}>
+              <h2>Ability Effects - {abilities().find((a: any) => a.id === selectedAbilityForEffects())?.name}</h2>
+              <button onClick={() => setShowAbilityEffectModal(false)} style={{ background: "none", border: "none", "font-size": "1.5rem", cursor: "pointer" }}>×</button>
+            </div>
+            
+            {/* Add New Effect Button */}
+            <button class="button primary" style={{ "margin-bottom": "1rem" }} onClick={() => {
+              setEditingAbilityEffect({
+                ability_id: selectedAbilityForEffects(),
+                effect_order: (abilityEffects().length || 0) + 1,
+                effect_type: 'damage',
+                target: 'enemy',
+                value_min: 0,
+                value_max: 0,
+                is_periodic: 0,
+                tick_interval: 0,
+                tick_count: 0,
+                tick_value: 0,
+                stat_affected: null,
+                stat_scaling: null,
+                scaling_factor: 0,
+                chance: 1.0,
+                duration: 0,
+                shield_amount: 0,
+                drain_percent: 0,
+                stacks_max: 1
+              });
+            }}>
+              Add New Effect
+            </button>
+            
+            {/* Effects List */}
+            <Show when={abilityEffects().length > 0}>
+              <div style={{ "margin-bottom": "2rem" }}>
+                <h3 style={{ "margin-bottom": "1rem" }}>Current Effects</h3>
+                <For each={abilityEffects()}>
+                  {(effect: any) => (
+                    <div style={{ 
+                      padding: "1rem", 
+                      background: "var(--bg-light)", 
+                      "border-radius": "8px",
+                      "margin-bottom": "1rem"
+                    }}>
+                      <div style={{ display: "flex", "justify-content": "space-between", "align-items": "start" }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ "font-weight": "bold", "margin-bottom": "0.5rem" }}>
+                            Effect #{effect.effect_order}: {effect.effect_type.toUpperCase()} → {effect.target}
+                          </div>
+                          <div style={{ "font-size": "0.9rem", color: "var(--text-secondary)" }}>
+                            <Show when={effect.effect_type === 'damage' || effect.effect_type === 'heal'}>
+                              <div>Value: {effect.value_min}-{effect.value_max}</div>
+                            </Show>
+                            <Show when={effect.is_periodic === 1}>
+                              <div>Periodic: {effect.tick_value} per tick, every {effect.tick_interval}s for {effect.tick_count} ticks (Total: {effect.tick_interval * effect.tick_count}s)</div>
+                            </Show>
+                            <Show when={effect.stat_affected}>
+                              <div>Stat: {effect.stat_affected}</div>
+                            </Show>
+                            <Show when={effect.duration > 0}>
+                              <div>Duration: {effect.duration}s</div>
+                            </Show>
+                            <Show when={effect.stat_scaling}>
+                              <div>Scaling: {effect.stat_scaling} × {effect.scaling_factor}</div>
+                            </Show>
+                            <Show when={effect.chance < 1.0}>
+                              <div>Chance: {(effect.chance * 100).toFixed(0)}%</div>
+                            </Show>
+                            <Show when={effect.shield_amount > 0}>
+                              <div>Shield: {effect.shield_amount}</div>
+                            </Show>
+                            <Show when={effect.drain_percent > 0}>
+                              <div>Drain: {(effect.drain_percent * 100).toFixed(0)}%</div>
+                            </Show>
+                            <Show when={effect.stat_affected === 'thorns'}>
+                              <div>Thorns: {effect.value_min}% reflect</div>
+                            </Show>
+                            <Show when={effect.stacks_max > 1}>
+                              <div>Max Stacks: {effect.stacks_max}</div>
+                            </Show>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: "0.5rem" }}>
+                          <button 
+                            class="button secondary" 
+                            style={{ padding: "0.25rem 0.5rem", "font-size": "0.8rem" }}
+                            onClick={() => handleEditAbilityEffect(effect)}
+                          >
+                            Edit
+                          </button>
+                          <button 
+                            class="button" 
+                            style={{ padding: "0.25rem 0.5rem", "font-size": "0.8rem", background: "var(--danger)" }}
+                            onClick={() => handleDeleteAbilityEffect(effect.id)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </For>
+              </div>
+            </Show>
+            
+            {/* Effect Edit Form */}
+            <Show when={editingAbilityEffect()}>
+              <div style={{ padding: "1.5rem", background: "var(--bg-light)", "border-radius": "8px" }}>
+                <h3 style={{ "margin-bottom": "1rem" }}>{editingAbilityEffect()?.id ? 'Edit Effect' : 'New Effect'}</h3>
+                <form onSubmit={handleSaveAbilityEffect}>
+                  <div style={{ display: "grid", gap: "1rem", "grid-template-columns": "1fr 1fr" }}>
+                    <div>
+                      <label>Effect Order</label>
+                      <input type="number" min="1" value={editingAbilityEffect()?.effect_order || 1} 
+                             onInput={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, effect_order: parseInt(e.currentTarget.value)})} required />
+                    </div>
+                    <div>
+                      <label>Effect Type</label>
+                      <select value={editingAbilityEffect()?.effect_type || 'damage'} 
+                              onChange={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, effect_type: e.currentTarget.value})} required>
+                        <option value="damage">Damage</option>
+                        <option value="heal">Heal</option>
+                        <option value="buff">Buff</option>
+                        <option value="debuff">Debuff</option>
+                        <option value="dot">DOT (Damage Over Time)</option>
+                        <option value="hot">HOT (Heal Over Time)</option>
+                        <option value="drain">Drain</option>
+                        <option value="shield">Shield</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label>Target</label>
+                      <select value={editingAbilityEffect()?.target || 'enemy'} 
+                              onChange={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, target: e.currentTarget.value})} required>
+                        <option value="self">Self</option>
+                        <option value="enemy">Enemy</option>
+                        <option value="ally">Ally</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label>Chance (0-1)</label>
+                      <input type="number" step="0.01" min="0" max="1" value={editingAbilityEffect()?.chance ?? 1.0} 
+                             onChange={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, chance: parseFloat(e.currentTarget.value) || 1.0})} />
+                    </div>
+                    
+                    <div style={{ "grid-column": "1 / -1", "margin-top": "0.5rem" }}>
+                      <h4 style={{ "font-size": "1rem", "margin-bottom": "0.5rem", color: "var(--accent)" }}>Instant Values</h4>
+                    </div>
+                    
+                    <div>
+                      <label>Value Min</label>
+                      <input type="number" min="0" value={editingAbilityEffect()?.value_min ?? 0} 
+                             onInput={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, value_min: parseInt(e.currentTarget.value) || 0})} />
+                    </div>
+                    <div>
+                      <label>Value Max</label>
+                      <input type="number" min="0" value={editingAbilityEffect()?.value_max ?? 0} 
+                             onInput={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, value_max: parseInt(e.currentTarget.value) || 0})} />
+                    </div>
+                    
+                    <div style={{ "grid-column": "1 / -1", "margin-top": "0.5rem" }}>
+                      <h4 style={{ "font-size": "1rem", "margin-bottom": "0.5rem", color: "var(--accent)" }}>Periodic Effects (DOT/HOT)</h4>
+                    </div>
+                    
+                    <div>
+                      <label>Is Periodic</label>
+                      <select value={editingAbilityEffect()?.is_periodic ?? 0} 
+                              onChange={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, is_periodic: parseInt(e.currentTarget.value)})}>
+                        <option value={0}>No</option>
+                        <option value={1}>Yes</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label>Tick Value</label>
+                      <input type="number" min="0" value={editingAbilityEffect()?.tick_value ?? 0} 
+                             onInput={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, tick_value: parseInt(e.currentTarget.value) || 0})} />
+                    </div>
+                    <div>
+                      <label>Tick Interval (seconds)</label>
+                      <input type="number" min="0" value={editingAbilityEffect()?.tick_interval ?? 0} 
+                             onInput={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, tick_interval: parseInt(e.currentTarget.value) || 0})} />
+                    </div>
+                    <div>
+                      <label>Tick Count</label>
+                      <input type="number" min="0" value={editingAbilityEffect()?.tick_count ?? 0} 
+                             onInput={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, tick_count: parseInt(e.currentTarget.value) || 0})} />
+                    </div>
+                    
+                    <div style={{ "grid-column": "1 / -1", "margin-top": "0.5rem" }}>
+                      <h4 style={{ "font-size": "1rem", "margin-bottom": "0.5rem", color: "var(--accent)" }}>Buffs/Debuffs</h4>
+                    </div>
+                    
+                    <div>
+                      <label>Stat Affected</label>
+                      <select value={editingAbilityEffect()?.stat_affected || ''} 
+                              onChange={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, stat_affected: e.currentTarget.value || null})}>
+                        <option value="">None</option>
+                        <option value="strength">Strength</option>
+                        <option value="dexterity">Dexterity</option>
+                        <option value="constitution">Constitution</option>
+                        <option value="intelligence">Intelligence</option>
+                        <option value="wisdom">Wisdom</option>
+                        <option value="charisma">Charisma</option>
+                        <option value="armor">Armor</option>
+                        <option value="damage">Damage</option>
+                        <option value="thorns">Thorns (Reflect Damage)</option>
+                      </select>
+                      <small style={{ display: "block", "font-size": "0.75rem", color: "var(--text-secondary)", "margin-top": "0.25rem" }}>For Thorns, set value_min to reflect %</small>
+                    </div>
+                    <div>
+                      <label>Duration (seconds)</label>
+                      <input type="number" min="0" value={editingAbilityEffect()?.duration ?? 0} 
+                             onInput={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, duration: parseInt(e.currentTarget.value) || 0})} />
+                    </div>
+                    
+                    <div style={{ "grid-column": "1 / -1", "margin-top": "0.5rem" }}>
+                      <h4 style={{ "font-size": "1rem", "margin-bottom": "0.5rem", color: "var(--accent)" }}>Scaling</h4>
+                    </div>
+                    
+                    <div>
+                      <label>Stat Scaling</label>
+                      <select value={editingAbilityEffect()?.stat_scaling || ''} 
+                              onChange={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, stat_scaling: e.currentTarget.value || null})}>
+                        <option value="">None</option>
+                        <option value="strength">Strength</option>
+                        <option value="dexterity">Dexterity</option>
+                        <option value="constitution">Constitution</option>
+                        <option value="intelligence">Intelligence</option>
+                        <option value="wisdom">Wisdom</option>
+                        <option value="charisma">Charisma</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label>Scaling Factor</label>
+                      <input type="number" step="0.1" min="0" value={editingAbilityEffect()?.scaling_factor ?? 0} 
+                             onChange={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, scaling_factor: parseFloat(e.currentTarget.value) || 0})} />
+                    </div>
+                    
+                    <div style={{ "grid-column": "1 / -1", "margin-top": "0.5rem" }}>
+                      <h4 style={{ "font-size": "1rem", "margin-bottom": "0.5rem", color: "var(--accent)" }}>Special Effects</h4>
+                    </div>
+                    
+                    <div>
+                      <label>Shield Amount</label>
+                      <input type="number" min="0" value={editingAbilityEffect()?.shield_amount ?? 0} 
+                             onInput={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, shield_amount: parseInt(e.currentTarget.value) || 0})} />
+                    </div>
+                    <div>
+                      <label>Drain % (0-1)</label>
+                      <input type="number" step="0.01" min="0" max="1" value={editingAbilityEffect()?.drain_percent ?? 0} 
+                             onChange={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, drain_percent: parseFloat(e.currentTarget.value) || 0})} />
+                    </div>
+                    <div>
+                      <label>Max Stacks</label>
+                      <input type="number" min="1" value={editingAbilityEffect()?.stacks_max ?? 1} 
+                             onInput={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, stacks_max: parseInt(e.currentTarget.value) || 1})} />
+                      <small style={{ display: "block", "font-size": "0.75rem", color: "var(--text-secondary)" }}>How many times this effect can stack</small>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: "1rem", "margin-top": "1.5rem" }}>
+                    <button type="submit" class="button primary" style={{ flex: 1 }}>Save Effect</button>
+                    <button type="button" class="button secondary" style={{ flex: 1 }} onClick={() => setEditingAbilityEffect(null)}>Cancel</button>
+                  </div>
+                </form>
+              </div>
+            </Show>
+            
+            <div style={{ "margin-top": "1.5rem" }}>
+              <button class="button secondary" onClick={() => setShowAbilityEffectModal(false)}>Close</button>
+            </div>
           </div>
         </div>
       </Show>

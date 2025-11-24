@@ -140,7 +140,8 @@ export async function getAllItems() {
             attack_speed, health_restore, mana_restore,
             required_level as level,
             required_strength, required_dexterity, required_constitution,
-            required_intelligence, required_wisdom, required_charisma
+            required_intelligence, required_wisdom, required_charisma,
+            teaches_ability_id
           FROM items 
           ORDER BY type, required_level, name`,
     args: [],
@@ -157,8 +158,8 @@ export async function createItem(itemData: any) {
             strength_bonus, dexterity_bonus, constitution_bonus, intelligence_bonus, 
             wisdom_bonus, charisma_bonus, health_restore, mana_restore, attack_speed, 
             required_level, required_strength, required_dexterity, required_constitution,
-            required_intelligence, required_wisdom, required_charisma, stackable)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            required_intelligence, required_wisdom, required_charisma, stackable, teaches_ability_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       itemData.name || '',
       itemData.description || '',
@@ -185,6 +186,7 @@ export async function createItem(itemData: any) {
       itemData.required_wisdom ?? 0,
       itemData.required_charisma ?? 0,
       itemData.stackable ?? 0,
+      itemData.teaches_ability_id || null,
     ],
   });
   
@@ -202,7 +204,7 @@ export async function updateItem(id: number, itemData: any) {
             charisma_bonus = ?, health_restore = ?, mana_restore = ?,
             attack_speed = ?, required_level = ?, required_strength = ?,
             required_dexterity = ?, required_constitution = ?, required_intelligence = ?,
-            required_wisdom = ?, required_charisma = ?, stackable = ?
+            required_wisdom = ?, required_charisma = ?, stackable = ?, teaches_ability_id = ?
           WHERE id = ?`,
     args: [
       itemData.name || '', 
@@ -229,7 +231,8 @@ export async function updateItem(id: number, itemData: any) {
       itemData.required_intelligence ?? 0, 
       itemData.required_wisdom ?? 0, 
       itemData.required_charisma ?? 0,
-      itemData.stackable ?? 0, 
+      itemData.stackable ?? 0,
+      itemData.teaches_ability_id || null,
       id,
     ],
   });
@@ -398,6 +401,95 @@ export async function deleteAbility(id: number) {
   
   await db.execute({
     sql: 'DELETE FROM abilities WHERE id = ?',
+    args: [id],
+  });
+}
+
+// Ability Effects Management
+export async function getAbilityEffects(abilityId: number) {
+  await requireGM();
+  
+  const result = await db.execute({
+    sql: 'SELECT * FROM ability_effects WHERE ability_id = ? ORDER BY effect_order',
+    args: [abilityId],
+  });
+  
+  return result.rows;
+}
+
+export async function createAbilityEffect(effectData: any) {
+  await requireGM();
+  
+  const result = await db.execute({
+    sql: `INSERT INTO ability_effects (
+            ability_id, effect_order, effect_type, target,
+            value_min, value_max, is_periodic, tick_interval, tick_count, tick_value,
+            stat_affected, stat_scaling, scaling_factor, chance, duration,
+            shield_amount, drain_percent, stacks_max
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
+      effectData.ability_id,
+      effectData.effect_order ?? 1,
+      effectData.effect_type,
+      effectData.target ?? 'enemy',
+      effectData.value_min ?? 0,
+      effectData.value_max ?? 0,
+      effectData.is_periodic ?? 0,
+      effectData.tick_interval ?? 0,
+      effectData.tick_count ?? 0,
+      effectData.tick_value ?? 0,
+      effectData.stat_affected || null,
+      effectData.stat_scaling || null,
+      effectData.scaling_factor ?? 0,
+      effectData.chance ?? 1.0,
+      effectData.duration ?? 0,
+      effectData.shield_amount ?? 0,
+      effectData.drain_percent ?? 0,
+      effectData.stacks_max ?? 1,
+    ],
+  });
+  
+  return result.lastInsertRowid;
+}
+
+export async function updateAbilityEffect(id: number, effectData: any) {
+  await requireGM();
+  
+  await db.execute({
+    sql: `UPDATE ability_effects SET
+            effect_order = ?, effect_type = ?, target = ?,
+            value_min = ?, value_max = ?, is_periodic = ?, tick_interval = ?, tick_count = ?, tick_value = ?,
+            stat_affected = ?, stat_scaling = ?, scaling_factor = ?, chance = ?, duration = ?,
+            shield_amount = ?, drain_percent = ?, stacks_max = ?
+          WHERE id = ?`,
+    args: [
+      effectData.effect_order ?? 1,
+      effectData.effect_type,
+      effectData.target ?? 'enemy',
+      effectData.value_min ?? 0,
+      effectData.value_max ?? 0,
+      effectData.is_periodic ?? 0,
+      effectData.tick_interval ?? 0,
+      effectData.tick_count ?? 0,
+      effectData.tick_value ?? 0,
+      effectData.stat_affected || null,
+      effectData.stat_scaling || null,
+      effectData.scaling_factor ?? 0,
+      effectData.chance ?? 1.0,
+      effectData.duration ?? 0,
+      effectData.shield_amount ?? 0,
+      effectData.drain_percent ?? 0,
+      effectData.stacks_max ?? 1,
+      id,
+    ],
+  });
+}
+
+export async function deleteAbilityEffect(id: number) {
+  await requireGM();
+  
+  await db.execute({
+    sql: 'DELETE FROM ability_effects WHERE id = ?',
     args: [id],
   });
 }
