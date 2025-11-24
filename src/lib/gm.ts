@@ -256,6 +256,54 @@ export async function getAllRegions() {
   return result.rows;
 }
 
+export async function createRegion(regionData: any) {
+  await requireGM();
+  
+  const result = await db.execute({
+    sql: `INSERT INTO regions (name, description, min_level, max_level, locked, unlock_requirement)
+          VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [
+      regionData.name || '',
+      regionData.description || '',
+      regionData.min_level ?? 1,
+      regionData.max_level ?? 5,
+      regionData.locked ?? 0,
+      regionData.unlock_requirement || null,
+    ],
+  });
+  
+  return result.lastInsertRowid;
+}
+
+export async function updateRegion(id: number, regionData: any) {
+  await requireGM();
+  
+  await db.execute({
+    sql: `UPDATE regions SET
+            name = ?, description = ?, min_level = ?, max_level = ?,
+            locked = ?, unlock_requirement = ?
+          WHERE id = ?`,
+    args: [
+      regionData.name || '',
+      regionData.description || '',
+      regionData.min_level ?? 1,
+      regionData.max_level ?? 5,
+      regionData.locked ?? 0,
+      regionData.unlock_requirement || null,
+      id,
+    ],
+  });
+}
+
+export async function deleteRegion(id: number) {
+  await requireGM();
+  
+  await db.execute({
+    sql: 'DELETE FROM regions WHERE id = ?',
+    args: [id],
+  });
+}
+
 // Abilities Management
 export async function getAllAbilities() {
   await requireGM();
@@ -272,8 +320,12 @@ export async function createAbility(abilityData: any) {
   await requireGM();
   
   const result = await db.execute({
-    sql: `INSERT INTO abilities (name, description, type, category, required_level, mana_cost, cooldown, primary_stat)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO abilities (name, description, type, category, required_level, mana_cost, cooldown, 
+            primary_stat, stat_scaling, damage_min, damage_max, healing, 
+            buff_stat, buff_amount, buff_duration,
+            required_strength, required_dexterity, required_constitution,
+            required_intelligence, required_wisdom, required_charisma)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       abilityData.name || '',
       abilityData.description || '',
@@ -283,6 +335,19 @@ export async function createAbility(abilityData: any) {
       abilityData.mana_cost ?? 0,
       abilityData.cooldown ?? 0,
       abilityData.primary_stat || null,
+      abilityData.stat_scaling ?? 0,
+      abilityData.damage_min ?? 0,
+      abilityData.damage_max ?? 0,
+      abilityData.healing ?? 0,
+      abilityData.buff_stat || null,
+      abilityData.buff_amount ?? 0,
+      abilityData.buff_duration ?? 0,
+      abilityData.required_strength ?? 0,
+      abilityData.required_dexterity ?? 0,
+      abilityData.required_constitution ?? 0,
+      abilityData.required_intelligence ?? 0,
+      abilityData.required_wisdom ?? 0,
+      abilityData.required_charisma ?? 0,
     ],
   });
   
@@ -295,7 +360,11 @@ export async function updateAbility(id: number, abilityData: any) {
   await db.execute({
     sql: `UPDATE abilities SET
             name = ?, description = ?, type = ?, category = ?, required_level = ?,
-            mana_cost = ?, cooldown = ?, primary_stat = ?
+            mana_cost = ?, cooldown = ?, primary_stat = ?, stat_scaling = ?,
+            damage_min = ?, damage_max = ?, healing = ?,
+            buff_stat = ?, buff_amount = ?, buff_duration = ?,
+            required_strength = ?, required_dexterity = ?, required_constitution = ?,
+            required_intelligence = ?, required_wisdom = ?, required_charisma = ?
           WHERE id = ?`,
     args: [
       abilityData.name || '',
@@ -306,6 +375,19 @@ export async function updateAbility(id: number, abilityData: any) {
       abilityData.mana_cost ?? 0,
       abilityData.cooldown ?? 0,
       abilityData.primary_stat || null,
+      abilityData.stat_scaling ?? 0,
+      abilityData.damage_min ?? 0,
+      abilityData.damage_max ?? 0,
+      abilityData.healing ?? 0,
+      abilityData.buff_stat || null,
+      abilityData.buff_amount ?? 0,
+      abilityData.buff_duration ?? 0,
+      abilityData.required_strength ?? 0,
+      abilityData.required_dexterity ?? 0,
+      abilityData.required_constitution ?? 0,
+      abilityData.required_intelligence ?? 0,
+      abilityData.required_wisdom ?? 0,
+      abilityData.required_charisma ?? 0,
       id,
     ],
   });
@@ -333,6 +415,47 @@ export async function getAllMerchants() {
   });
   
   return result.rows;
+}
+
+export async function createMerchant(merchantData: any) {
+  await requireGM();
+  
+  const result = await db.execute({
+    sql: `INSERT INTO merchants (name, description, region_id)
+          VALUES (?, ?, ?)`,
+    args: [
+      merchantData.name || '',
+      merchantData.description || '',
+      merchantData.region_id ?? 1,
+    ],
+  });
+  
+  return result.lastInsertRowid;
+}
+
+export async function updateMerchant(id: number, merchantData: any) {
+  await requireGM();
+  
+  await db.execute({
+    sql: `UPDATE merchants SET
+            name = ?, description = ?, region_id = ?
+          WHERE id = ?`,
+    args: [
+      merchantData.name || '',
+      merchantData.description || '',
+      merchantData.region_id ?? 1,
+      id,
+    ],
+  });
+}
+
+export async function deleteMerchant(id: number) {
+  await requireGM();
+  
+  await db.execute({
+    sql: 'DELETE FROM merchants WHERE id = ?',
+    args: [id],
+  });
 }
 
 // Loot Management
@@ -481,6 +604,131 @@ export async function deleteRegionRareLoot(id: number) {
   
   await db.execute({
     sql: 'DELETE FROM region_rare_loot WHERE id = ?',
+    args: [id],
+  });
+}
+
+// Region Mobs (Spawn Control)
+export async function getAllRegionMobs() {
+  await requireGM();
+  
+  const result = await db.execute({
+    sql: `SELECT 
+            rm.*,
+            r.name as region_name,
+            m.name as mob_name,
+            m.level as mob_level
+          FROM region_mobs rm
+          JOIN regions r ON rm.region_id = r.id
+          JOIN mobs m ON rm.mob_id = m.id
+          ORDER BY r.min_level, r.name, rm.spawn_weight DESC`,
+    args: [],
+  });
+  
+  return result.rows;
+}
+
+export async function createRegionMob(data: any) {
+  await requireGM();
+  
+  const result = await db.execute({
+    sql: `INSERT INTO region_mobs (region_id, mob_id, spawn_weight)
+          VALUES (?, ?, ?)`,
+    args: [
+      data.region_id ?? 0,
+      data.mob_id ?? 0,
+      data.spawn_weight ?? 1,
+    ],
+  });
+  
+  return result.lastInsertRowid;
+}
+
+export async function updateRegionMob(id: number, data: any) {
+  await requireGM();
+  
+  await db.execute({
+    sql: `UPDATE region_mobs SET
+            region_id = ?, mob_id = ?, spawn_weight = ?
+          WHERE id = ?`,
+    args: [
+      data.region_id ?? 0,
+      data.mob_id ?? 0,
+      data.spawn_weight ?? 1,
+      id,
+    ],
+  });
+}
+
+export async function deleteRegionMob(id: number) {
+  await requireGM();
+  
+  await db.execute({
+    sql: 'DELETE FROM region_mobs WHERE id = ?',
+    args: [id],
+  });
+}
+
+// Merchant Inventory
+export async function getAllMerchantInventory() {
+  await requireGM();
+  
+  const result = await db.execute({
+    sql: `SELECT 
+            mi.*,
+            m.name as merchant_name,
+            i.name as item_name,
+            i.type as item_type,
+            i.value as base_value
+          FROM merchant_inventory mi
+          JOIN merchants m ON mi.merchant_id = m.id
+          JOIN items i ON mi.item_id = i.id
+          ORDER BY m.name, i.name`,
+    args: [],
+  });
+  
+  return result.rows;
+}
+
+export async function createMerchantInventory(data: any) {
+  await requireGM();
+  
+  const result = await db.execute({
+    sql: `INSERT INTO merchant_inventory (merchant_id, item_id, stock, price_multiplier)
+          VALUES (?, ?, ?, ?)`,
+    args: [
+      data.merchant_id ?? 0,
+      data.item_id ?? 0,
+      data.stock ?? -1,
+      data.price_multiplier ?? 1.0,
+    ],
+  });
+  
+  return result.lastInsertRowid;
+}
+
+export async function updateMerchantInventory(id: number, data: any) {
+  await requireGM();
+  
+  await db.execute({
+    sql: `UPDATE merchant_inventory SET
+            merchant_id = ?, item_id = ?, stock = ?, price_multiplier = ?
+          WHERE id = ?`,
+    args: [
+      data.merchant_id ?? 0,
+      data.item_id ?? 0,
+      data.stock ?? -1,
+      data.price_multiplier ?? 1.0,
+      id,
+    ],
+  });
+}
+
+export async function deleteMerchantInventory(id: number) {
+  await requireGM();
+  
+  await db.execute({
+    sql: 'DELETE FROM merchant_inventory WHERE id = ?',
     args: [id],
   });
 }

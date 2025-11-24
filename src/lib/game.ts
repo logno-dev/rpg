@@ -450,6 +450,34 @@ export async function processCombatRound(
           character.max_health
         );
         log.push(`You cast ${ability.name} and heal for ${ability.healing} HP!`);
+      } else if (ability.type === 'buff' && ability.buff_stat && ability.buff_amount) {
+        // Apply buff by temporarily increasing character stats
+        // For dodge abilities, this increases DEX which will improve dodge chance this round
+        const buffUpdate: any = {};
+        const statMap: any = {
+          'strength': 'strength',
+          'dexterity': 'dexterity',
+          'constitution': 'constitution',
+          'intelligence': 'intelligence',
+          'wisdom': 'wisdom',
+          'charisma': 'charisma'
+        };
+        
+        if (statMap[ability.buff_stat]) {
+          const statColumn = statMap[ability.buff_stat];
+          await db.execute({
+            sql: `UPDATE characters SET ${statColumn} = ${statColumn} + ? WHERE id = ?`,
+            args: [ability.buff_amount, character.id],
+          });
+          
+          // Update local character object for this combat round
+          (character as any)[statColumn] += ability.buff_amount;
+          
+          log.push(`You cast ${ability.name}! ${ability.buff_stat.toUpperCase()} increased by ${ability.buff_amount} for ${ability.buff_duration} seconds!`);
+          
+          // Note: In a full implementation, you'd need an active_effects table to track duration
+          // For now, the buff lasts for this combat round, and we'll remove it at the end
+        }
       } else {
         const abilityDamage = Math.floor(
           Math.random() * (ability.damage_max - ability.damage_min + 1) + ability.damage_min
@@ -565,21 +593,44 @@ export async function processCombatRound(
   }
 
   // Mob's turn
-  let mobDamage = Math.floor(Math.random() * (mob.damage_max - mob.damage_min + 1)) + mob.damage_min;
-
-  // Calculate defense from equipped armor
-  const equippedArmor = await db.execute({
-    sql: `SELECT SUM(items.armor) as total_armor FROM items 
+  // First, check if the player dodges the attack
+  // Get total dexterity (base + equipment)
+  const equippedDexBonus = await db.execute({
+    sql: `SELECT SUM(items.dexterity_bonus) as total_dex FROM items 
       JOIN character_inventory ON items.id = character_inventory.item_id
-      WHERE character_inventory.character_id = ? AND character_inventory.equipped = 1 AND items.type = 'armor'`,
+      WHERE character_inventory.character_id = ? AND character_inventory.equipped = 1`,
     args: [character.id],
   });
+  
+  const totalDexterity = character.dexterity + ((equippedDexBonus.rows[0] as any)?.total_dex || 0);
+  
+  // Calculate dodge chance: 5% base + 1% per 2 dexterity above 10
+  // Formula: 5% + ((DEX - 10) / 2)%
+  // Examples: 10 DEX = 5%, 20 DEX = 10%, 30 DEX = 15%, 50 DEX = 25%
+  const dodgeChance = 0.05 + Math.max(0, (totalDexterity - 10) / 2) * 0.01;
+  const dodgeRoll = Math.random();
+  
+  if (dodgeRoll < dodgeChance) {
+    // Attack missed!
+    log.push(`${mob.name} attacks but you dodge! (${Math.round(dodgeChance * 100)}% chance)`);
+  } else {
+    // Attack hits, calculate damage
+    let mobDamage = Math.floor(Math.random() * (mob.damage_max - mob.damage_min + 1)) + mob.damage_min;
 
-  const totalArmor = (equippedArmor.rows[0] as any)?.total_armor || 0;
-  mobDamage = Math.max(1, mobDamage - totalArmor);
+    // Calculate defense from equipped armor
+    const equippedArmor = await db.execute({
+      sql: `SELECT SUM(items.armor) as total_armor FROM items 
+        JOIN character_inventory ON items.id = character_inventory.item_id
+        WHERE character_inventory.character_id = ? AND character_inventory.equipped = 1 AND items.type = 'armor'`,
+      args: [character.id],
+    });
 
-  combat.character_health -= mobDamage;
-  log.push(`${mob.name} attacks for ${mobDamage} damage!`);
+    const totalArmor = (equippedArmor.rows[0] as any)?.total_armor || 0;
+    mobDamage = Math.max(1, mobDamage - totalArmor);
+
+    combat.character_health -= mobDamage;
+    log.push(`${mob.name} attacks for ${mobDamage} damage!`);
+  }
 
   // Check if character is defeated
   if (combat.character_health <= 0) {

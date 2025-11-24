@@ -1,7 +1,7 @@
 import { createSignal, Show, For, onMount } from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
 import { getUser } from "~/lib/auth";
-import { isGM, getAllPlayers, getAllMobs, getAllItems, getAllRegions, getAllAbilities, getAllMerchants, updateMob, deleteMob, createMob, updateItem, deleteItem, createItem, getAllMobLoot, getAllRegionRareLoot, createMobLoot, updateMobLoot, deleteMobLoot, createRegionRareLoot, updateRegionRareLoot, deleteRegionRareLoot, createAbility, updateAbility, deleteAbility } from "~/lib/gm";
+import { isGM, getAllPlayers, getAllMobs, getAllItems, getAllRegions, getAllAbilities, getAllMerchants, updateMob, deleteMob, createMob, updateItem, deleteItem, createItem, getAllMobLoot, getAllRegionRareLoot, createMobLoot, updateMobLoot, deleteMobLoot, createRegionRareLoot, updateRegionRareLoot, deleteRegionRareLoot, createAbility, updateAbility, deleteAbility, createRegion, updateRegion, deleteRegion, createMerchant, updateMerchant, deleteMerchant, getAllRegionMobs, createRegionMob, updateRegionMob, deleteRegionMob, getAllMerchantInventory, createMerchantInventory, updateMerchantInventory, deleteMerchantInventory } from "~/lib/gm";
 
 export default function GMPage() {
   const navigate = useNavigate();
@@ -17,6 +17,8 @@ export default function GMPage() {
   const [merchants, setMerchants] = createSignal<any[]>([]);
   const [mobLoot, setMobLoot] = createSignal<any[]>([]);
   const [regionRareLoot, setRegionRareLoot] = createSignal<any[]>([]);
+  const [regionMobs, setRegionMobs] = createSignal<any[]>([]);
+  const [merchantInventory, setMerchantInventory] = createSignal<any[]>([]);
   
   // Edit modal state
   const [editingMob, setEditingMob] = createSignal<any | null>(null);
@@ -24,14 +26,24 @@ export default function GMPage() {
   const [editingMobLoot, setEditingMobLoot] = createSignal<any | null>(null);
   const [editingRegionLoot, setEditingRegionLoot] = createSignal<any | null>(null);
   const [editingAbility, setEditingAbility] = createSignal<any | null>(null);
+  const [editingRegion, setEditingRegion] = createSignal<any | null>(null);
+  const [editingMerchant, setEditingMerchant] = createSignal<any | null>(null);
+  const [editingRegionMob, setEditingRegionMob] = createSignal<any | null>(null);
+  const [editingMerchantInv, setEditingMerchantInv] = createSignal<any | null>(null);
   const [showMobModal, setShowMobModal] = createSignal(false);
   const [showItemModal, setShowItemModal] = createSignal(false);
   const [showMobLootModal, setShowMobLootModal] = createSignal(false);
   const [showRegionLootModal, setShowRegionLootModal] = createSignal(false);
   const [showAbilityModal, setShowAbilityModal] = createSignal(false);
+  const [showRegionModal, setShowRegionModal] = createSignal(false);
+  const [showMerchantModal, setShowMerchantModal] = createSignal(false);
+  const [showRegionMobModal, setShowRegionMobModal] = createSignal(false);
+  const [showMerchantInvModal, setShowMerchantInvModal] = createSignal(false);
   const [calcLevel, setCalcLevel] = createSignal(1);
   const [selectedMobForLoot, setSelectedMobForLoot] = createSignal<number | null>(null);
   const [selectedRegionForLoot, setSelectedRegionForLoot] = createSignal<number | null>(null);
+  const [selectedRegionForMobs, setSelectedRegionForMobs] = createSignal<number | null>(null);
+  const [selectedMerchantForInv, setSelectedMerchantForInv] = createSignal<number | null>(null);
   
   // Helper to check if XP is balanced
   const getXPStatus = (mobLevel: number, xp: number) => {
@@ -69,6 +81,16 @@ export default function GMPage() {
   const reloadAbilities = async () => {
     const abilitiesData = await getAllAbilities();
     setAbilities(abilitiesData as any);
+  };
+  
+  const reloadRegions = async () => {
+    const regionsData = await getAllRegions();
+    setRegions(regionsData as any);
+  };
+  
+  const reloadMerchants = async () => {
+    const merchantsData = await getAllMerchants();
+    setMerchants(merchantsData as any);
   };
   
   // Handle mob edit/delete
@@ -256,6 +278,165 @@ export default function GMPage() {
     }
   };
   
+  // Handle region edit/delete
+  const handleEditRegion = (region: any) => {
+    setEditingRegion({...region});
+    setShowRegionModal(true);
+  };
+  
+  const handleDeleteRegion = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this region? This may break the game if characters are in this region.')) return;
+    try {
+      await deleteRegion(id);
+      await reloadRegions();
+    } catch (err) {
+      console.error('Error deleting region:', err);
+      alert('Failed to delete region');
+    }
+  };
+  
+  const handleSaveRegion = async (e: Event) => {
+    e.preventDefault();
+    const region = editingRegion();
+    if (!region) return;
+    
+    try {
+      if (region.id) {
+        await updateRegion(region.id, region);
+      } else {
+        await createRegion(region);
+      }
+      setShowRegionModal(false);
+      setEditingRegion(null);
+      await reloadRegions();
+    } catch (err) {
+      console.error('Error saving region:', err);
+      alert('Failed to save region');
+    }
+  };
+  
+  // Handle merchant edit/delete
+  const handleEditMerchant = (merchant: any) => {
+    setEditingMerchant({...merchant});
+    setShowMerchantModal(true);
+  };
+  
+  const handleDeleteMerchant = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this merchant?')) return;
+    try {
+      await deleteMerchant(id);
+      await reloadMerchants();
+    } catch (err) {
+      console.error('Error deleting merchant:', err);
+      alert('Failed to delete merchant');
+    }
+  };
+  
+  const handleSaveMerchant = async (e: Event) => {
+    e.preventDefault();
+    const merchant = editingMerchant();
+    if (!merchant) return;
+    
+    try {
+      if (merchant.id) {
+        await updateMerchant(merchant.id, merchant);
+      } else {
+        await createMerchant(merchant);
+      }
+      setShowMerchantModal(false);
+      setEditingMerchant(null);
+      await reloadMerchants();
+    } catch (err) {
+      console.error('Error saving merchant:', err);
+      alert('Failed to save merchant');
+    }
+  };
+  
+  // Reload functions for new tables
+  const reloadRegionMobs = async () => {
+    const data = await getAllRegionMobs();
+    setRegionMobs(data as any);
+  };
+  
+  const reloadMerchantInventory = async () => {
+    const data = await getAllMerchantInventory();
+    setMerchantInventory(data as any);
+  };
+  
+  // Handle region mob spawns edit/delete
+  const handleEditRegionMob = (regionMob: any) => {
+    setEditingRegionMob({...regionMob});
+    setShowRegionMobModal(true);
+  };
+  
+  const handleDeleteRegionMob = async (id: number) => {
+    if (!confirm('Are you sure you want to remove this mob from the region?')) return;
+    try {
+      await deleteRegionMob(id);
+      await reloadRegionMobs();
+    } catch (err) {
+      console.error('Error deleting region mob:', err);
+      alert('Failed to delete region mob');
+    }
+  };
+  
+  const handleSaveRegionMob = async (e: Event) => {
+    e.preventDefault();
+    const regionMob = editingRegionMob();
+    if (!regionMob) return;
+    
+    try {
+      if (regionMob.id) {
+        await updateRegionMob(regionMob.id, regionMob);
+      } else {
+        await createRegionMob(regionMob);
+      }
+      setShowRegionMobModal(false);
+      setEditingRegionMob(null);
+      await reloadRegionMobs();
+    } catch (err) {
+      console.error('Error saving region mob:', err);
+      alert('Failed to save region mob');
+    }
+  };
+  
+  // Handle merchant inventory edit/delete
+  const handleEditMerchantInv = (inv: any) => {
+    setEditingMerchantInv({...inv});
+    setShowMerchantInvModal(true);
+  };
+  
+  const handleDeleteMerchantInv = async (id: number) => {
+    if (!confirm('Are you sure you want to remove this item from the merchant?')) return;
+    try {
+      await deleteMerchantInventory(id);
+      await reloadMerchantInventory();
+    } catch (err) {
+      console.error('Error deleting merchant inventory:', err);
+      alert('Failed to delete merchant inventory');
+    }
+  };
+  
+  const handleSaveMerchantInv = async (e: Event) => {
+    e.preventDefault();
+    const inv = editingMerchantInv();
+    if (!inv) return;
+    
+    try {
+      if (inv.id) {
+        await updateMerchantInventory(inv.id, inv);
+      } else {
+        await createMerchantInventory(inv);
+      }
+      setShowMerchantInvModal(false);
+      setEditingMerchantInv(null);
+      await reloadMerchantInventory();
+    } catch (err) {
+      console.error('Error saving merchant inventory:', err);
+      alert('Failed to save merchant inventory');
+    }
+  };
+  
   onMount(async () => {
     try {
       // Check if user is logged in
@@ -275,7 +456,7 @@ export default function GMPage() {
       // User is authorized, load data
       setAuthorized(true);
       
-      const [playersData, mobsData, itemsData, regionsData, abilitiesData, merchantsData, mobLootData, regionLootData] = await Promise.all([
+      const [playersData, mobsData, itemsData, regionsData, abilitiesData, merchantsData, mobLootData, regionLootData, regionMobsData, merchantInvData] = await Promise.all([
         getAllPlayers(),
         getAllMobs(),
         getAllItems(),
@@ -284,6 +465,8 @@ export default function GMPage() {
         getAllMerchants(),
         getAllMobLoot(),
         getAllRegionRareLoot(),
+        getAllRegionMobs(),
+        getAllMerchantInventory(),
       ]);
       
       setPlayers(playersData as any);
@@ -294,6 +477,8 @@ export default function GMPage() {
       setMerchants(merchantsData as any);
       setMobLoot(mobLootData as any);
       setRegionRareLoot(regionLootData as any);
+      setRegionMobs(regionMobsData as any);
+      setMerchantInventory(merchantInvData as any);
     } catch (err) {
       console.error('GM page error:', err);
       navigate("/");
@@ -366,6 +551,18 @@ export default function GMPage() {
               onClick={() => setActiveTab("loot")}
             >
               Loot Tables
+            </button>
+            <button
+              class={activeTab() === "spawns" ? "button primary" : "button secondary"}
+              onClick={() => setActiveTab("spawns")}
+            >
+              Mob Spawns
+            </button>
+            <button
+              class={activeTab() === "inventory" ? "button primary" : "button secondary"}
+              onClick={() => setActiveTab("inventory")}
+            >
+              Merchant Inventory
             </button>
           </div>
           
@@ -645,7 +842,11 @@ export default function GMPage() {
                 <button class="button primary" onClick={() => {
                   setEditingAbility({
                     name: '', description: '', type: 'damage', category: 'combat',
-                    required_level: 1, mana_cost: 0, cooldown: 0, primary_stat: null
+                    required_level: 1, mana_cost: 0, cooldown: 0, primary_stat: null,
+                    stat_scaling: 0, damage_min: 0, damage_max: 0, healing: 0,
+                    buff_stat: null, buff_amount: 0, buff_duration: 0,
+                    required_strength: 0, required_dexterity: 0, required_constitution: 0,
+                    required_intelligence: 0, required_wisdom: 0, required_charisma: 0
                   });
                   setShowAbilityModal(true);
                 }}>
@@ -707,7 +908,18 @@ export default function GMPage() {
           {/* Regions Tab */}
           <Show when={activeTab() === "regions"}>
             <div class="card">
-              <h2>Regions</h2>
+              <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center", "margin-bottom": "1rem" }}>
+                <h2>Regions ({regions()?.length || 0})</h2>
+                <button class="button primary" onClick={() => {
+                  setEditingRegion({
+                    name: '', description: '', min_level: 1, max_level: 5,
+                    locked: 0, unlock_requirement: null
+                  });
+                  setShowRegionModal(true);
+                }}>
+                  Add Region
+                </button>
+              </div>
               <Show when={regions()}>
                 <div style={{ display: "grid", gap: "1rem", overflow: "auto", "max-height": "600px" }}>
                   <For each={regions()}>
@@ -716,18 +928,42 @@ export default function GMPage() {
                         padding: "1rem", 
                         background: "var(--bg-light)", 
                         "border-radius": "8px",
-                        border: "2px solid var(--accent)"
+                        border: "2px solid var(--accent)",
+                        position: "relative"
                       }}>
-                        <h3 style={{ margin: "0 0 0.5rem 0" }}>{region.name}</h3>
-                        <p style={{ margin: "0 0 0.5rem 0", color: "var(--text-secondary)" }}>
-                          {region.description}
-                        </p>
-                        <div style={{ display: "flex", gap: "2rem", "font-size": "0.9rem" }}>
-                          <div>
-                            <strong>Level Range:</strong> {region.min_level}-{region.max_level}
+                        <div style={{ display: "flex", "justify-content": "space-between", "align-items": "start" }}>
+                          <div style={{ flex: 1 }}>
+                            <h3 style={{ margin: "0 0 0.5rem 0" }}>
+                              {region.name}
+                              {region.locked === 1 && <span style={{ "margin-left": "0.5rem", "font-size": "0.8rem", color: "var(--warning)" }}>🔒 Locked</span>}
+                            </h3>
+                            <p style={{ margin: "0 0 0.5rem 0", color: "var(--text-secondary)" }}>
+                              {region.description}
+                            </p>
+                            <div style={{ display: "flex", gap: "2rem", "font-size": "0.9rem" }}>
+                              <div>
+                                <strong>Level Range:</strong> {region.min_level}-{region.max_level}
+                              </div>
+                              <div>
+                                <strong>Unlock Requirement:</strong> {region.unlock_requirement || "None"}
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <strong>Unlock Requirement:</strong> {region.unlock_requirement || "None"}
+                          <div style={{ display: "flex", gap: "0.5rem", "margin-left": "1rem" }}>
+                            <button 
+                              class="button secondary" 
+                              style={{ padding: "0.5rem 1rem", "font-size": "0.9rem" }}
+                              onClick={() => handleEditRegion(region)}
+                            >
+                              Edit
+                            </button>
+                            <button 
+                              class="button" 
+                              style={{ padding: "0.5rem 1rem", "font-size": "0.9rem", background: "var(--danger)" }}
+                              onClick={() => handleDeleteRegion(region.id)}
+                            >
+                              Delete
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -975,7 +1211,17 @@ export default function GMPage() {
           {/* Merchants Tab */}
           <Show when={activeTab() === "merchants"}>
             <div class="card">
-              <h2>Merchants</h2>
+              <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center", "margin-bottom": "1rem" }}>
+                <h2>Merchants ({merchants()?.length || 0})</h2>
+                <button class="button primary" onClick={() => {
+                  setEditingMerchant({
+                    name: '', description: '', region_id: 1
+                  });
+                  setShowMerchantModal(true);
+                }}>
+                  Add Merchant
+                </button>
+              </div>
               <Show when={merchants()}>
                 <div style={{ overflow: "auto", "max-height": "600px" }}>
                   <table style={{ width: "100%", "border-collapse": "collapse" }}>
@@ -984,6 +1230,7 @@ export default function GMPage() {
                         <th style={{ padding: "0.5rem", "text-align": "left" }}>Name</th>
                         <th style={{ padding: "0.5rem", "text-align": "left" }}>Description</th>
                         <th style={{ padding: "0.5rem", "text-align": "center" }}>Region</th>
+                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -993,11 +1240,226 @@ export default function GMPage() {
                             <td style={{ padding: "0.5rem" }}>{merchant.name}</td>
                             <td style={{ padding: "0.5rem" }}>{merchant.description}</td>
                             <td style={{ padding: "0.5rem", "text-align": "center" }}>{merchant.region_name}</td>
+                            <td style={{ padding: "0.5rem", "text-align": "center" }}>
+                              <button 
+                                class="button secondary" 
+                                style={{ padding: "0.25rem 0.5rem", "font-size": "0.8rem", "margin-right": "0.25rem" }}
+                                onClick={() => handleEditMerchant(merchant)}
+                              >
+                                Edit
+                              </button>
+                              <button 
+                                class="button" 
+                                style={{ padding: "0.25rem 0.5rem", "font-size": "0.8rem", background: "var(--danger)" }}
+                                onClick={() => handleDeleteMerchant(merchant.id)}
+                              >
+                                Delete
+                              </button>
+                            </td>
                           </tr>
                         )}
                       </For>
                     </tbody>
                   </table>
+                </div>
+              </Show>
+            </div>
+          </Show>
+          
+          {/* Mob Spawns Tab */}
+          <Show when={activeTab() === "spawns"}>
+            <div class="card">
+              <h2 style={{ "margin-bottom": "1rem" }}>Region Mob Spawns</h2>
+              <div style={{ display: "grid", "grid-template-columns": "1fr auto", gap: "1rem", "margin-bottom": "1rem", "align-items": "end" }}>
+                <div>
+                  <label style={{ display: "block", "margin-bottom": "0.5rem", "font-weight": "bold" }}>Select Region</label>
+                  <select 
+                    value={selectedRegionForMobs() || ''} 
+                    onChange={(e) => setSelectedRegionForMobs(e.currentTarget.value ? parseInt(e.currentTarget.value) : null)}
+                    style={{ width: "100%", padding: "0.5rem", "font-size": "1rem" }}
+                  >
+                    <option value="">-- Select a region --</option>
+                    <For each={regions().sort((a: any, b: any) => a.min_level - b.min_level)}>
+                      {(region: any) => (
+                        <option value={region.id}>
+                          {region.name} (Lvl {region.min_level}-{region.max_level}) - {regionMobs().filter((rm: any) => rm.region_id === region.id).length} mobs
+                        </option>
+                      )}
+                    </For>
+                  </select>
+                </div>
+                <Show when={selectedRegionForMobs()}>
+                  <button class="button primary" onClick={() => {
+                    setEditingRegionMob({
+                      region_id: selectedRegionForMobs()!,
+                      mob_id: mobs()[0]?.id || 1,
+                      spawn_weight: 1
+                    });
+                    setShowRegionMobModal(true);
+                  }}>
+                    Add Mob Spawn
+                  </button>
+                </Show>
+              </div>
+              
+              <Show when={selectedRegionForMobs()}>
+                <Show 
+                  when={regionMobs().filter((rm: any) => rm.region_id === selectedRegionForMobs()).length > 0}
+                  fallback={
+                    <div style={{ padding: "2rem", "text-align": "center", color: "var(--text-secondary)" }}>
+                      <p>No mobs spawn in this region.</p>
+                      <p style={{ "font-size": "0.9rem", "margin-top": "0.5rem" }}>Click "Add Mob Spawn" to configure mob spawns.</p>
+                    </div>
+                  }
+                >
+                  <div style={{ overflow: "auto", "max-height": "600px" }}>
+                    <table style={{ width: "100%", "border-collapse": "collapse", "font-size": "0.9rem" }}>
+                      <thead style={{ position: "sticky", top: 0, background: "var(--bg-dark)" }}>
+                        <tr style={{ "border-bottom": "2px solid var(--bg-light)" }}>
+                          <th style={{ padding: "0.5rem", "text-align": "left" }}>Mob Name</th>
+                          <th style={{ padding: "0.5rem", "text-align": "center" }}>Level</th>
+                          <th style={{ padding: "0.5rem", "text-align": "center" }}>Spawn Weight</th>
+                          <th style={{ padding: "0.5rem", "text-align": "center" }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <For each={regionMobs().filter((rm: any) => rm.region_id === selectedRegionForMobs()).sort((a: any, b: any) => b.spawn_weight - a.spawn_weight)}>
+                          {(regionMob: any) => (
+                            <tr style={{ "border-bottom": "1px solid var(--bg-light)" }}>
+                              <td style={{ padding: "0.5rem" }}>{regionMob.mob_name}</td>
+                              <td style={{ padding: "0.5rem", "text-align": "center" }}>{regionMob.mob_level}</td>
+                              <td style={{ padding: "0.5rem", "text-align": "center" }}>{regionMob.spawn_weight}</td>
+                              <td style={{ padding: "0.5rem", "text-align": "center" }}>
+                                <button 
+                                  class="button secondary" 
+                                  style={{ padding: "0.25rem 0.5rem", "font-size": "0.8rem", "margin-right": "0.25rem" }}
+                                  onClick={() => handleEditRegionMob(regionMob)}
+                                >
+                                  Edit
+                                </button>
+                                <button 
+                                  class="button" 
+                                  style={{ padding: "0.25rem 0.5rem", "font-size": "0.8rem", background: "var(--danger)" }}
+                                  onClick={() => handleDeleteRegionMob(regionMob.id)}
+                                >
+                                  Delete
+                                </button>
+                              </td>
+                            </tr>
+                          )}
+                        </For>
+                      </tbody>
+                    </table>
+                  </div>
+                </Show>
+              </Show>
+              
+              <Show when={!selectedRegionForMobs()}>
+                <div style={{ padding: "3rem", "text-align": "center", color: "var(--text-secondary)" }}>
+                  <p style={{ "font-size": "1.1rem" }}>Select a region from the dropdown above to manage which mobs spawn there.</p>
+                </div>
+              </Show>
+            </div>
+          </Show>
+          
+          {/* Merchant Inventory Tab */}
+          <Show when={activeTab() === "inventory"}>
+            <div class="card">
+              <h2 style={{ "margin-bottom": "1rem" }}>Merchant Inventory</h2>
+              <div style={{ display: "grid", "grid-template-columns": "1fr auto", gap: "1rem", "margin-bottom": "1rem", "align-items": "end" }}>
+                <div>
+                  <label style={{ display: "block", "margin-bottom": "0.5rem", "font-weight": "bold" }}>Select Merchant</label>
+                  <select 
+                    value={selectedMerchantForInv() || ''} 
+                    onChange={(e) => setSelectedMerchantForInv(e.currentTarget.value ? parseInt(e.currentTarget.value) : null)}
+                    style={{ width: "100%", padding: "0.5rem", "font-size": "1rem" }}
+                  >
+                    <option value="">-- Select a merchant --</option>
+                    <For each={merchants()}>
+                      {(merchant: any) => (
+                        <option value={merchant.id}>
+                          {merchant.name} ({merchant.region_name}) - {merchantInventory().filter((mi: any) => mi.merchant_id === merchant.id).length} items
+                        </option>
+                      )}
+                    </For>
+                  </select>
+                </div>
+                <Show when={selectedMerchantForInv()}>
+                  <button class="button primary" onClick={() => {
+                    setEditingMerchantInv({
+                      merchant_id: selectedMerchantForInv()!,
+                      item_id: items()[0]?.id || 1,
+                      stock: -1,
+                      price_multiplier: 1.0
+                    });
+                    setShowMerchantInvModal(true);
+                  }}>
+                    Add Item
+                  </button>
+                </Show>
+              </div>
+              
+              <Show when={selectedMerchantForInv()}>
+                <Show 
+                  when={merchantInventory().filter((mi: any) => mi.merchant_id === selectedMerchantForInv()).length > 0}
+                  fallback={
+                    <div style={{ padding: "2rem", "text-align": "center", color: "var(--text-secondary)" }}>
+                      <p>This merchant has no inventory.</p>
+                      <p style={{ "font-size": "0.9rem", "margin-top": "0.5rem" }}>Click "Add Item" to add items to sell.</p>
+                    </div>
+                  }
+                >
+                  <div style={{ overflow: "auto", "max-height": "600px" }}>
+                    <table style={{ width: "100%", "border-collapse": "collapse", "font-size": "0.9rem" }}>
+                      <thead style={{ position: "sticky", top: 0, background: "var(--bg-dark)" }}>
+                        <tr style={{ "border-bottom": "2px solid var(--bg-light)" }}>
+                          <th style={{ padding: "0.5rem", "text-align": "left" }}>Item</th>
+                          <th style={{ padding: "0.5rem", "text-align": "center" }}>Type</th>
+                          <th style={{ padding: "0.5rem", "text-align": "right" }}>Base Value</th>
+                          <th style={{ padding: "0.5rem", "text-align": "right" }}>Price Mult</th>
+                          <th style={{ padding: "0.5rem", "text-align": "right" }}>Final Price</th>
+                          <th style={{ padding: "0.5rem", "text-align": "center" }}>Stock</th>
+                          <th style={{ padding: "0.5rem", "text-align": "center" }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <For each={merchantInventory().filter((mi: any) => mi.merchant_id === selectedMerchantForInv()).sort((a: any, b: any) => a.item_name.localeCompare(b.item_name))}>
+                          {(inv: any) => (
+                            <tr style={{ "border-bottom": "1px solid var(--bg-light)" }}>
+                              <td style={{ padding: "0.5rem" }}>{inv.item_name}</td>
+                              <td style={{ padding: "0.5rem", "text-align": "center" }}>{inv.item_type}</td>
+                              <td style={{ padding: "0.5rem", "text-align": "right" }}>{inv.base_value}g</td>
+                              <td style={{ padding: "0.5rem", "text-align": "right" }}>{inv.price_multiplier}x</td>
+                              <td style={{ padding: "0.5rem", "text-align": "right" }}>{Math.round(inv.base_value * inv.price_multiplier)}g</td>
+                              <td style={{ padding: "0.5rem", "text-align": "center" }}>{inv.stock === -1 ? "∞" : inv.stock}</td>
+                              <td style={{ padding: "0.5rem", "text-align": "center" }}>
+                                <button 
+                                  class="button secondary" 
+                                  style={{ padding: "0.25rem 0.5rem", "font-size": "0.8rem", "margin-right": "0.25rem" }}
+                                  onClick={() => handleEditMerchantInv(inv)}
+                                >
+                                  Edit
+                                </button>
+                                <button 
+                                  class="button" 
+                                  style={{ padding: "0.25rem 0.5rem", "font-size": "0.8rem", background: "var(--danger)" }}
+                                  onClick={() => handleDeleteMerchantInv(inv.id)}
+                                >
+                                  Delete
+                                </button>
+                              </td>
+                            </tr>
+                          )}
+                        </For>
+                      </tbody>
+                    </table>
+                  </div>
+                </Show>
+              </Show>
+              
+              <Show when={!selectedMerchantForInv()}>
+                <div style={{ padding: "3rem", "text-align": "center", color: "var(--text-secondary)" }}>
+                  <p style={{ "font-size": "1.1rem" }}>Select a merchant from the dropdown above to manage their inventory.</p>
                 </div>
               </Show>
             </div>
@@ -1373,6 +1835,65 @@ export default function GMPage() {
                     <option value="utility">Utility</option>
                   </select>
                 </div>
+                
+                <div style={{ "grid-column": "1 / -1", "margin-top": "0.5rem" }}>
+                  <h3 style={{ "font-size": "1rem", "margin-bottom": "0.5rem", color: "var(--accent)" }}>Effect Values</h3>
+                </div>
+                
+                <div>
+                  <label>Damage Min</label>
+                  <input type="number" min="0" value={editingAbility()?.damage_min ?? 0} 
+                         onInput={(e) => setEditingAbility({...editingAbility()!, damage_min: parseInt(e.currentTarget.value)})} />
+                </div>
+                <div>
+                  <label>Damage Max</label>
+                  <input type="number" min="0" value={editingAbility()?.damage_max ?? 0} 
+                         onInput={(e) => setEditingAbility({...editingAbility()!, damage_max: parseInt(e.currentTarget.value)})} />
+                </div>
+                <div>
+                  <label>Healing Amount</label>
+                  <input type="number" min="0" value={editingAbility()?.healing ?? 0} 
+                         onInput={(e) => setEditingAbility({...editingAbility()!, healing: parseInt(e.currentTarget.value)})} />
+                </div>
+                <div>
+                  <label>Stat Scaling</label>
+                  <input type="number" step="0.1" min="0" value={editingAbility()?.stat_scaling ?? 0} 
+                         onInput={(e) => setEditingAbility({...editingAbility()!, stat_scaling: parseFloat(e.currentTarget.value)})} />
+                  <small style={{ display: "block", "font-size": "0.75rem", color: "var(--text-secondary)" }}>Multiplier for primary stat</small>
+                </div>
+                
+                <div style={{ "grid-column": "1 / -1", "margin-top": "0.5rem" }}>
+                  <h3 style={{ "font-size": "1rem", "margin-bottom": "0.5rem", color: "var(--accent)" }}>Buff/Debuff (if applicable)</h3>
+                </div>
+                
+                <div>
+                  <label>Buff Stat</label>
+                  <select value={editingAbility()?.buff_stat || ''} 
+                          onChange={(e) => setEditingAbility({...editingAbility()!, buff_stat: e.currentTarget.value || null})}>
+                    <option value="">None</option>
+                    <option value="strength">Strength</option>
+                    <option value="dexterity">Dexterity</option>
+                    <option value="constitution">Constitution</option>
+                    <option value="intelligence">Intelligence</option>
+                    <option value="wisdom">Wisdom</option>
+                    <option value="charisma">Charisma</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Buff Amount</label>
+                  <input type="number" value={editingAbility()?.buff_amount ?? 0} 
+                         onInput={(e) => setEditingAbility({...editingAbility()!, buff_amount: parseInt(e.currentTarget.value)})} />
+                </div>
+                <div>
+                  <label>Buff Duration (seconds)</label>
+                  <input type="number" min="0" value={editingAbility()?.buff_duration ?? 0} 
+                         onInput={(e) => setEditingAbility({...editingAbility()!, buff_duration: parseInt(e.currentTarget.value)})} />
+                </div>
+                
+                <div style={{ "grid-column": "1 / -1", "margin-top": "0.5rem" }}>
+                  <h3 style={{ "font-size": "1rem", "margin-bottom": "0.5rem", color: "var(--accent)" }}>Costs & Requirements</h3>
+                </div>
+                
                 <div>
                   <label>Level Requirement</label>
                   <input type="number" min="1" value={editingAbility()?.required_level || 1} 
@@ -1389,7 +1910,7 @@ export default function GMPage() {
                          onInput={(e) => setEditingAbility({...editingAbility()!, cooldown: parseFloat(e.currentTarget.value)})} required />
                 </div>
                 <div>
-                  <label>Primary Stat (optional)</label>
+                  <label>Primary Stat (for scaling)</label>
                   <select value={editingAbility()?.primary_stat || ''} 
                           onChange={(e) => setEditingAbility({...editingAbility()!, primary_stat: e.currentTarget.value || null})}>
                     <option value="">None</option>
@@ -1401,10 +1922,256 @@ export default function GMPage() {
                     <option value="charisma">Charisma</option>
                   </select>
                 </div>
+                
+                <div style={{ "grid-column": "1 / -1", "margin-top": "0.5rem" }}>
+                  <h3 style={{ "font-size": "1rem", "margin-bottom": "0.5rem", color: "var(--accent)" }}>Stat Requirements</h3>
+                </div>
+                
+                <div>
+                  <label>Required STR</label>
+                  <input type="number" min="0" value={editingAbility()?.required_strength ?? 0} 
+                         onInput={(e) => setEditingAbility({...editingAbility()!, required_strength: parseInt(e.currentTarget.value)})} />
+                </div>
+                <div>
+                  <label>Required DEX</label>
+                  <input type="number" min="0" value={editingAbility()?.required_dexterity ?? 0} 
+                         onInput={(e) => setEditingAbility({...editingAbility()!, required_dexterity: parseInt(e.currentTarget.value)})} />
+                </div>
+                <div>
+                  <label>Required CON</label>
+                  <input type="number" min="0" value={editingAbility()?.required_constitution ?? 0} 
+                         onInput={(e) => setEditingAbility({...editingAbility()!, required_constitution: parseInt(e.currentTarget.value)})} />
+                </div>
+                <div>
+                  <label>Required INT</label>
+                  <input type="number" min="0" value={editingAbility()?.required_intelligence ?? 0} 
+                         onInput={(e) => setEditingAbility({...editingAbility()!, required_intelligence: parseInt(e.currentTarget.value)})} />
+                </div>
+                <div>
+                  <label>Required WIS</label>
+                  <input type="number" min="0" value={editingAbility()?.required_wisdom ?? 0} 
+                         onInput={(e) => setEditingAbility({...editingAbility()!, required_wisdom: parseInt(e.currentTarget.value)})} />
+                </div>
+                <div>
+                  <label>Required CHA</label>
+                  <input type="number" min="0" value={editingAbility()?.required_charisma ?? 0} 
+                         onInput={(e) => setEditingAbility({...editingAbility()!, required_charisma: parseInt(e.currentTarget.value)})} />
+                </div>
               </div>
               <div style={{ display: "flex", gap: "1rem", "margin-top": "1.5rem" }}>
                 <button type="submit" class="button primary" style={{ flex: 1 }}>Save</button>
                 <button type="button" class="button secondary" style={{ flex: 1 }} onClick={() => setShowAbilityModal(false)}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </Show>
+      
+      {/* Region Edit Modal */}
+      <Show when={showRegionModal()}>
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.7)", display: "flex",
+          "align-items": "center", "justify-content": "center", "z-index": 1000
+        }} onClick={() => setShowRegionModal(false)}>
+          <div class="card" style={{ "max-width": "600px", width: "90%", "max-height": "90vh", overflow: "auto" }} 
+               onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center", "margin-bottom": "1rem" }}>
+              <h2>{editingRegion()?.id ? 'Edit Region' : 'Create Region'}</h2>
+              <button onClick={() => setShowRegionModal(false)} style={{ background: "none", border: "none", "font-size": "1.5rem", cursor: "pointer" }}>×</button>
+            </div>
+            <form onSubmit={handleSaveRegion}>
+              <div style={{ display: "grid", gap: "1rem" }}>
+                <div>
+                  <label>Name</label>
+                  <input type="text" value={editingRegion()?.name || ''} 
+                         onInput={(e) => setEditingRegion({...editingRegion()!, name: e.currentTarget.value})} required />
+                </div>
+                <div>
+                  <label>Description</label>
+                  <textarea value={editingRegion()?.description || ''} rows={3}
+                            onInput={(e) => setEditingRegion({...editingRegion()!, description: e.currentTarget.value})} />
+                </div>
+                <div style={{ display: "grid", "grid-template-columns": "1fr 1fr", gap: "1rem" }}>
+                  <div>
+                    <label>Min Level</label>
+                    <input type="number" min="1" value={editingRegion()?.min_level || 1} 
+                           onInput={(e) => setEditingRegion({...editingRegion()!, min_level: parseInt(e.currentTarget.value)})} required />
+                  </div>
+                  <div>
+                    <label>Max Level</label>
+                    <input type="number" min="1" value={editingRegion()?.max_level || 5} 
+                           onInput={(e) => setEditingRegion({...editingRegion()!, max_level: parseInt(e.currentTarget.value)})} required />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: "flex", "align-items": "center", gap: "0.5rem" }}>
+                    <input type="checkbox" checked={editingRegion()?.locked === 1} 
+                           onChange={(e) => setEditingRegion({...editingRegion()!, locked: e.currentTarget.checked ? 1 : 0})} />
+                    Locked (requires unlock requirement)
+                  </label>
+                </div>
+                <div>
+                  <label>Unlock Requirement (optional)</label>
+                  <input type="text" value={editingRegion()?.unlock_requirement || ''} 
+                         onInput={(e) => setEditingRegion({...editingRegion()!, unlock_requirement: e.currentTarget.value || null})}
+                         placeholder="e.g., Complete Greenfield Quest" />
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "1rem", "margin-top": "1.5rem" }}>
+                <button type="submit" class="button primary" style={{ flex: 1 }}>Save</button>
+                <button type="button" class="button secondary" style={{ flex: 1 }} onClick={() => setShowRegionModal(false)}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </Show>
+      
+      {/* Merchant Edit Modal */}
+      <Show when={showMerchantModal()}>
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.7)", display: "flex",
+          "align-items": "center", "justify-content": "center", "z-index": 1000
+        }} onClick={() => setShowMerchantModal(false)}>
+          <div class="card" style={{ "max-width": "600px", width: "90%", "max-height": "90vh", overflow: "auto" }} 
+               onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center", "margin-bottom": "1rem" }}>
+              <h2>{editingMerchant()?.id ? 'Edit Merchant' : 'Create Merchant'}</h2>
+              <button onClick={() => setShowMerchantModal(false)} style={{ background: "none", border: "none", "font-size": "1.5rem", cursor: "pointer" }}>×</button>
+            </div>
+            <form onSubmit={handleSaveMerchant}>
+              <div style={{ display: "grid", gap: "1rem" }}>
+                <div>
+                  <label>Name</label>
+                  <input type="text" value={editingMerchant()?.name || ''} 
+                         onInput={(e) => setEditingMerchant({...editingMerchant()!, name: e.currentTarget.value})} required />
+                </div>
+                <div>
+                  <label>Description</label>
+                  <textarea value={editingMerchant()?.description || ''} rows={2}
+                            onInput={(e) => setEditingMerchant({...editingMerchant()!, description: e.currentTarget.value})} />
+                </div>
+                <div>
+                  <label>Region</label>
+                  <select value={editingMerchant()?.region_id || 1} 
+                          onChange={(e) => setEditingMerchant({...editingMerchant()!, region_id: parseInt(e.currentTarget.value)})} required>
+                    <For each={regions()}>
+                      {(region: any) => <option value={region.id}>{region.name}</option>}
+                    </For>
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "1rem", "margin-top": "1.5rem" }}>
+                <button type="submit" class="button primary" style={{ flex: 1 }}>Save</button>
+                <button type="button" class="button secondary" style={{ flex: 1 }} onClick={() => setShowMerchantModal(false)}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </Show>
+      
+      {/* Region Mob Spawn Modal */}
+      <Show when={showRegionMobModal()}>
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.7)", display: "flex",
+          "align-items": "center", "justify-content": "center", "z-index": 1000
+        }} onClick={() => setShowRegionMobModal(false)}>
+          <div class="card" style={{ "max-width": "500px", width: "90%"}} 
+               onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center", "margin-bottom": "1rem" }}>
+              <h2>{editingRegionMob()?.id ? 'Edit Mob Spawn' : 'Add Mob Spawn'}</h2>
+              <button onClick={() => setShowRegionMobModal(false)} style={{ background: "none", border: "none", "font-size": "1.5rem", cursor: "pointer" }}>×</button>
+            </div>
+            <form onSubmit={handleSaveRegionMob}>
+              <div style={{ display: "grid", gap: "1rem" }}>
+                <div>
+                  <label>Region</label>
+                  <select value={editingRegionMob()?.region_id || 1} 
+                          onChange={(e) => setEditingRegionMob({...editingRegionMob()!, region_id: parseInt(e.currentTarget.value)})} required>
+                    <For each={regions()}>
+                      {(region: any) => <option value={region.id}>{region.name}</option>}
+                    </For>
+                  </select>
+                </div>
+                <div>
+                  <label>Mob</label>
+                  <select value={editingRegionMob()?.mob_id || 1} 
+                          onChange={(e) => setEditingRegionMob({...editingRegionMob()!, mob_id: parseInt(e.currentTarget.value)})} required>
+                    <For each={mobs().sort((a: any, b: any) => a.level - b.level || a.name.localeCompare(b.name))}>
+                      {(mob: any) => <option value={mob.id}>{mob.name} (Lvl {mob.level})</option>}
+                    </For>
+                  </select>
+                </div>
+                <div>
+                  <label>Spawn Weight (higher = more common)</label>
+                  <input type="number" min="1" value={editingRegionMob()?.spawn_weight || 1} 
+                         onInput={(e) => setEditingRegionMob({...editingRegionMob()!, spawn_weight: parseInt(e.currentTarget.value)})} required />
+                  <small style={{ display: "block", "margin-top": "0.25rem", color: "var(--text-secondary)" }}>
+                    Relative spawn frequency. Higher numbers = spawns more often.
+                  </small>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "1rem", "margin-top": "1.5rem" }}>
+                <button type="submit" class="button primary" style={{ flex: 1 }}>Save</button>
+                <button type="button" class="button secondary" style={{ flex: 1 }} onClick={() => setShowRegionMobModal(false)}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </Show>
+      
+      {/* Merchant Inventory Modal */}
+      <Show when={showMerchantInvModal()}>
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.7)", display: "flex",
+          "align-items": "center", "justify-content": "center", "z-index": 1000
+        }} onClick={() => setShowMerchantInvModal(false)}>
+          <div class="card" style={{ "max-width": "500px", width: "90%" }} 
+               onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center", "margin-bottom": "1rem" }}>
+              <h2>{editingMerchantInv()?.id ? 'Edit Merchant Item' : 'Add Merchant Item'}</h2>
+              <button onClick={() => setShowMerchantInvModal(false)} style={{ background: "none", border: "none", "font-size": "1.5rem", cursor: "pointer" }}>×</button>
+            </div>
+            <form onSubmit={handleSaveMerchantInv}>
+              <div style={{ display: "grid", gap: "1rem" }}>
+                <div>
+                  <label>Merchant</label>
+                  <select value={editingMerchantInv()?.merchant_id || 1} 
+                          onChange={(e) => setEditingMerchantInv({...editingMerchantInv()!, merchant_id: parseInt(e.currentTarget.value)})} required>
+                    <For each={merchants()}>
+                      {(merchant: any) => <option value={merchant.id}>{merchant.name} ({merchant.region_name})</option>}
+                    </For>
+                  </select>
+                </div>
+                <div>
+                  <label>Item</label>
+                  <select value={editingMerchantInv()?.item_id || 1} 
+                          onChange={(e) => setEditingMerchantInv({...editingMerchantInv()!, item_id: parseInt(e.currentTarget.value)})} required>
+                    <For each={items().sort((a: any, b: any) => a.name.localeCompare(b.name))}>
+                      {(item: any) => <option value={item.id}>{item.name} ({item.type})</option>}
+                    </For>
+                  </select>
+                </div>
+                <div>
+                  <label>Stock (-1 = infinite)</label>
+                  <input type="number" min="-1" value={editingMerchantInv()?.stock ?? -1} 
+                         onInput={(e) => setEditingMerchantInv({...editingMerchantInv()!, stock: parseInt(e.currentTarget.value)})} required />
+                </div>
+                <div>
+                  <label>Price Multiplier</label>
+                  <input type="number" step="0.1" min="0.1" value={editingMerchantInv()?.price_multiplier || 1.0} 
+                         onInput={(e) => setEditingMerchantInv({...editingMerchantInv()!, price_multiplier: parseFloat(e.currentTarget.value)})} required />
+                  <small style={{ display: "block", "margin-top": "0.25rem", color: "var(--text-secondary)" }}>
+                    1.0 = normal price, 0.5 = half price, 2.0 = double price
+                  </small>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "1rem", "margin-top": "1.5rem" }}>
+                <button type="submit" class="button primary" style={{ flex: 1 }}>Save</button>
+                <button type="button" class="button secondary" style={{ flex: 1 }} onClick={() => setShowMerchantInvModal(false)}>Cancel</button>
               </div>
             </form>
           </div>
