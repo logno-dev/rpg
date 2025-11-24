@@ -1,11 +1,20 @@
-import { createSignal, Show } from "solid-js";
+import { createSignal, Show, onMount } from "solid-js";
 import { useNavigate } from "@solidjs/router";
+import { getUser } from "~/lib/auth";
 
 export default function Home() {
   const [isRegister, setIsRegister] = createSignal(false);
   const [error, setError] = createSignal("");
   const [loading, setLoading] = createSignal(false);
   const navigate = useNavigate();
+  
+  // Redirect to character select if already logged in
+  onMount(async () => {
+    const user = await getUser();
+    if (user) {
+      navigate('/character-select');
+    }
+  });
 
   const handleSubmit = async (e: SubmitEvent) => {
     e.preventDefault();

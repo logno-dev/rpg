@@ -81,6 +81,7 @@ async function migrate() {
       '030_fix_combat_sessions_mob_id.sql',
       '031_create_loot_tables.sql',
       '032_add_region_id_to_mobs.sql',
+      '033_add_gm_role.sql',
     ];
 
     for (const migrationFile of migrations) {

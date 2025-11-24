@@ -14,8 +14,8 @@ function calculateMaxHealth(level: number, constitution: number): number {
 }
 
 function calculateMaxMana(level: number, intelligence: number): number {
-  const baseMana = 50;
-  const levelBonus = level * 10; // +10 mana per level
+  const baseMana = 100;
+  const levelBonus = level * 20; // +20 mana per level (same as health)
   const intelligenceBonus = (intelligence - 10) * 5; // +5 mana per INT point
   return baseMana + levelBonus + intelligenceBonus;
 }
