@@ -166,9 +166,25 @@ export default function GamePage() {
       
       // Always preserve health/mana if we have existing values (client-side regen is authoritative)
       // The server only updates HP/mana when we explicitly sync via syncHealthToServer
+      // Also preserve exp, level, gold, and available_points if we have newer values from combat
       if (existingChar) {
         character.current_health = existingChar.current_health;
         character.current_mana = existingChar.current_mana;
+        
+        // Preserve combat-updated stats if they're newer (higher values)
+        // This prevents stale cached route data from overwriting fresh combat results
+        if (existingChar.experience > gameData.character.experience) {
+          character.experience = existingChar.experience;
+        }
+        if (existingChar.level > gameData.character.level) {
+          character.level = existingChar.level;
+        }
+        if (existingChar.gold > gameData.character.gold) {
+          character.gold = existingChar.gold;
+        }
+        if (existingChar.available_points > gameData.character.available_points) {
+          character.available_points = existingChar.available_points;
+        }
       }
       
       // Initialize ALL CharacterContext data from server
@@ -730,15 +746,9 @@ export default function GamePage() {
           console.log('[COMBAT END] WARNING: No inventory in response!');
         }
 
-        // For dungeon combat, don't refetch - we need to preserve HP/mana for regen between encounters
-        // For normal combat, refetch to ensure everything is synced
-        const shouldRefetch = !isDungeonCombat();
-        
-        setTimeout(async () => {
-          if (shouldRefetch) {
-            await refetchData();
-          }
-          
+        // No need to refetch - we already have fresh data from finish-combat response
+        // Refetching would pull stale cached data that overwrites our correct values
+        setTimeout(() => {
           // Show victory modal with rewards
           setVictoryData({
             expGained: responseData.expGained,
@@ -1185,7 +1195,8 @@ export default function GamePage() {
         actions.setCharacter(result.character);
       }
       
-      await refetchData();
+      // Don't refetch - we already have the updated character from the server response
+      // Refetching might get stale cached data
       
     } catch (error: any) {
       console.error('Assign stats error:', error);

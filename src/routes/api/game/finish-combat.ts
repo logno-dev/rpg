@@ -87,10 +87,11 @@ export async function POST(event: APIEvent) {
           ],
         });
       } else {
-        // For normal combat, update character HP and stats
+        // For normal combat, update character HP, mana, and stats
         await db.execute({
           sql: `UPDATE characters 
                 SET current_health = ?, 
+                    current_mana = ?,
                     experience = ?, 
                     gold = gold + ?, 
                     level = ?, 
@@ -98,6 +99,7 @@ export async function POST(event: APIEvent) {
                 WHERE id = ?`,
           args: [
             finalHealth,
+            finalMana || 0,
             levelUp ? 0 : newExp,
             goldGained,
             newLevel,
