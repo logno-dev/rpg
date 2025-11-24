@@ -151,44 +151,17 @@ export default function GamePage() {
   const currentAbilities = () => store.abilities;
   const currentHotbar = () => store.hotbar;
   
-  // Initialize CharacterContext from server data
+  // Initialize CharacterContext from server data ONLY on first load
+  // After that, we update CharacterContext directly from API responses
+  const [isInitialized, setIsInitialized] = createSignal(false);
+  
   createEffect(() => {
     const gameData = data();
-    if (gameData) {
-      console.log('[DATA] Server data updated - initializing CharacterContext', {
-        hasActiveDungeon: !!gameData.activeDungeonProgress,
-        currentIsDungeonCombat: isDungeonCombat()
-      });
+    if (gameData && !isInitialized()) {
+      console.log('[DATA] Initial load - initializing CharacterContext');
       
-      // Preserve current health/mana if we already have a character
-      const existingChar = store.character;
-      const character = { ...gameData.character };
-      
-      // Always preserve health/mana if we have existing values (client-side regen is authoritative)
-      // The server only updates HP/mana when we explicitly sync via syncHealthToServer
-      // Also preserve exp, level, gold, and available_points if we have newer values from combat
-      if (existingChar) {
-        character.current_health = existingChar.current_health;
-        character.current_mana = existingChar.current_mana;
-        
-        // Preserve combat-updated stats if they're newer (higher values)
-        // This prevents stale cached route data from overwriting fresh combat results
-        if (existingChar.experience > gameData.character.experience) {
-          character.experience = existingChar.experience;
-        }
-        if (existingChar.level > gameData.character.level) {
-          character.level = existingChar.level;
-        }
-        if (existingChar.gold > gameData.character.gold) {
-          character.gold = existingChar.gold;
-        }
-        if (existingChar.available_points > gameData.character.available_points) {
-          character.available_points = existingChar.available_points;
-        }
-      }
-      
-      // Initialize ALL CharacterContext data from server
-      actions.setCharacter(character);
+      // On initial load, use all server data as-is
+      actions.setCharacter(gameData.character);
       actions.setInventory(gameData.inventory);
       actions.setAbilities(gameData.abilities);
       actions.setHotbar(gameData.hotbar || []);
@@ -196,6 +169,25 @@ export default function GamePage() {
       actions.setCurrentRegion(gameData.currentRegion);
       actions.setMerchants(gameData.merchants || []);
       actions.setDungeons(gameData.dungeons || []);
+      
+      setIsInitialized(true);
+    } else if (gameData && isInitialized()) {
+      console.log('[DATA] Route data updated but already initialized - preserving CharacterContext');
+      // After initial load, CharacterContext is the source of truth
+      // We only update it directly via API responses, not from stale route cache
+      // The ONLY thing we might want to update is health/mana from server if it's more authoritative
+      // But since we handle regen client-side, we don't even need that
+      
+      // HOWEVER: We do need to preserve health/mana from client during route refetches
+      const existingChar = store.character;
+      if (existingChar && gameData.character) {
+        // Sync server's max_health/max_mana in case they changed from level up
+        const updatedChar = { ...existingChar };
+        updatedChar.max_health = gameData.character.max_health;
+        updatedChar.max_mana = gameData.character.max_mana;
+        actions.setCharacter(updatedChar);
+      }
+    }
       
       // Set active dungeon if there is one
       if (gameData.activeDungeonProgress) {

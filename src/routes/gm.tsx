@@ -2012,6 +2012,7 @@ export default function GMPage() {
                   <select value={editingAbility()?.type || 'damage'} 
                           onChange={(e) => setEditingAbility({...editingAbility()!, type: e.currentTarget.value})} required>
                     <option value="damage">Damage</option>
+                    <option value="spell">Spell</option>
                     <option value="heal">Heal</option>
                     <option value="buff">Buff</option>
                     <option value="debuff">Debuff</option>

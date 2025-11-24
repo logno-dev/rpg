@@ -268,7 +268,8 @@ export function CombatEngine(props: CombatEngineProps) {
   // Check if ability can be used
   const canUseAbility = (ability: AbilityWithCooldown): { canUse: boolean; reason?: string } => {
     // Check mana cost
-    if (ability.type === 'spell' && currentMana() < ability.mana_cost) {
+    // Check mana if ability has a mana cost
+    if (ability.mana_cost > 0 && currentMana() < ability.mana_cost) {
       return { canUse: false, reason: `Need ${ability.mana_cost} mana` };
     }
     
@@ -444,9 +445,9 @@ export function CombatEngine(props: CombatEngineProps) {
       return newState;
     });
 
-    // Consume mana and update parent
-    const newMana = ability.type === 'spell' ? currentMana() - ability.mana_cost : currentMana();
-    if (ability.type === 'spell') {
+    // Consume mana if ability has a mana cost
+    const newMana = ability.mana_cost > 0 ? currentMana() - ability.mana_cost : currentMana();
+    if (ability.mana_cost > 0) {
       setCurrentMana(newMana);
     }
     
@@ -896,7 +897,7 @@ export function CombatEngine(props: CombatEngineProps) {
                       ) : ''
                     }\n${
                       action.type === 'ability' && action.ability ? (
-                        action.ability.type === 'spell' ? `Mana: ${action.ability.mana_cost}` : `Cooldown: ${action.ability.cooldown}s`
+                        action.ability.mana_cost > 0 ? `Mana: ${action.ability.mana_cost}` : `Cooldown: ${action.ability.cooldown}s`
                       ) : action.type === 'consumable' && action.item ? (
                         `Quantity: ${action.item.quantity}`
                       ) : ''
@@ -926,7 +927,7 @@ export function CombatEngine(props: CombatEngineProps) {
                     
                     <div style={{ "font-weight": "bold" }}>{name()}</div>
                     
-                    <Show when={action.type === 'ability' && action.ability?.type === 'spell'}>
+                    <Show when={action.type === 'ability' && action.ability?.mana_cost && action.ability.mana_cost > 0}>
                       <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)" }}>
                         {action.ability?.mana_cost} mana
                       </div>
