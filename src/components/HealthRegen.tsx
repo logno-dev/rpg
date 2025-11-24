@@ -19,7 +19,7 @@ const BASE_MANA_REGEN_OUT_OF_COMBAT = 3;
 
 // In combat regen rates
 const BASE_HP_REGEN_IN_COMBAT = 0.1;
-const BASE_MANA_REGEN_IN_COMBAT = 0.2;
+const BASE_MANA_REGEN_IN_COMBAT = 1.5; // Increased from 0.2 to 1.5 (mages need mana!)
 
 export function HealthRegen(props: HealthRegenProps) {
   let healthIntervalId: number | undefined;
@@ -83,8 +83,8 @@ export function HealthRegen(props: HealthRegenProps) {
       manaIntervalId = undefined;
     }
     
-    // Check if we need mana regen (only out of combat)
-    if (currentM >= maxM || inCombat) {
+    // Check if we need mana regen
+    if (currentM >= maxM) {
       return;
     }
 
@@ -95,8 +95,8 @@ export function HealthRegen(props: HealthRegenProps) {
       const isInCombat = props.isInCombat();
       const currentHealth = props.currentHealth();
 
-      // Stop if mana is full or entered combat
-      if (currentMana >= maxMana || isInCombat) {
+      // Stop if mana is full
+      if (currentMana >= maxMana) {
         if (manaIntervalId !== undefined) {
           clearInterval(manaIntervalId);
           manaIntervalId = undefined;
@@ -104,9 +104,9 @@ export function HealthRegen(props: HealthRegenProps) {
         return;
       }
 
-      // Calculate mana regen (only out of combat)
-      const baseManaRegen = BASE_MANA_REGEN_OUT_OF_COMBAT;
-      const wisdomBonusMultiplier = 0.3;
+      // Calculate mana regen (works in and out of combat now)
+      const baseManaRegen = isInCombat ? BASE_MANA_REGEN_IN_COMBAT : BASE_MANA_REGEN_OUT_OF_COMBAT;
+      const wisdomBonusMultiplier = isInCombat ? 0.1 : 0.3;
       const wisdomBonus = (wisdom - 10) * wisdomBonusMultiplier;
       const manaRegenRate = baseManaRegen + wisdomBonus;
 

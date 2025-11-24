@@ -327,13 +327,25 @@ export async function startCombat(characterId: number, mobId: number, isDungeon:
     throw new Error('Already in combat');
   }
 
+  // For dungeon combat, use session HP/mana from dungeon progress
+  let characterHealth = character.current_health;
+  let characterMana = character.current_mana;
+  
+  if (isDungeon) {
+    const dungeonProgress = await getActiveDungeon(characterId);
+    if (dungeonProgress && dungeonProgress.session_health !== null) {
+      characterHealth = dungeonProgress.session_health;
+      characterMana = dungeonProgress.session_mana ?? character.current_mana;
+    }
+  }
+
   // Create combat session
   const result = await db.execute({
     sql: `INSERT INTO combat_sessions 
       (character_id, mob_id, character_health, mob_health, is_dungeon) 
       VALUES (?, ?, ?, ?, ?) 
       RETURNING *`,
-    args: [characterId, mobId, character.current_health, mob.max_health, isDungeon ? 1 : 0],
+    args: [characterId, mobId, characterHealth, mob.max_health, isDungeon ? 1 : 0],
   });
 
   return result.rows[0] as CombatSession;
@@ -356,13 +368,25 @@ export async function startNamedMobCombat(characterId: number, namedMobId: numbe
     throw new Error('Already in combat');
   }
 
+  // For dungeon combat, use session HP/mana from dungeon progress
+  let characterHealth = character.current_health;
+  let characterMana = character.current_mana;
+  
+  if (isDungeon) {
+    const dungeonProgress = await getActiveDungeon(characterId);
+    if (dungeonProgress && dungeonProgress.session_health !== null) {
+      characterHealth = dungeonProgress.session_health;
+      characterMana = dungeonProgress.session_mana ?? character.current_mana;
+    }
+  }
+
   // Create combat session with named mob (mob_id is NULL for named mobs)
   const result = await db.execute({
     sql: `INSERT INTO combat_sessions 
       (character_id, mob_id, named_mob_id, character_health, mob_health, is_dungeon) 
       VALUES (?, NULL, ?, ?, ?, ?) 
       RETURNING *`,
-    args: [characterId, namedMobId, character.current_health, namedMob.max_health, isDungeon ? 1 : 0],
+    args: [characterId, namedMobId, characterHealth, namedMob.max_health, isDungeon ? 1 : 0],
   });
 
   return result.rows[0] as CombatSession;
@@ -1160,12 +1184,13 @@ export async function startDungeon(characterId: number, dungeonId: number): Prom
     throw new Error(`Requires level ${dungeon.required_level}`);
   }
 
-  // Create dungeon progress
+  // Create dungeon progress with session state
   const progress = await db.execute({
-    sql: `INSERT INTO character_dungeon_progress (character_id, dungeon_id, current_encounter, status)
-          VALUES (?, ?, 1, 'active')
+    sql: `INSERT INTO character_dungeon_progress 
+          (character_id, dungeon_id, current_encounter, status, boss_mob_id, session_health, session_mana)
+          VALUES (?, ?, 1, 'active', ?, ?, ?)
           RETURNING *`,
-    args: [characterId, dungeonId],
+    args: [characterId, dungeonId, dungeon.boss_mob_id, character.current_health, character.current_mana],
   });
 
   // Get all encounters to calculate total
@@ -1190,8 +1215,15 @@ export async function startDungeon(characterId: number, dungeonId: number): Prom
     if (!namedMob) throw new Error('Boss not found');
     
     const combat = await startNamedMobCombat(characterId, dungeon.boss_mob_id, true);
+    
+    const dungeonProgress = {
+      ...(progress.rows[0] as any),
+      dungeon_name: dungeon.name,
+      total_encounters: totalEncounters
+    };
+    
     return {
-      dungeonProgress: progress.rows[0],
+      dungeonProgress,
       encounter,
       dungeon,
       combat,
@@ -1212,8 +1244,15 @@ export async function startDungeon(characterId: number, dungeonId: number): Prom
     
     const mob = mobResult.rows[0];
     const combat = await startCombat(characterId, encounter.mob_id, true);
+    
+    const dungeonProgress = {
+      ...(progress.rows[0] as any),
+      dungeon_name: dungeon.name,
+      total_encounters: totalEncounters
+    };
+    
     return {
-      dungeonProgress: progress.rows[0],
+      dungeonProgress,
       encounter,
       dungeon,
       combat,
@@ -1229,7 +1268,11 @@ export async function startDungeon(characterId: number, dungeonId: number): Prom
 
 export async function getActiveDungeon(characterId: number): Promise<any | null> {
   const result = await db.execute({
-    sql: `SELECT character_dungeon_progress.*, dungeons.name as dungeon_name, dungeons.boss_mob_id
+    sql: `SELECT 
+            character_dungeon_progress.*, 
+            dungeons.name as dungeon_name, 
+            dungeons.boss_mob_id,
+            (SELECT COUNT(*) FROM dungeon_encounters WHERE dungeon_id = character_dungeon_progress.dungeon_id) as total_encounters
           FROM character_dungeon_progress
           JOIN dungeons ON character_dungeon_progress.dungeon_id = dungeons.id
           WHERE character_dungeon_progress.character_id = ? AND character_dungeon_progress.status = ?`,
@@ -1239,11 +1282,19 @@ export async function getActiveDungeon(characterId: number): Promise<any | null>
   return result.rows[0] as any | null;
 }
 
-export async function advanceDungeonEncounter(characterId: number): Promise<any> {
+export async function advanceDungeonEncounter(characterId: number, currentHealth?: number, currentMana?: number): Promise<any> {
   // Get active dungeon progress
   const progress = await getActiveDungeon(characterId);
   if (!progress) {
     throw new Error('No active dungeon');
+  }
+
+  // Update session HP/mana before advancing to next encounter
+  if (currentHealth !== undefined && currentMana !== undefined) {
+    await db.execute({
+      sql: 'UPDATE character_dungeon_progress SET session_health = ?, session_mana = ?, updated_at = unixepoch() WHERE id = ?',
+      args: [currentHealth, currentMana, progress.id],
+    });
   }
 
   // Get all encounters for this dungeon
@@ -1289,6 +1340,10 @@ export async function advanceDungeonEncounter(characterId: number): Promise<any>
 
   // Get next encounter
   const nextEncounter = encounters.find((e: any) => e.encounter_order === nextEncounterOrder);
+  
+  if (!nextEncounter) {
+    throw new Error(`No encounter found for order ${nextEncounterOrder}`);
+  }
 
   if (nextEncounter.is_boss) {
     // Boss encounter - start combat with named mob

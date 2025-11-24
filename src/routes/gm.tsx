@@ -1857,9 +1857,9 @@ export default function GMPage() {
                 </div>
                 <div>
                   <label>Stat Scaling</label>
-                  <input type="number" step="0.1" min="0" value={editingAbility()?.stat_scaling ?? 0} 
-                         onInput={(e) => setEditingAbility({...editingAbility()!, stat_scaling: parseFloat(e.currentTarget.value)})} />
-                  <small style={{ display: "block", "font-size": "0.75rem", color: "var(--text-secondary)" }}>Multiplier for primary stat</small>
+                  <input type="number" step="0.01" min="0" value={editingAbility()?.stat_scaling ?? 0} 
+                         onChange={(e) => setEditingAbility({...editingAbility()!, stat_scaling: parseFloat(e.currentTarget.value) || 0})} />
+                  <small style={{ display: "block", "font-size": "0.75rem", color: "var(--text-secondary)" }}>Multiplier for primary stat (e.g. 0.5, 1.2)</small>
                 </div>
                 
                 <div style={{ "grid-column": "1 / -1", "margin-top": "0.5rem" }}>
@@ -1906,8 +1906,8 @@ export default function GMPage() {
                 </div>
                 <div>
                   <label>Cooldown (seconds)</label>
-                  <input type="number" min="0" step="0.1" value={editingAbility()?.cooldown || 0} 
-                         onInput={(e) => setEditingAbility({...editingAbility()!, cooldown: parseFloat(e.currentTarget.value)})} required />
+                  <input type="number" step="0.01" min="0" value={editingAbility()?.cooldown || 0} 
+                         onChange={(e) => setEditingAbility({...editingAbility()!, cooldown: parseFloat(e.currentTarget.value) || 0})} required />
                 </div>
                 <div>
                   <label>Primary Stat (for scaling)</label>

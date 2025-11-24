@@ -5,7 +5,14 @@ import { db } from '~/lib/db';
 export async function POST(event: APIEvent) {
   try {
     const body = await event.request.json();
-    const { characterId, mobId, namedMobId, result, finalHealth } = body;
+    const { characterId, mobId, namedMobId, result, finalHealth, finalMana } = body;
+
+    // Check if this is dungeon combat
+    const activeDungeonResult = await db.execute({
+      sql: 'SELECT * FROM character_dungeon_progress WHERE character_id = ? AND status = ?',
+      args: [characterId, 'active'],
+    });
+    const isDungeonCombat = activeDungeonResult.rows.length > 0;
 
     if (result === 'victory') {
       let mob: any;
@@ -55,23 +62,50 @@ export async function POST(event: APIEvent) {
       }
 
       // Update character
-      await db.execute({
-        sql: `UPDATE characters 
-              SET current_health = ?, 
-                  experience = ?, 
-                  gold = gold + ?, 
-                  level = ?, 
-                  available_points = available_points + ?
-              WHERE id = ?`,
-        args: [
-          finalHealth,
-          levelUp ? 0 : newExp,
-          goldGained,
-          newLevel,
-          pointsGained,
-          characterId
-        ],
-      });
+      if (isDungeonCombat) {
+        // For dungeon combat, update dungeon session HP/mana instead of character
+        await db.execute({
+          sql: `UPDATE character_dungeon_progress 
+                SET session_health = ?, session_mana = ?, updated_at = unixepoch()
+                WHERE character_id = ? AND status = ?`,
+          args: [finalHealth, finalMana || 0, characterId, 'active'],
+        });
+        // Still update exp, gold, level for character
+        await db.execute({
+          sql: `UPDATE characters 
+                SET experience = ?, 
+                    gold = gold + ?, 
+                    level = ?, 
+                    available_points = available_points + ?
+                WHERE id = ?`,
+          args: [
+            levelUp ? 0 : newExp,
+            goldGained,
+            newLevel,
+            pointsGained,
+            characterId
+          ],
+        });
+      } else {
+        // For normal combat, update character HP and stats
+        await db.execute({
+          sql: `UPDATE characters 
+                SET current_health = ?, 
+                    experience = ?, 
+                    gold = gold + ?, 
+                    level = ?, 
+                    available_points = available_points + ?
+                WHERE id = ?`,
+          args: [
+            finalHealth,
+            levelUp ? 0 : newExp,
+            goldGained,
+            newLevel,
+            pointsGained,
+            characterId
+          ],
+        });
+      }
 
       // Roll for loot - each item is rolled independently based on drop chance
       const loot: any[] = [];

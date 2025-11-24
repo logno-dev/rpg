@@ -3,14 +3,14 @@ import type { APIEvent } from '@solidjs/start/server';
 import { getUser } from '~/lib/auth';
 import { db } from '~/lib/db';
 
-export async function POST({ request }: APIEvent) {
+export async function POST(event: APIEvent) {
   try {
-    const user = await getUser(request);
+    const user = await getUser();
     if (!user) {
       return json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
+    const body = await event.request.json();
     const { characterId } = body;
 
     if (!characterId) {
@@ -24,10 +24,12 @@ export async function POST({ request }: APIEvent) {
     });
 
     // Mark dungeon as failed
-    await db.execute({
+    const result = await db.execute({
       sql: 'UPDATE character_dungeon_progress SET status = ?, updated_at = unixepoch() WHERE character_id = ? AND status = ?',
       args: ['failed', characterId, 'active'],
     });
+
+    console.log('[ABANDON DUNGEON] Updated rows:', result.rowsAffected);
 
     return json({ success: true });
   } catch (error: any) {

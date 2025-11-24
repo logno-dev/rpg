@@ -3,7 +3,7 @@ import { createStore, produce } from "solid-js/store";
 import type { Character, Item, Region, Ability } from "~/lib/db";
 
 // Types
-type InventoryItem = {
+export type InventoryItem = {
   id: number;
   character_id: number;
   item_id: number;
@@ -73,6 +73,17 @@ type HotbarSlot = {
   itemData?: InventoryItem;
 };
 
+export type DungeonSession = {
+  id: number;
+  dungeon_id: number;
+  current_encounter: number;
+  total_encounters: number;
+  session_health: number;
+  session_mana: number;
+  boss_mob_id: number;
+  dungeon_name: string;
+};
+
 type CharacterStore = {
   character: Character | null;
   inventory: InventoryItem[];
@@ -82,6 +93,7 @@ type CharacterStore = {
   currentRegion: Region | null;
   merchants: Merchant[];
   dungeons: Dungeon[];
+  dungeonSession: DungeonSession | null;
   isLoading: boolean;
 };
 
@@ -96,6 +108,8 @@ type CharacterContextValue = [
     setCurrentRegion: (region: Region) => void;
     setMerchants: (merchants: Merchant[]) => void;
     setDungeons: (dungeons: Dungeon[]) => void;
+    setDungeonSession: (session: DungeonSession | null) => void;
+    updateDungeonHealth: (health: number, mana: number) => void;
     updateHealth: (health: number, mana?: number) => void;
     updateGold: (gold: number) => void;
     updateExperience: (exp: number) => void;
@@ -124,6 +138,7 @@ export const CharacterProvider: ParentComponent<{ initialData?: Partial<Characte
     currentRegion: props.initialData?.currentRegion || null,
     merchants: props.initialData?.merchants || [],
     dungeons: props.initialData?.dungeons || [],
+    dungeonSession: null,
     isLoading: false,
   });
 
@@ -158,6 +173,18 @@ export const CharacterProvider: ParentComponent<{ initialData?: Partial<Characte
 
     setDungeons: (dungeons: Dungeon[]) => {
       setStore("dungeons", dungeons);
+    },
+
+    setDungeonSession: (session: DungeonSession | null) => {
+      setStore("dungeonSession", session);
+    },
+
+    updateDungeonHealth: (health: number, mana: number) => {
+      console.log('[UPDATE DUNGEON HEALTH]', { health, mana });
+      setStore("dungeonSession", (session) => {
+        if (!session) return session;
+        return { ...session, session_health: health, session_mana: mana };
+      });
     },
 
     updateHealth: (health: number, mana?: number) => {

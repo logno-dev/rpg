@@ -126,7 +126,11 @@ export default function GamePage() {
   // Dungeon state
   const [activeDungeon, setActiveDungeon] = createSignal<any | null>(null);
   const [namedMobEncounter, setNamedMobEncounter] = createSignal<NamedMob | null>(null);
-  const [isDungeonCombat, setIsDungeonCombat] = createSignal(false);
+  // Derived from dungeonSession - if we have a session, we're in a dungeon
+  const isDungeonCombat = () => !!store.dungeonSession;
+  
+  // Track if we're actively in dungeon flow (to prevent interruption modal between battles)
+  const [isInActiveDungeonFlow, setIsInActiveDungeonFlow] = createSignal(false);
   const [dungeonProgress, setDungeonProgress] = createSignal<{current: number, total: number} | null>(null);
   
   // Debug dungeonProgress changes
@@ -151,15 +155,18 @@ export default function GamePage() {
   createEffect(() => {
     const gameData = data();
     if (gameData) {
-      console.log('[DATA] Server data updated - initializing CharacterContext');
+      console.log('[DATA] Server data updated - initializing CharacterContext', {
+        hasActiveDungeon: !!gameData.activeDungeonProgress,
+        currentIsDungeonCombat: isDungeonCombat()
+      });
       
       // Preserve current health/mana if we already have a character
       const existingChar = store.character;
       const character = { ...gameData.character };
       
-      // Only preserve health/mana if we have existing values and we're not in combat
-      // (combat updates should always use server values)
-      if (existingChar && !activeMob()) {
+      // Always preserve health/mana if we have existing values (client-side regen is authoritative)
+      // The server only updates HP/mana when we explicitly sync via syncHealthToServer
+      if (existingChar) {
         character.current_health = existingChar.current_health;
         character.current_mana = existingChar.current_mana;
       }
@@ -177,10 +184,34 @@ export default function GamePage() {
       // Set active dungeon if there is one
       if (gameData.activeDungeonProgress) {
         setActiveDungeon(gameData.activeDungeonProgress);
-        setIsDungeonCombat(true);
-      } else {
+        
+        // Set dungeon session in CharacterContext (source of truth for HP/mana)
+        actions.setDungeonSession({
+          id: gameData.activeDungeonProgress.id,
+          dungeon_id: gameData.activeDungeonProgress.dungeon_id,
+          current_encounter: gameData.activeDungeonProgress.current_encounter,
+          total_encounters: gameData.activeDungeonProgress.total_encounters,
+          session_health: gameData.activeDungeonProgress.session_health,
+          session_mana: gameData.activeDungeonProgress.session_mana,
+          boss_mob_id: gameData.activeDungeonProgress.boss_mob_id,
+          dungeon_name: gameData.activeDungeonProgress.dungeon_name
+        });
+        
+        // Set dungeon progress for UI
+        if (gameData.activeDungeonProgress.total_encounters) {
+          setDungeonProgress({
+            current: gameData.activeDungeonProgress.current_encounter,
+            total: gameData.activeDungeonProgress.total_encounters
+          });
+        }
+      } else if (!activeMob()) {
+        // Only clear dungeon state when NOT in active combat
+        // This prevents race conditions when data refetches during dungeon combat
         setActiveDungeon(null);
-        setIsDungeonCombat(false);
+        // Only clear session if server says no active dungeon (handles abandon case)
+        if (!gameData.activeDungeonProgress) {
+          actions.setDungeonSession(null);
+        }
       }
       
       console.log('[DATA] CharacterContext initialized:', {
@@ -194,8 +225,20 @@ export default function GamePage() {
   });
   
   // Read health/mana from CharacterContext
-  const currentHealth = () => store.character?.current_health ?? 0;
-  const currentMana = () => store.character?.current_mana ?? 0;
+  // When in dungeon, use dungeon session as source of truth
+  const currentHealth = () => {
+    if (store.dungeonSession) {
+      return store.dungeonSession.session_health;
+    }
+    return store.character?.current_health ?? 0;
+  };
+  
+  const currentMana = () => {
+    if (store.dungeonSession) {
+      return store.dungeonSession.session_mana;
+    }
+    return store.character?.current_mana ?? 0;
+  };
   
   // Legacy no-op functions (to be removed - all updates should use actions directly)
   const setOptimisticHealth = (health: number) => actions.updateHealth(health, currentMana());
@@ -253,6 +296,7 @@ export default function GamePage() {
 
   
   const refetchData = async () => {
+    console.log('[REFETCH] Refetching game data...', new Error().stack);
     // Force a fresh fetch by revalidating all keys
     // This will refetch the game data with the current characterId
     revalidate();
@@ -388,13 +432,13 @@ export default function GamePage() {
   const currentMaxMana = createMemo(() => {
     const char = currentCharacter();
     const stats = totalStats();
-    if (!char) return 50;
+    if (!char) return 100;
     
-    // New formula: Base + (Level × 10) + (INT - 10) × 5
-    // This scales mana with both level progression and intelligence
-    // Example: Level 15, 30 INT = 50 + 150 + 100 = 300 Mana
-    const baseMana = 50;
-    const levelBonus = char.level * 10;
+    // New formula: Base + (Level × 20) + (INT - 10) × 5
+    // This scales mana aggressively with level progression and intelligence (same rate as health)
+    // Example: Level 8, 31 INT = 100 + 160 + 105 = 365 Mana
+    const baseMana = 100;
+    const levelBonus = char.level * 20;
     const intelligenceBonus = (stats.intelligence - 10) * 5;
     
     return baseMana + levelBonus + intelligenceBonus;
@@ -569,12 +613,23 @@ export default function GamePage() {
   };
 
   const handleHealthChange = (health: number, mana: number) => {
-    actions.updateHealth(health, mana);
+    console.log('[HEALTH CHANGE]', { health, mana, inDungeon: !!store.dungeonSession });
+    // If in dungeon, update dungeon session; otherwise update character
+    if (store.dungeonSession) {
+      actions.updateDungeonHealth(health, mana);
+    } else {
+      actions.updateHealth(health, mana);
+    }
     // Sync will happen automatically via the createEffect watching currentHealth/currentMana
   };
 
   const handleRegenTick = (health: number, mana: number) => {
-    actions.updateHealth(health, mana);
+    // If in dungeon, update dungeon session; otherwise update character
+    if (store.dungeonSession) {
+      actions.updateDungeonHealth(health, mana);
+    } else {
+      actions.updateHealth(health, mana);
+    }
     // Sync will happen automatically via the createEffect with debouncing
   };
 
@@ -622,6 +677,7 @@ export default function GamePage() {
           namedMobId: activeNamedMobId(),
           result,
           finalHealth: finalState.characterHealth,
+          finalMana: currentMana(),
         }),
       });
 
@@ -641,10 +697,17 @@ export default function GamePage() {
           level: responseData.character.level,
           gold: responseData.character.gold,
           health: responseData.character.current_health,
-          mana: responseData.character.current_mana
+          mana: responseData.character.current_mana,
+          isDungeon: !!store.dungeonSession
         });
-        // Update character in store
+        // Update character in store (but not HP/mana if in dungeon - use session instead)
         actions.setCharacter(responseData.character);
+        
+        // If in dungeon, update session HP/mana from combat result
+        if (store.dungeonSession) {
+          actions.updateDungeonHealth(finalState.characterHealth, currentMana());
+          console.log('[COMBAT END] Updated dungeon session HP/mana:', finalState.characterHealth, currentMana());
+        }
       }
 
       if (responseData.result === 'victory') {
@@ -667,12 +730,14 @@ export default function GamePage() {
           console.log('[COMBAT END] WARNING: No inventory in response!');
         }
 
-        // Refetch data in background to ensure everything is synced
+        // For dungeon combat, don't refetch - we need to preserve HP/mana for regen between encounters
+        // For normal combat, refetch to ensure everything is synced
+        const shouldRefetch = !isDungeonCombat();
+        
         setTimeout(async () => {
-          await refetchData();
-          
-          // Don't clear optimistic states - let them persist until next update
-          // The refetch will update data() and the memos will use whichever is newer
+          if (shouldRefetch) {
+            await refetchData();
+          }
           
           // Show victory modal with rewards
           setVictoryData({
@@ -1270,13 +1335,27 @@ export default function GamePage() {
 
       console.log('[DUNGEON START] Result:', result);
 
+      // Mark as actively in dungeon flow
+      setIsInActiveDungeonFlow(true);
+      
       // Set dungeon progress
       if (result.dungeonProgress) {
         setActiveDungeon(result.dungeonProgress);
+        
+        // Set dungeon session in CharacterContext
+        actions.setDungeonSession({
+          id: result.dungeonProgress.id,
+          dungeon_id: result.dungeonProgress.dungeon_id,
+          current_encounter: result.dungeonProgress.current_encounter || 1,
+          total_encounters: result.encounterProgress?.total || 0,
+          session_health: result.dungeonProgress.session_health || currentHealth(),
+          session_mana: result.dungeonProgress.session_mana || currentMana(),
+          boss_mob_id: result.dungeonProgress.boss_mob_id || result.dungeon?.boss_mob_id,
+          dungeon_name: result.dungeon?.name || 'Unknown Dungeon'
+        });
       }
-      setIsDungeonCombat(true);
       
-      // Set encounter progress
+      // Set encounter progress for UI
       if (result.encounterProgress) {
         console.log('[DUNGEON] Setting encounter progress:', result.encounterProgress);
         setDungeonProgress(result.encounterProgress);
@@ -1305,10 +1384,18 @@ export default function GamePage() {
 
   const handleAdvanceDungeon = async () => {
     try {
+      // Get current health/mana to save in dungeon session
+      const currentH = currentHealth();
+      const currentM = currentMana();
+      
       const response = await fetch('/api/game/advance-dungeon', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ characterId: characterId() }),
+        body: JSON.stringify({ 
+          characterId: characterId(),
+          currentHealth: currentH,
+          currentMana: currentM
+        }),
       });
 
       const result = await response.json();
@@ -1321,21 +1408,36 @@ export default function GamePage() {
       if (result.completed) {
         // Dungeon complete!
         setActiveDungeon(null);
-        setIsDungeonCombat(false);
+        actions.setDungeonSession(null);
         setDungeonProgress(null);
+        setIsInActiveDungeonFlow(false);
         setCombatLog([...combatLog(), '🎉 Dungeon completed! The boss has been defeated!']);
         await refetchData();
         return { completed: true };
       } else {
         // Start next encounter immediately
         if (result.combat && result.mob) {
+          console.log('[DUNGEON ADVANCE] Starting next encounter:', result.mob.name);
           setActiveMob(result.mob);
           
-          // Update encounter progress
+          // Update dungeon session encounter count
+          if (store.dungeonSession && result.progress) {
+            actions.setDungeonSession({
+              ...store.dungeonSession,
+              current_encounter: result.progress.current,
+              total_encounters: result.progress.total
+            });
+          }
+          
+          // Update encounter progress for UI
           if (result.progress) {
+            console.log('[DUNGEON ADVANCE] Setting progress from result.progress:', result.progress);
             setDungeonProgress(result.progress);
           } else if (result.encounterProgress) {
+            console.log('[DUNGEON ADVANCE] Setting progress from result.encounterProgress:', result.encounterProgress);
             setDungeonProgress(result.encounterProgress);
+          } else {
+            console.warn('[DUNGEON ADVANCE] No progress data in result!');
           }
           
           if (result.isBoss && result.namedMob) {
@@ -1348,6 +1450,10 @@ export default function GamePage() {
           }
           
           return { completed: false };
+        } else {
+          console.error('[DUNGEON ADVANCE] Missing combat or mob data:', result);
+          alert('Error: Failed to start next encounter - missing data');
+          return { completed: false, error: true };
         }
       }
     } catch (error: any) {
@@ -1413,19 +1519,62 @@ export default function GamePage() {
         throw new Error(result.error);
       }
 
-      // Clear dungeon state
+      // Clear client-side dungeon state immediately
       setActiveDungeon(null);
-      setIsDungeonCombat(false);
+      actions.setDungeonSession(null);
       setDungeonProgress(null);
+      setIsInActiveDungeonFlow(false);
       setActiveMob(null);
       setActiveNamedMobId(null);
-      setCombatLog(['You have abandoned the dungeon.']);
-
-      // Refetch data to sync
-      await refetchData();
+      
+      // Reload the page to get fresh server data (this ensures cache is cleared)
+      window.location.reload();
     } catch (error: any) {
       console.error('Abandon dungeon error:', error);
       alert('Failed to abandon dungeon: ' + error.message);
+    }
+  };
+
+  const handleContinueDungeon = async () => {
+    if (!store.dungeonSession) return;
+
+    // Mark as actively in dungeon flow
+    setIsInActiveDungeonFlow(true);
+
+    try {
+      // Fetch the current encounter for this dungeon
+      const response = await fetch('/api/game/get-dungeon-encounter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ characterId: characterId() }),
+      });
+
+      const result = await response.json();
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      // Set up dungeon progress UI
+      if (result.progress) {
+        setDungeonProgress(result.progress);
+      }
+
+      // Start combat with the current encounter mob
+      if (result.mob) {
+        setActiveMob(result.mob);
+        
+        if (result.isBoss && result.namedMob) {
+          setActiveNamedMobId(result.namedMob.id);
+          const title = result.namedMob?.title ? ` ${result.namedMob.title}` : '';
+          setCombatLog([`Resuming dungeon...`, `${result.mob.name}${title} blocks your path!`]);
+        } else {
+          setActiveNamedMobId(null);
+          setCombatLog([`Resuming dungeon...`, `${result.mob.name} attacks!`]);
+        }
+      }
+    } catch (error: any) {
+      console.error('Continue dungeon error:', error);
+      alert('Failed to continue dungeon: ' + error.message);
     }
   };
 
@@ -2644,14 +2793,13 @@ export default function GamePage() {
                       class="button success"
                       style={{ width: "100%" }}
                       onClick={async () => {
-                        setShowVictoryModal(false);
-                        setVictoryData(null);
-                        
-                        // If in a dungeon, immediately advance to next encounter
+                        // If in a dungeon, handle dungeon advancement
                         if (isDungeonCombat() && activeDungeon()) {
                           const result = await handleAdvanceDungeon();
                           if (result?.completed) {
-                            // Dungeon complete! Refetch to update regions
+                            // Dungeon complete! Close modal and refetch to update regions
+                            setShowVictoryModal(false);
+                            setVictoryData(null);
                             await refetchData();
                             const gameData = await getGameData(characterId());
                             if (gameData) {
@@ -2659,9 +2807,15 @@ export default function GamePage() {
                               actions.setDungeons(gameData.dungeons || []);
                             }
                           } else if (!result?.error) {
-                            // Next combat started, modal will close and combat UI shows
+                            // Next combat started, close modal and combat UI shows
+                            setShowVictoryModal(false);
+                            setVictoryData(null);
                             return;
                           }
+                        } else {
+                          // Normal combat, just close modal
+                          setShowVictoryModal(false);
+                          setVictoryData(null);
                         }
                       }}
                     >
@@ -2818,6 +2972,165 @@ export default function GamePage() {
                   >
                     Accept Your Fate
                   </button>
+                </div>
+              </div>
+            </Show>
+
+            {/* Interrupted Dungeon Modal - Blocks all actions until resolved */}
+            <Show when={store.dungeonSession && !activeMob() && !isInActiveDungeonFlow()}>
+              <div 
+                style={{ 
+                  position: "fixed", 
+                  top: 0, 
+                  left: 0, 
+                  right: 0, 
+                  bottom: 0, 
+                  background: "rgba(0, 0, 0, 0.95)", 
+                  display: "flex", 
+                  "align-items": "center", 
+                  "justify-content": "center",
+                  "z-index": 2000,
+                  padding: "1rem"
+                }}
+              >
+                <div 
+                  class="card"
+                  style={{ 
+                    "max-width": "500px",
+                    width: "100%",
+                    border: "2px solid var(--accent)",
+                    background: "linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(99, 102, 241, 0.1))"
+                  }}
+                >
+                  <div style={{ 
+                    "text-align": "center",
+                    "margin-bottom": "1.5rem"
+                  }}>
+                    <div style={{ 
+                      "font-size": "3rem",
+                      "margin-bottom": "0.5rem"
+                    }}>
+                      🏰
+                    </div>
+                    <h2 style={{ 
+                      "font-size": "1.5rem",
+                      "margin-bottom": "0.5rem",
+                      color: "var(--accent)"
+                    }}>
+                      Dungeon In Progress
+                    </h2>
+                    <p style={{ 
+                      color: "var(--text-secondary)",
+                      "font-size": "0.875rem"
+                    }}>
+                      You have an active dungeon session
+                    </p>
+                  </div>
+
+                  <div style={{ 
+                    background: "var(--bg-dark)",
+                    padding: "1rem",
+                    "border-radius": "8px",
+                    "margin-bottom": "1.5rem"
+                  }}>
+                    <div style={{ 
+                      display: "grid",
+                      "grid-template-columns": "1fr 1fr",
+                      gap: "1rem",
+                      "margin-bottom": "1rem"
+                    }}>
+                      <div>
+                        <div style={{ 
+                          "font-size": "0.75rem",
+                          color: "var(--text-secondary)",
+                          "margin-bottom": "0.25rem"
+                        }}>
+                          Dungeon
+                        </div>
+                        <div style={{ 
+                          "font-weight": "bold",
+                          color: "var(--accent)"
+                        }}>
+                          {store.dungeonSession?.dungeon_name}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ 
+                          "font-size": "0.75rem",
+                          color: "var(--text-secondary)",
+                          "margin-bottom": "0.25rem"
+                        }}>
+                          Progress
+                        </div>
+                        <div style={{ "font-weight": "bold" }}>
+                          Encounter {store.dungeonSession?.current_encounter}/{store.dungeonSession?.total_encounters}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ 
+                      display: "grid",
+                      "grid-template-columns": "1fr 1fr",
+                      gap: "1rem"
+                    }}>
+                      <div>
+                        <div style={{ 
+                          "font-size": "0.75rem",
+                          color: "var(--text-secondary)",
+                          "margin-bottom": "0.25rem"
+                        }}>
+                          Health
+                        </div>
+                        <div style={{ color: "var(--success)" }}>
+                          {store.dungeonSession?.session_health} HP
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ 
+                          "font-size": "0.75rem",
+                          color: "var(--text-secondary)",
+                          "margin-bottom": "0.25rem"
+                        }}>
+                          Mana
+                        </div>
+                        <div style={{ color: "var(--info)" }}>
+                          {store.dungeonSession?.session_mana} MP
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ 
+                    background: "var(--warning)",
+                    color: "var(--bg-dark)",
+                    padding: "0.75rem",
+                    "border-radius": "6px",
+                    "margin-bottom": "1.5rem",
+                    "text-align": "center",
+                    "font-size": "0.875rem"
+                  }}>
+                    ⚠️ You must complete or abandon this dungeon before taking other actions
+                  </div>
+
+                  <div style={{ 
+                    display: "flex",
+                    gap: "1rem"
+                  }}>
+                    <button
+                      class="button danger"
+                      style={{ flex: 1 }}
+                      onClick={handleAbandonDungeon}
+                    >
+                      Abandon Dungeon
+                    </button>
+                    <button
+                      class="button success"
+                      style={{ flex: 1 }}
+                      onClick={handleContinueDungeon}
+                    >
+                      Continue Dungeon →
+                    </button>
+                  </div>
                 </div>
               </div>
             </Show>

@@ -11,13 +11,13 @@ export async function POST({ request }: APIEvent) {
     }
 
     const body = await request.json();
-    const { characterId } = body;
+    const { characterId, currentHealth, currentMana } = body;
 
     if (!characterId) {
       return json({ error: 'Missing characterId' }, { status: 400 });
     }
 
-    const result = await advanceDungeonEncounter(characterId);
+    const result = await advanceDungeonEncounter(characterId, currentHealth, currentMana);
 
     return json(result);
   } catch (error: any) {
