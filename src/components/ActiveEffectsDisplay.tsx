@@ -4,6 +4,7 @@ import type { ActiveEffect } from "~/lib/db";
 
 type ActiveEffectsDisplayProps = {
   combatHots?: ActiveEffect[];
+  combatThorns?: { name: string; reflectPercent: number; duration: number; expiresAt: number } | null;
 };
 
 export function ActiveEffectsDisplay(props: ActiveEffectsDisplayProps = {}) {
@@ -37,7 +38,7 @@ export function ActiveEffectsDisplay(props: ActiveEffectsDisplayProps = {}) {
         "align-items": "flex-start"
       }}>
         <Show 
-          when={effectsStore.effects.length > 0 || (props.combatHots && props.combatHots.length > 0)}
+          when={effectsStore.effects.length > 0 || (props.combatHots && props.combatHots.length > 0) || (props.combatThorns && Date.now() < props.combatThorns.expiresAt)}
           fallback={
             <div style={{ 
               color: "var(--text-secondary)", 
@@ -143,6 +144,44 @@ export function ActiveEffectsDisplay(props: ActiveEffectsDisplayProps = {}) {
               );
             }}
           </For>
+          
+          {/* Thorns from Combat */}
+          <Show when={props.combatThorns && Date.now() < props.combatThorns.expiresAt}>
+            <div
+              style={{
+                padding: "0.5rem 0.75rem",
+                background: "var(--accent)",
+                color: "white",
+                "border-radius": "6px",
+                "font-size": "0.875rem",
+                "font-weight": "bold",
+                position: "relative",
+                overflow: "hidden",
+                "min-width": "120px",
+              }}
+            >
+              {/* Background progress bar */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  bottom: 0,
+                  width: `${props.combatThorns ? ((props.combatThorns.expiresAt - currentTime()) / (props.combatThorns.duration * 1000)) * 100 : 0}%`,
+                  background: "rgba(255, 255, 255, 0.2)",
+                  transition: "width 0.1s linear",
+                }}
+              />
+              
+              {/* Content */}
+              <div style={{ position: "relative", "z-index": 1 }}>
+                <div>⚡ {props.combatThorns!.name}</div>
+                <div style={{ "font-size": "0.75rem", opacity: 0.9 }}>
+                  {props.combatThorns!.reflectPercent}% reflect · {Math.max(0, Math.ceil((props.combatThorns!.expiresAt - currentTime()) / 1000))}s
+                </div>
+              </div>
+            </div>
+          </Show>
         </Show>
       </div>
     </div>

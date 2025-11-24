@@ -111,6 +111,9 @@ export default function GamePage() {
   // Active HOTs from combat (for Active Effects display)
   const [combatHots, setCombatHots] = createSignal<any[]>([]);
   
+  // Active Thorns from combat (for Active Effects display)
+  const [combatThorns, setCombatThorns] = createSignal<any>(null);
+  
   // Merchant modal state
   const [showMerchantModal, setShowMerchantModal] = createSignal(false);
   const [activeMerchant, setActiveMerchant] = createSignal<any | null>(null);
@@ -150,8 +153,19 @@ export default function GamePage() {
     if (gameData) {
       console.log('[DATA] Server data updated - initializing CharacterContext');
       
+      // Preserve current health/mana if we already have a character
+      const existingChar = store.character;
+      const character = { ...gameData.character };
+      
+      // Only preserve health/mana if we have existing values and we're not in combat
+      // (combat updates should always use server values)
+      if (existingChar && !activeMob()) {
+        character.current_health = existingChar.current_health;
+        character.current_mana = existingChar.current_mana;
+      }
+      
       // Initialize ALL CharacterContext data from server
-      actions.setCharacter(gameData.character);
+      actions.setCharacter(character);
       actions.setInventory(gameData.inventory);
       actions.setAbilities(gameData.abilities);
       actions.setHotbar(gameData.hotbar || []);
@@ -448,8 +462,15 @@ export default function GamePage() {
       
       console.log('[TRAVEL] Traveled to:', result.region.name);
       
+      // Preserve current health/mana (don't let server overwrite regen progress)
+      const currentHP = currentHealth();
+      const currentMP = currentMana();
+      
       // Update CharacterContext immediately
       if (result.character) {
+        // Preserve the current health/mana values
+        result.character.current_health = currentHP;
+        result.character.current_mana = currentMP;
         actions.setCharacter(result.character);
       }
       
@@ -471,7 +492,7 @@ export default function GamePage() {
       // Close travel modal
       setShowTravelModal(false);
       
-      // Refetch in background to sync
+      // Refetch in background to sync (health/mana already preserved above)
       await refetchData();
       
       // Manually fetch merchants and dungeons for the new region
@@ -635,6 +656,7 @@ export default function GamePage() {
           setActiveMob(null);
           setActiveNamedMobId(null);
           setCombatHots([]); // Clear HOTs when combat ends
+          setCombatThorns(null); // Clear Thorns when combat ends
         }, 100);
 
         // Update inventory in CharacterContext from server response
@@ -671,6 +693,7 @@ export default function GamePage() {
           setActiveMob(null);
           setActiveNamedMobId(null);
           setCombatHots([]); // Clear HOTs when combat ends
+          setCombatThorns(null); // Clear Thorns when combat ends
         }, 100);
 
         // Update inventory optimistically from server response
@@ -1084,9 +1107,16 @@ export default function GamePage() {
       
       const result = await response.json();
       
+      // Preserve current health/mana (don't let server overwrite regen progress)
+      const currentHP = currentHealth();
+      const currentMP = currentMana();
+      
       // Use server-confirmed data
       if (result.character) {
         console.log('[ASSIGN STATS] Server returned character with available_points:', result.character.available_points);
+        // Preserve the current health/mana values
+        result.character.current_health = currentHP;
+        result.character.current_mana = currentMP;
         actions.setCharacter(result.character);
       }
       
@@ -1537,7 +1567,7 @@ export default function GamePage() {
             currentMana={currentMana}
             constitution={() => totalStats().constitution}
             wisdom={() => totalStats().wisdom}
-            isInCombat={() => !!activeMob()}
+            isInCombat={() => !!activeMob() || !!activeDungeon()}
             onRegenTick={handleRegenTick}
             onRegenComplete={(health, mana) => {
               // Update store, sync will happen automatically
@@ -1643,7 +1673,7 @@ export default function GamePage() {
             </div>
 
             {/* Active Effects */}
-            <ActiveEffectsDisplay combatHots={combatHots()} />
+            <ActiveEffectsDisplay combatHots={combatHots()} combatThorns={combatThorns()} />
 
             {/* Combat Engine - Always mounted but hidden when not in use */}
             <Show when={activeMob()}>
@@ -1702,6 +1732,7 @@ export default function GamePage() {
                   onCombatEnd={handleCombatEnd}
                   onHealthChange={handleHealthChange}
                   onActiveHotsChange={setCombatHots}
+                  onThornsChange={setCombatThorns}
                   onUseConsumable={async (itemId) => {
                     const item = currentInventory().find((i: any) => i.id === itemId);
                     if (item) {

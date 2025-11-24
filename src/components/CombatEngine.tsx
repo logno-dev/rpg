@@ -45,6 +45,7 @@ type CombatEngineProps = {
   onHealthChange: (health: number, mana: number) => void;
   onUseConsumable?: (itemId: number) => Promise<void>;
   onActiveHotsChange?: (hots: ActiveEffect[]) => void;
+  onThornsChange?: (thorns: { name: string; reflectPercent: number; duration: number; expiresAt: number } | null) => void;
 };
 
 const TICK_INTERVAL = 100; // 100ms per tick
@@ -129,6 +130,13 @@ export function CombatEngine(props: CombatEngineProps) {
   createEffect(() => {
     if (props.onActiveHotsChange) {
       props.onActiveHotsChange(activeHots());
+    }
+  });
+  
+  // Notify parent when Thorns changes
+  createEffect(() => {
+    if (props.onThornsChange) {
+      props.onThornsChange(thornsEffect());
     }
   });
   
@@ -328,20 +336,8 @@ export function CombatEngine(props: CombatEngineProps) {
               setActiveHots(EffectProcessor.addOrStackEffect(activeHots(), activeEffect));
               newLog.push(`Applied ${ability.name} HoT!`);
             } else if (activeEffect.effect_type === 'buff') {
-              effectsActions.addEffect({
-                name: activeEffect.name,
-                stat: activeEffect.stat!,
-                amount: activeEffect.amount!,
-                duration: activeEffect.duration,
-              });
-              newLog.push(`${ability.name}: +${activeEffect.amount} ${activeEffect.stat} for ${activeEffect.duration}s`);
-            } else if (activeEffect.effect_type === 'debuff') {
-              setActiveDebuffs(EffectProcessor.addOrStackEffect(activeDebuffs(), activeEffect));
-              newLog.push(`${ability.name}: Debuff applied!`);
-            } else if (activeEffect.effect_type === 'shield') {
-              // Thorns/Shield effect - check for damage reflection
-              // Thorns abilities should have stat_affected = 'thorns' and amount = reflect %
-              if (activeEffect.stat_affected === 'thorns' && activeEffect.amount) {
+              // Check if this is a Thorns buff (damage reflection)
+              if (activeEffect.stat === 'thorns' && activeEffect.amount) {
                 setThornsEffect({
                   name: ability.name,
                   reflectPercent: activeEffect.amount,
@@ -349,7 +345,22 @@ export function CombatEngine(props: CombatEngineProps) {
                   expiresAt: Date.now() + (activeEffect.duration * 1000),
                 });
                 newLog.push(`${ability.name}: Reflecting ${activeEffect.amount}% damage for ${activeEffect.duration}s!`);
+              } else {
+                // Regular stat buff
+                effectsActions.addEffect({
+                  name: activeEffect.name,
+                  stat: activeEffect.stat!,
+                  amount: activeEffect.amount!,
+                  duration: activeEffect.duration,
+                });
+                newLog.push(`${ability.name}: +${activeEffect.amount} ${activeEffect.stat} for ${activeEffect.duration}s`);
               }
+            } else if (activeEffect.effect_type === 'debuff') {
+              setActiveDebuffs(EffectProcessor.addOrStackEffect(activeDebuffs(), activeEffect));
+              newLog.push(`${ability.name}: Debuff applied!`);
+            } else if (activeEffect.effect_type === 'shield') {
+              // Shield effect - absorbs damage
+              // (Future implementation for shield mechanics)
             }
           }
         });
