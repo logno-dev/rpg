@@ -110,6 +110,7 @@ type CharacterContextValue = [
     setDungeons: (dungeons: Dungeon[]) => void;
     setDungeonSession: (session: DungeonSession | null) => void;
     updateDungeonHealth: (health: number, mana: number) => void;
+    updateDungeonEncounter: (encounterNumber: number, health: number, mana: number) => void;
     updateHealth: (health: number, mana?: number) => void;
     updateGold: (gold: number) => void;
     updateExperience: (exp: number) => void;
@@ -185,6 +186,13 @@ export const CharacterProvider: ParentComponent<{ initialData?: Partial<Characte
         if (!session) return session;
         return { ...session, session_health: health, session_mana: mana };
       });
+    },
+
+    updateDungeonEncounter: (encounterNumber: number, health: number, mana: number) => {
+      console.log('[UPDATE DUNGEON ENCOUNTER]', { encounterNumber, health, mana });
+      setStore("dungeonSession", "current_encounter", encounterNumber);
+      setStore("dungeonSession", "session_health", health);
+      setStore("dungeonSession", "session_mana", mana);
     },
 
     updateHealth: (health: number, mana?: number) => {

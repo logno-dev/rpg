@@ -1,5 +1,5 @@
-import { createAsync, useParams, redirect, revalidate } from "@solidjs/router";
-import { createSignal, Show, For, createEffect, onCleanup, createMemo, on, onMount } from "solid-js";
+import { createAsync, useParams, redirect, revalidate, useNavigate } from "@solidjs/router";
+import { createSignal, Show, For, createEffect, onCleanup, createMemo, on, onMount, batch } from "solid-js";
 import { getUser } from "~/lib/auth";
 import { getCharacter, getInventory, getAllRegions, getRegion, getCharacterAbilities, getMerchantsInRegion, getDungeonsInRegion, getActiveDungeon, getHotbar, getAbilitiesWithEffects } from "~/lib/game";
 import { db, type Mob, type Item, type Region, type NamedMob } from "~/lib/db";
@@ -12,7 +12,14 @@ import { useActiveEffects } from "~/lib/ActiveEffectsContext";
 
 async function getGameData(characterId: number) {
   "use server";
-  const user = await getUser();
+  let user;
+  try {
+    user = await getUser();
+  } catch (error) {
+    console.error("Error getting user:", error);
+    throw redirect("/");
+  }
+  
   if (!user) throw redirect("/");
 
   const character = await getCharacter(characterId);
@@ -43,6 +50,7 @@ async function getGameData(characterId: number) {
 
 export default function GamePage() {
   const params = useParams();
+  const navigate = useNavigate();
   const characterId = () => parseInt(params.id);
   const data = createAsync(() => getGameData(characterId()));
   const [store, actions] = useCharacter();
@@ -802,14 +810,19 @@ export default function GamePage() {
     try {
       console.log('[USE ITEM] Using:', itemName);
       
-      // Optimistic update - restore health/mana immediately in CharacterContext
+      // Optimistic update - restore health/mana immediately
       const currentH = currentHealth();
       const currentM = currentMana();
       
       const newHealth = Math.min(currentMaxHealth(), currentH + healthRestore);
       const newMana = Math.min(currentMaxMana(), currentM + manaRestore);
       
-      actions.updateHealth(newHealth, newMana);
+      // Update dungeon session if in dungeon, otherwise update character
+      if (store.dungeonSession) {
+        actions.updateDungeonHealth(newHealth, newMana);
+      } else {
+        actions.updateHealth(newHealth, newMana);
+      }
       
       // Optimistically update inventory
       const currentInv = currentInventory();
@@ -841,7 +854,13 @@ export default function GamePage() {
       
       // Use server-confirmed data
       actions.setInventory(result.inventory);
-      actions.updateHealth(result.character.current_health, result.character.current_mana);
+      
+      // Update health/mana: dungeon session if in dungeon, otherwise character
+      if (store.dungeonSession) {
+        actions.updateDungeonHealth(result.character.current_health, result.character.current_mana);
+      } else {
+        actions.updateHealth(result.character.current_health, result.character.current_mana);
+      }
       
     } catch (error: any) {
       console.error('[USE ITEM] Error:', error);
@@ -1331,8 +1350,7 @@ export default function GamePage() {
   // Dungeon handlers
   const handleStartDungeon = async (dungeonId: number) => {
     try {
-      setCombatLog(['Entering the dungeon...']);
-      
+      // Start dungeon on server
       const response = await fetch('/api/game/start-dungeon', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1344,49 +1362,8 @@ export default function GamePage() {
         throw new Error(result.error);
       }
 
-      console.log('[DUNGEON START] Result:', result);
-
-      // Mark as actively in dungeon flow
-      setIsInActiveDungeonFlow(true);
-      
-      // Set dungeon progress
-      if (result.dungeonProgress) {
-        setActiveDungeon(result.dungeonProgress);
-        
-        // Set dungeon session in CharacterContext
-        actions.setDungeonSession({
-          id: result.dungeonProgress.id,
-          dungeon_id: result.dungeonProgress.dungeon_id,
-          current_encounter: result.dungeonProgress.current_encounter || 1,
-          total_encounters: result.encounterProgress?.total || 0,
-          session_health: result.dungeonProgress.session_health || currentHealth(),
-          session_mana: result.dungeonProgress.session_mana || currentMana(),
-          boss_mob_id: result.dungeonProgress.boss_mob_id || result.dungeon?.boss_mob_id,
-          dungeon_name: result.dungeon?.name || 'Unknown Dungeon'
-        });
-      }
-      
-      // Set encounter progress for UI
-      if (result.encounterProgress) {
-        console.log('[DUNGEON] Setting encounter progress:', result.encounterProgress);
-        setDungeonProgress(result.encounterProgress);
-      } else {
-        console.log('[DUNGEON] No encounterProgress in result');
-      }
-      
-      // Set active mob from result
-      if (result.mob) {
-        setActiveMob(result.mob);
-        const dungeonName = result.dungeon?.name || 'the dungeon';
-        if (result.isBoss && result.namedMob) {
-          setActiveNamedMobId(result.namedMob.id); // Track named mob ID for boss loot
-          const title = result.namedMob?.title ? ` ${result.namedMob.title}` : '';
-          setCombatLog([`Entered ${dungeonName}!`, `You face the boss: ${result.mob.name}${title}!`]);
-        } else {
-          setActiveNamedMobId(null); // Regular dungeon mob
-          setCombatLog([`Entered ${dungeonName}!`, `${result.mob.name} attacks!`]);
-        }
-      }
+      // Navigate to dedicated dungeon route
+      navigate(`/game/${characterId()}/dungeon/${dungeonId}`);
     } catch (error: any) {
       console.error('Start dungeon error:', error);
       alert('Failed to start dungeon: ' + error.message);
@@ -1418,12 +1395,26 @@ export default function GamePage() {
 
       if (result.completed) {
         // Dungeon complete!
-        setActiveDungeon(null);
-        actions.setDungeonSession(null);
-        setDungeonProgress(null);
-        setIsInActiveDungeonFlow(false);
+        console.log('[DUNGEON COMPLETE] Transferring HP/mana and clearing dungeon state');
+        
+        // Transfer dungeon session HP/mana to character before clearing
+        const finalHealth = currentH;
+        const finalMana = currentM;
+        
+        // Update character with final dungeon HP/mana FIRST
+        actions.updateHealth(finalHealth, finalMana);
+        
+        // Then clear ALL dungeon state in a batch
+        batch(() => {
+          setActiveDungeon(null);
+          setDungeonProgress(null);
+          setIsInActiveDungeonFlow(false);
+          actions.setDungeonSession(null); // Clear dungeon session LAST
+        });
+        
+        console.log('[DUNGEON COMPLETE] State cleared - dungeon session:', store.dungeonSession);
         setCombatLog([...combatLog(), '🎉 Dungeon completed! The boss has been defeated!']);
-        await refetchData();
+        
         return { completed: true };
       } else {
         // Start next encounter immediately
@@ -1549,44 +1540,8 @@ export default function GamePage() {
   const handleContinueDungeon = async () => {
     if (!store.dungeonSession) return;
 
-    // Mark as actively in dungeon flow
-    setIsInActiveDungeonFlow(true);
-
-    try {
-      // Fetch the current encounter for this dungeon
-      const response = await fetch('/api/game/get-dungeon-encounter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ characterId: characterId() }),
-      });
-
-      const result = await response.json();
-      if (result.error) {
-        throw new Error(result.error);
-      }
-
-      // Set up dungeon progress UI
-      if (result.progress) {
-        setDungeonProgress(result.progress);
-      }
-
-      // Start combat with the current encounter mob
-      if (result.mob) {
-        setActiveMob(result.mob);
-        
-        if (result.isBoss && result.namedMob) {
-          setActiveNamedMobId(result.namedMob.id);
-          const title = result.namedMob?.title ? ` ${result.namedMob.title}` : '';
-          setCombatLog([`Resuming dungeon...`, `${result.mob.name}${title} blocks your path!`]);
-        } else {
-          setActiveNamedMobId(null);
-          setCombatLog([`Resuming dungeon...`, `${result.mob.name} attacks!`]);
-        }
-      }
-    } catch (error: any) {
-      console.error('Continue dungeon error:', error);
-      alert('Failed to continue dungeon: ' + error.message);
-    }
+    // Navigate to the dedicated dungeon route
+    navigate(`/game/${characterId()}/dungeon/${store.dungeonSession.dungeon_id}`);
   };
 
   // Auto-scroll adventure combat log

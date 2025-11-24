@@ -877,6 +877,18 @@ export async function useItem(characterId: number, inventoryItemId: number): Pro
   const character = await getCharacter(characterId);
   if (!character) throw new Error('Character not found');
   
+  // Check if character is in an active dungeon FIRST
+  const dungeonResult = await db.execute({
+    sql: 'SELECT * FROM character_dungeon_progress WHERE character_id = ? AND status = ?',
+    args: [characterId, 'active'],
+  });
+  const isInDungeon = dungeonResult.rows.length > 0;
+  const dungeonProgress = isInDungeon ? dungeonResult.rows[0] as any : null;
+  
+  // Get current health/mana from dungeon session if in dungeon, otherwise from character
+  const currentHealth = isInDungeon ? dungeonProgress.session_health : character.current_health;
+  const currentMana = isInDungeon ? dungeonProgress.session_mana : character.current_mana;
+  
   // Get total stats including equipment bonuses
   const totalStats = await getTotalStats(characterId);
   
@@ -885,18 +897,26 @@ export async function useItem(characterId: number, inventoryItemId: number): Pro
   const actualMaxMana = calculateMaxMana(character.level, totalStats.intelligence);
   
   // Calculate new health and mana values (capped at actual max)
-  const newHealth = Math.min(actualMaxHealth, character.current_health + (invItem.health_restore || 0));
-  const newMana = Math.min(actualMaxMana, character.current_mana + (invItem.mana_restore || 0));
+  const newHealth = Math.min(actualMaxHealth, currentHealth + (invItem.health_restore || 0));
+  const newMana = Math.min(actualMaxMana, currentMana + (invItem.mana_restore || 0));
   
   // Calculate actual restoration amounts
-  const healthRestored = newHealth - character.current_health;
-  const manaRestored = newMana - character.current_mana;
+  const healthRestored = newHealth - currentHealth;
+  const manaRestored = newMana - currentMana;
   
-  // Update character health/mana
-  await db.execute({
-    sql: 'UPDATE characters SET current_health = ?, current_mana = ? WHERE id = ?',
-    args: [newHealth, newMana, characterId],
-  });
+  if (isInDungeon) {
+    // Update dungeon session health/mana
+    await db.execute({
+      sql: 'UPDATE character_dungeon_progress SET session_health = ?, session_mana = ? WHERE character_id = ? AND status = ?',
+      args: [newHealth, newMana, characterId, 'active'],
+    });
+  } else {
+    // Update character health/mana
+    await db.execute({
+      sql: 'UPDATE characters SET current_health = ?, current_mana = ? WHERE id = ?',
+      args: [newHealth, newMana, characterId],
+    });
+  }
   
   // Decrease item quantity or remove if used last one
   if (invItem.quantity > 1) {
@@ -1313,6 +1333,14 @@ export async function advanceDungeonEncounter(characterId: number, currentHealth
       sql: 'UPDATE combat_sessions SET status = ? WHERE character_id = ? AND status = ?',
       args: ['victory', characterId, 'active'],
     });
+
+    // Update character's HP/mana to final dungeon state
+    if (currentHealth !== undefined && currentMana !== undefined) {
+      await db.execute({
+        sql: 'UPDATE characters SET current_health = ?, current_mana = ?, updated_at = unixepoch() WHERE id = ?',
+        args: [currentHealth, currentMana, characterId],
+      });
+    }
 
     // Dungeon complete! Mark progress as completed
     await db.execute({
