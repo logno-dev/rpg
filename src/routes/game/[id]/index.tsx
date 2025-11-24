@@ -49,6 +49,7 @@ async function getGameData(characterId: number) {
 }
 
 export default function GamePage() {
+  console.log('=== GamePage component loaded - NEW VERSION WITH REACTIVE MEMOS ===');
   const params = useParams();
   const navigate = useNavigate();
   const characterId = () => parseInt(params.id);
@@ -140,11 +141,6 @@ export default function GamePage() {
   // Track if we're actively in dungeon flow (to prevent interruption modal between battles)
   const [isInActiveDungeonFlow, setIsInActiveDungeonFlow] = createSignal(false);
   const [dungeonProgress, setDungeonProgress] = createSignal<{current: number, total: number} | null>(null);
-  
-  // Debug dungeonProgress changes
-  createEffect(() => {
-    console.log('[DUNGEON PROGRESS] Current value:', dungeonProgress());
-  });
   
   // Regional data from context store
   const currentMerchants = () => store.merchants;
@@ -250,19 +246,30 @@ export default function GamePage() {
   
   // Read health/mana from CharacterContext
   // When in dungeon, use dungeon session as source of truth
-  const currentHealth = () => {
-    if (store.dungeonSession) {
-      return store.dungeonSession.session_health;
-    }
-    return store.character?.current_health ?? 0;
-  };
+  // Debug: Track when character changes
+  createEffect(() => {
+    console.log('[STORE WATCH] character changed:', {
+      health: store.character?.current_health,
+      mana: store.character?.current_mana,
+      charObject: store.character
+    });
+  });
+
+  const currentHealth = createMemo(() => {
+    const health = store.dungeonSession 
+      ? store.dungeonSession.session_health 
+      : (store.character?.current_health ?? 0);
+    console.log('[MEMO] currentHealth() returning:', health, 'from', store.dungeonSession ? 'dungeon session' : 'character');
+    return health;
+  });
   
-  const currentMana = () => {
-    if (store.dungeonSession) {
-      return store.dungeonSession.session_mana;
-    }
-    return store.character?.current_mana ?? 0;
-  };
+  const currentMana = createMemo(() => {
+    const mana = store.dungeonSession 
+      ? store.dungeonSession.session_mana 
+      : (store.character?.current_mana ?? 0);
+    console.log('[MEMO] currentMana() returning:', mana, 'from', store.dungeonSession ? 'dungeon session' : 'character');
+    return mana;
+  });
   
   // Legacy no-op functions (to be removed - all updates should use actions directly)
   const setOptimisticHealth = (health: number) => actions.updateHealth(health, currentMana());
@@ -716,21 +723,12 @@ export default function GamePage() {
 
       // Update CharacterContext with values from server response
       if (responseData.character) {
-        console.log('[COMBAT END] Updating CharacterContext:', {
-          exp: responseData.character.experience,
-          level: responseData.character.level,
-          gold: responseData.character.gold,
-          health: responseData.character.current_health,
-          mana: responseData.character.current_mana,
-          isDungeon: !!store.dungeonSession
-        });
         // Update character in store (but not HP/mana if in dungeon - use session instead)
         actions.setCharacter(responseData.character);
         
         // If in dungeon, update session HP/mana from combat result
         if (store.dungeonSession) {
           actions.updateDungeonHealth(finalState.characterHealth, currentMana());
-          console.log('[COMBAT END] Updated dungeon session HP/mana:', finalState.characterHealth, currentMana());
         }
       }
 
@@ -748,10 +746,7 @@ export default function GamePage() {
 
         // Update inventory in CharacterContext from server response
         if (responseData.inventory) {
-          console.log('[COMBAT END] Updating inventory with', responseData.inventory.length, 'items');
           actions.setInventory(responseData.inventory);
-        } else {
-          console.log('[COMBAT END] WARNING: No inventory in response!');
         }
 
         // No need to refetch - we already have fresh data from finish-combat response
@@ -808,7 +803,7 @@ export default function GamePage() {
 
   const handleUseItem = async (inventoryItemId: number, itemName: string, healthRestore: number, manaRestore: number) => {
     try {
-      console.log('[USE ITEM] Using:', itemName);
+      console.log('[USE ITEM] Using:', itemName, 'HP restore:', healthRestore, 'Mana restore:', manaRestore);
       
       // Optimistic update - restore health/mana immediately
       const currentH = currentHealth();
@@ -987,7 +982,13 @@ export default function GamePage() {
       console.log('[SELL] Sold for', result.goldGained, 'gold. Server returned', result.inventory.length, 'items');
       
       // Update CharacterContext with server-confirmed data
-      actions.setCharacter(result.character);
+      // Preserve current HP/mana (don't overwrite with stale server data)
+      const currentChar = store.character;
+      actions.setCharacter({
+        ...result.character,
+        current_health: currentChar?.current_health ?? result.character.current_health,
+        current_mana: currentChar?.current_mana ?? result.character.current_mana
+      });
       actions.setInventory(result.inventory);
       
       setSellItemData(null);
@@ -1178,9 +1179,9 @@ export default function GamePage() {
         const totalIntelligence = updatedStats.intelligence + equipBonuses.intelligence + effectBonus;
         
         // Calculate new max mana with all bonuses using new formula
-        // Mana: Base + (Level × 10) + (INT - 10) × 5
-        const baseMana = 50;
-        const levelBonus = updatedStats.level * 10;
+        // Mana: Base + (Level × 20) + (INT - 10) × 5
+        const baseMana = 100;
+        const levelBonus = updatedStats.level * 20;
         const intelligenceBonus = (totalIntelligence - 10) * 5;
         updatedStats.max_mana = baseMana + levelBonus + intelligenceBonus;
         
@@ -1204,14 +1205,25 @@ export default function GamePage() {
       // Preserve current health/mana (don't let server overwrite regen progress)
       const currentHP = currentHealth();
       const currentMP = currentMana();
+      const inDungeon = !!store.dungeonSession;
+      
+      console.log('[ASSIGN STATS] Current HP/Mana:', currentHP, currentMP, 'In dungeon:', inDungeon);
       
       // Use server-confirmed data
       if (result.character) {
         console.log('[ASSIGN STATS] Server returned character with available_points:', result.character.available_points);
+        console.log('[ASSIGN STATS] Server HP/Mana:', result.character.current_health, result.character.current_mana);
+        
         // Preserve the current health/mana values
         result.character.current_health = currentHP;
         result.character.current_mana = currentMP;
+        
+        console.log('[ASSIGN STATS] Setting character with preserved HP/Mana:', result.character.current_health, result.character.current_mana);
         actions.setCharacter(result.character);
+        
+        if (inDungeon) {
+          console.log('[ASSIGN STATS] In dungeon - current session HP/Mana should still be:', store.dungeonSession?.session_health, store.dungeonSession?.session_mana);
+        }
       }
       
       // Don't refetch - we already have the updated character from the server response
@@ -1391,13 +1403,8 @@ export default function GamePage() {
         throw new Error(result.error);
       }
 
-      console.log('[DUNGEON ADVANCE] Result:', result);
-
       if (result.completed) {
-        // Dungeon complete!
-        console.log('[DUNGEON COMPLETE] Transferring HP/mana and clearing dungeon state');
-        
-        // Transfer dungeon session HP/mana to character before clearing
+        // Dungeon complete! Transfer dungeon session HP/mana to character before clearing
         const finalHealth = currentH;
         const finalMana = currentM;
         
@@ -1412,14 +1419,12 @@ export default function GamePage() {
           actions.setDungeonSession(null); // Clear dungeon session LAST
         });
         
-        console.log('[DUNGEON COMPLETE] State cleared - dungeon session:', store.dungeonSession);
         setCombatLog([...combatLog(), '🎉 Dungeon completed! The boss has been defeated!']);
         
         return { completed: true };
       } else {
         // Start next encounter immediately
         if (result.combat && result.mob) {
-          console.log('[DUNGEON ADVANCE] Starting next encounter:', result.mob.name);
           setActiveMob(result.mob);
           
           // Update dungeon session encounter count
@@ -1433,13 +1438,9 @@ export default function GamePage() {
           
           // Update encounter progress for UI
           if (result.progress) {
-            console.log('[DUNGEON ADVANCE] Setting progress from result.progress:', result.progress);
             setDungeonProgress(result.progress);
           } else if (result.encounterProgress) {
-            console.log('[DUNGEON ADVANCE] Setting progress from result.encounterProgress:', result.encounterProgress);
             setDungeonProgress(result.encounterProgress);
-          } else {
-            console.warn('[DUNGEON ADVANCE] No progress data in result!');
           }
           
           if (result.isBoss && result.namedMob) {
@@ -1852,6 +1853,11 @@ export default function GamePage() {
                     const item = currentInventory().find((i: any) => i.id === itemId);
                     if (item) {
                       await handleUseItem(itemId, item.name, item.health_restore || 0, item.mana_restore || 0);
+                      // Return restoration values so CombatEngine can apply them internally
+                      return {
+                        healthRestore: item.health_restore || 0,
+                        manaRestore: item.mana_restore || 0
+                      };
                     }
                   }}
                 />

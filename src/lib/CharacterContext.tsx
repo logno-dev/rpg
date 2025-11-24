@@ -181,7 +181,6 @@ export const CharacterProvider: ParentComponent<{ initialData?: Partial<Characte
     },
 
     updateDungeonHealth: (health: number, mana: number) => {
-      console.log('[UPDATE DUNGEON HEALTH]', { health, mana });
       setStore("dungeonSession", (session) => {
         if (!session) return session;
         return { ...session, session_health: health, session_mana: mana };
@@ -189,42 +188,44 @@ export const CharacterProvider: ParentComponent<{ initialData?: Partial<Characte
     },
 
     updateDungeonEncounter: (encounterNumber: number, health: number, mana: number) => {
-      console.log('[UPDATE DUNGEON ENCOUNTER]', { encounterNumber, health, mana });
+      console.log('🎯 [Context] updateDungeonEncounter called:', { encounterNumber, health, mana });
+      console.log('🎯 [Context] Before update:', { 
+        current: store.dungeonSession?.current_encounter,
+        health: store.dungeonSession?.session_health,
+        mana: store.dungeonSession?.session_mana 
+      });
       setStore("dungeonSession", "current_encounter", encounterNumber);
       setStore("dungeonSession", "session_health", health);
       setStore("dungeonSession", "session_mana", mana);
+      console.log('🎯 [Context] After update:', { 
+        current: store.dungeonSession?.current_encounter,
+        health: store.dungeonSession?.session_health,
+        mana: store.dungeonSession?.session_mana 
+      });
     },
 
     updateHealth: (health: number, mana?: number) => {
-      setStore("character", (char) => {
-        if (!char) return char;
-        return {
-          ...char,
-          current_health: health,
-          ...(mana !== undefined ? { current_mana: mana } : {}),
-        };
-      });
+      console.log('[CharacterContext] updateHealth called:', { health, mana, currentChar: store.character?.current_health });
+      setStore("character", "current_health", health);
+      if (mana !== undefined) {
+        setStore("character", "current_mana", mana);
+      }
+      console.log('[CharacterContext] After update:', { health: store.character?.current_health, mana: store.character?.current_mana });
     },
 
     updateGold: (gold: number) => {
-      setStore("character", (char) => {
-        if (!char) return char;
-        return { ...char, gold };
-      });
+      setStore("character", "gold", gold);
     },
 
     updateExperience: (exp: number) => {
-      setStore("character", (char) => {
-        if (!char) return char;
-        return { ...char, experience: exp };
-      });
+      setStore("character", "experience", exp);
     },
 
     updateStats: (stats: Partial<Character>) => {
-      setStore("character", (char) => {
-        if (!char) return char;
-        return { ...char, ...stats };
-      });
+      setStore("character", produce((char) => {
+        if (!char) return;
+        Object.assign(char, stats);
+      }));
     },
 
     addItemToInventory: (item: InventoryItem) => {

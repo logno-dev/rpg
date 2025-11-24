@@ -72,6 +72,7 @@ async function getDungeonData(characterId: number, dungeonId: number) {
 }
 
 export default function DungeonRoute() {
+  console.log('🏰 === DUNGEON ROUTE LOADED - NEW VERSION WITH REACTIVE MEMOS ===');
   const params = useParams<{ id: string; dungeonId: string }>();
   const navigate = useNavigate();
   const characterId = () => parseInt(params.id!);
@@ -88,6 +89,10 @@ export default function DungeonRoute() {
   const [combatHots, setCombatHots] = createSignal<any[]>([]);
   const [combatThorns, setCombatThorns] = createSignal<any>(null);
   const [isScrolled, setIsScrolled] = createSignal(false);
+  
+  // Track combat HP/mana separately (updated by CombatEngine during combat)
+  const [combatHealth, setCombatHealth] = createSignal<number | null>(null);
+  const [combatMana, setCombatMana] = createSignal<number | null>(null);
   
   // Initialize CharacterContext and dungeon session when data loads
   createEffect(() => {
@@ -149,8 +154,6 @@ export default function DungeonRoute() {
         throw new Error(result.error);
       }
       
-      console.log('[DUNGEON ENCOUNTER] Starting:', result);
-      
       // Set current encounter
       setCurrentEncounter(result.encounter);
       setActiveMob(result.mob);
@@ -172,6 +175,8 @@ export default function DungeonRoute() {
   
   const handleCombatEnd = async (result: 'victory' | 'defeat', finalState: any) => {
     try {
+      console.log('🏁 [COMBAT END] Final state:', finalState.characterHealth, finalState.characterMana);
+      
       const response = await fetch('/api/game/finish-combat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -188,12 +193,7 @@ export default function DungeonRoute() {
       const responseData = await response.json();
       
       if (responseData.result === 'victory') {
-        // Update dungeon session with post-combat HP/mana
-        if (store.dungeonSession) {
-          actions.updateDungeonHealth(finalState.characterHealth, finalState.characterMana);
-        }
-        
-        // Clear combat
+        // Clear combat UI immediately
         setActiveMob(null);
         setActiveNamedMobId(null);
         setCombatHots([]);
@@ -211,12 +211,15 @@ export default function DungeonRoute() {
         });
         
         const advanceResult = await advanceResponse.json();
-        console.log('[DUNGEON] Advance result:', advanceResult);
         
         if (advanceResult.completed) {
           // Dungeon complete! Update character HP/mana and clear session
           actions.updateHealth(finalState.characterHealth, finalState.characterMana);
           actions.setDungeonSession(null);
+          
+          // Clear combat signals
+          setCombatHealth(null);
+          setCombatMana(null);
           
           alert('🎉 Dungeon Complete! You defeated the boss!');
           
@@ -224,24 +227,27 @@ export default function DungeonRoute() {
           setTimeout(() => {
             navigate(`/game/${characterId()}`);
           }, 100);
-        } else {
-          // Update dungeon session with new encounter number
-          console.log('[DUNGEON] Advance result:', advanceResult);
-          console.log('[DUNGEON] Current encounter before update:', store.dungeonSession?.current_encounter);
+        } else if (advanceResult.progress) {
+          // Update dungeon session with new encounter number and HP/mana
+          actions.updateDungeonEncounter(
+            advanceResult.progress.current,
+            finalState.characterHealth,
+            finalState.characterMana
+          );
           
-          if (advanceResult.progress) {
-            actions.updateDungeonEncounter(
-              advanceResult.progress.current,
-              finalState.characterHealth,
-              finalState.characterMana
-            );
-            console.log('[DUNGEON] Updated to encounter:', advanceResult.progress.current);
-          }
+          // Clear combat state signals AFTER store is updated to avoid showing stale values
+          console.log('🧹 [COMBAT END] Clearing combat signals, store now has:', 
+            store.dungeonSession?.session_health, store.dungeonSession?.session_mana);
+          setCombatHealth(null);
+          setCombatMana(null);
         }
-        
       } else {
         // Defeat - abandon dungeon
         await handleAbandonDungeon();
+        
+        // Clear combat signals
+        setCombatHealth(null);
+        setCombatMana(null);
       }
       
     } catch (error: any) {
@@ -251,8 +257,10 @@ export default function DungeonRoute() {
   };
   
   const handleHealthChange = (health: number, mana: number) => {
-    // Always update dungeon session when in dungeon route
-    actions.updateDungeonHealth(health, mana);
+    // During combat, DON'T update dungeon session here
+    // The CombatEngine manages HP/mana internally and reports final values via onCombatEnd
+    // This callback is only for tracking changes, not for syncing state during combat
+    // The final HP/mana will be saved when combat ends via handleCombatEnd
   };
   
   const handleRegenTick = (health: number, mana: number) => {
@@ -291,21 +299,120 @@ export default function DungeonRoute() {
     const initialProgress = dungeonData()?.progress;
     
     if (session) {
-      const result = {
+      return {
         ...initialProgress,
-        current_encounter: session.current_encounter
+        current_encounter: session.current_encounter,
+        session_health: session.session_health,
+        session_mana: session.session_mana
       };
-      console.log('[PROGRESS] Reading from session:', session.current_encounter, 'Result:', result);
-      return result;
     }
-    console.log('[PROGRESS] Reading from initial data:', initialProgress);
     return initialProgress;
   };
   
-  const currentHealth = () => store.dungeonSession?.session_health || store.character?.current_health || 0;
-  const currentMana = () => store.dungeonSession?.session_mana || store.character?.current_mana || 0;
-  const currentMaxHealth = () => store.character?.max_health || 100;
-  const currentMaxMana = () => store.character?.max_mana || 100;
+  // Equipment helpers (defined before memos that use them)
+  const equippedWeapon = () => {
+    return (store.inventory || []).find((i: any) => i.equipped && i.slot === 'weapon');
+  };
+  
+  const equippedArmor = () => {
+    return (store.inventory || []).filter((i: any) => i.equipped && i.slot !== 'weapon');
+  };
+  
+  // Debug: Watch store changes
+  createEffect(() => {
+    console.log('🔍 [DUNGEON STORE] Session changed:', {
+      session_health: store.dungeonSession?.session_health,
+      session_mana: store.dungeonSession?.session_mana,
+      char_health: store.character?.current_health,
+      char_mana: store.character?.current_mana
+    });
+  });
+
+  const currentHealth = createMemo(() => {
+    // During combat, use combat state; otherwise use store
+    const health = combatHealth() ?? (store.dungeonSession?.session_health || store.character?.current_health || 0);
+    console.log('💚 [DUNGEON MEMO] currentHealth =', health, 'from', combatHealth() !== null ? 'COMBAT' : 'STORE');
+    return health;
+  });
+  
+  const currentMana = createMemo(() => {
+    // During combat, use combat state; otherwise use store
+    const mana = combatMana() ?? (store.dungeonSession?.session_mana || store.character?.current_mana || 0);
+    console.log('💙 [DUNGEON MEMO] currentMana =', mana, 'from', combatMana() !== null ? 'COMBAT' : 'STORE');
+    return mana;
+  });
+  
+  // Calculate actual max health including equipment and active effects
+  const currentMaxHealth = createMemo(() => {
+    if (!store.character) {
+      console.log('❤️ [DUNGEON MEMO] currentMaxHealth = 100 (no character)');
+      return 100;
+    }
+    
+    // Get base constitution
+    let totalConstitution = store.character.constitution;
+    
+    // Add equipment bonuses
+    const armor = equippedArmor();
+    if (Array.isArray(armor)) {
+      armor.forEach((item: any) => {
+        if (item.constitution_bonus) {
+          totalConstitution += item.constitution_bonus;
+        }
+      });
+    }
+    
+    // Check weapon for constitution bonus
+    const weapon = equippedWeapon();
+    if (weapon?.constitution_bonus) {
+      totalConstitution += weapon.constitution_bonus;
+    }
+    
+    // Formula: Base + (Level × 20) + (CON - 10) × 8
+    const baseHealth = 100;
+    const levelBonus = store.character.level * 20;
+    const constitutionBonus = (totalConstitution - 10) * 8;
+    const maxHealth = baseHealth + levelBonus + constitutionBonus;
+    
+    console.log('❤️ [DUNGEON MEMO] currentMaxHealth =', maxHealth);
+    return maxHealth;
+  });
+  
+  // Calculate actual max mana including equipment and active effects
+  const currentMaxMana = createMemo(() => {
+    if (!store.character) {
+      console.log('🔵 [DUNGEON MEMO] currentMaxMana = 100 (no character)');
+      return 100;
+    }
+    
+    // Get base intelligence
+    let totalIntelligence = store.character.intelligence;
+    
+    // Add equipment bonuses
+    const armor = equippedArmor();
+    if (Array.isArray(armor)) {
+      armor.forEach((item: any) => {
+        if (item.intelligence_bonus) {
+          totalIntelligence += item.intelligence_bonus;
+        }
+      });
+    }
+    
+    // Check weapon for intelligence bonus
+    const weapon = equippedWeapon();
+    if (weapon?.intelligence_bonus) {
+      totalIntelligence += weapon.intelligence_bonus;
+    }
+    
+    // Formula: Base + (Level × 20) + (INT - 10) × 5
+    const baseMana = 100;
+    const levelBonus = store.character.level * 20;
+    const intelligenceBonus = (totalIntelligence - 10) * 5;
+    const maxMana = baseMana + levelBonus + intelligenceBonus;
+    
+    console.log('🔵 [DUNGEON MEMO] currentMaxMana =', maxMana);
+    return maxMana;
+  });
   
   const hotbarActions = createMemo(() => {
     const hotbar = store.hotbar || [];
@@ -340,14 +447,6 @@ export default function DungeonRoute() {
       })
       .filter((action: any) => action && (action.ability || action.item));
   });
-  
-  const equippedWeapon = () => {
-    return (store.inventory || []).find((i: any) => i.equipped && i.slot === 'weapon');
-  };
-  
-  const equippedArmor = () => {
-    return (store.inventory || []).filter((i: any) => i.equipped && i.slot !== 'weapon');
-  };
 
   return (
     <div style={{ 
@@ -571,72 +670,37 @@ export default function DungeonRoute() {
                 currentMana={currentMana()}
                 hotbarActions={hotbarActions()}
                 onCombatEnd={handleCombatEnd}
-                onHealthChange={handleHealthChange}
+                onHealthChange={(health, mana) => {
+                  // Update combat state signals so UI reflects combat changes
+                  console.log('⚔️ [COMBAT] HP/Mana changed:', health, mana);
+                  setCombatHealth(health);
+                  setCombatMana(mana);
+                }}
                 onActiveHotsChange={setCombatHots}
                 onThornsChange={setCombatThorns}
                 onUseConsumable={async (itemId) => {
                   const item = store.inventory?.find((i: any) => i.id === itemId);
+                  
+                  // Update inventory via API
+                  const response = await fetch('/api/game/use-item', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ characterId: characterId(), inventoryItemId: itemId }),
+                  });
+                  const result = await response.json();
+                  actions.setInventory(result.inventory);
+                  
+                  // Return restoration values so CombatEngine can apply them internally
                   if (item) {
-                    // Use item during dungeon
-                    const response = await fetch('/api/game/use-item', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ characterId: characterId(), inventoryItemId: itemId }),
-                    });
-                    const result = await response.json();
-                    
-                    // Update inventory and dungeon HP/mana
-                    actions.setInventory(result.inventory);
-                    if (store.dungeonSession) {
-                      actions.updateDungeonHealth(result.character.current_health, result.character.current_mana);
-                    }
+                    return {
+                      healthRestore: item.health_restore || 0,
+                      manaRestore: item.mana_restore || 0
+                    };
                   }
                 }}
               />
           </Show>
         </Show>
-      </Show>
-      
-      {/* Abandon Modal */}
-      <Show when={showAbandonModal()}>
-        <div style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: "rgba(0, 0, 0, 0.9)",
-          display: "flex",
-          "align-items": "center",
-          "justify-content": "center",
-          "z-index": 2000
-        }}>
-          <div class="card" style={{ "max-width": "400px" }}>
-            <h2 style={{ "margin-bottom": "1rem" }}>Abandon Dungeon?</h2>
-            <p style={{ "margin-bottom": "1.5rem", color: "var(--text-secondary)" }}>
-              Are you sure you want to abandon this dungeon? You will lose all progress and be returned to safety.
-            </p>
-            <div style={{ display: "flex", gap: "1rem" }}>
-              <button 
-                class="button secondary" 
-                style={{ flex: 1 }}
-                onClick={() => setShowAbandonModal(false)}
-              >
-                Cancel
-              </button>
-              <button 
-                class="button" 
-                style={{ flex: 1, background: "var(--danger)" }}
-                onClick={() => {
-                  setShowAbandonModal(false);
-                  handleAbandonDungeon();
-                }}
-              >
-                Abandon
-              </button>
-            </div>
-          </div>
-        </div>
       </Show>
     </div>
   );

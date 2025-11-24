@@ -1,10 +1,11 @@
-import { createSignal, onMount, onCleanup, For, Show, createEffect, onCleanup as onCleanupEffect } from "solid-js";
+import { createSignal, onMount, onCleanup, For, Show, createEffect, onCleanup as onCleanupEffect, untrack } from "solid-js";
 import type { Character, Mob, Item, Ability, AbilityEffect, ActiveEffect } from "~/lib/db";
 import { useActiveEffects } from "~/lib/ActiveEffectsContext";
 import { EffectProcessor } from "~/lib/EffectProcessor";
 
 type CombatState = {
   characterHealth: number;
+  characterMana: number;
   mobHealth: number;
   characterTicks: number;
   mobTicks: number;
@@ -43,7 +44,7 @@ type CombatEngineProps = {
   hotbarActions: HotbarAction[]; // Hotbar configured actions (abilities + consumables)
   onCombatEnd: (result: 'victory' | 'defeat', finalState: CombatState) => void;
   onHealthChange: (health: number, mana: number) => void;
-  onUseConsumable?: (itemId: number) => Promise<void>;
+  onUseConsumable?: (itemId: number) => Promise<{ healthRestore: number; manaRestore: number } | void>;
   onActiveHotsChange?: (hots: ActiveEffect[]) => void;
   onThornsChange?: (thorns: { name: string; reflectPercent: number; duration: number; expiresAt: number } | null) => void;
 };
@@ -85,6 +86,35 @@ export function CombatEngine(props: CombatEngineProps) {
     return baseHealth + levelBonus + constitutionBonus;
   };
   
+  const getActualMaxMana = () => {
+    // Get base intelligence
+    let totalIntelligence = props.character.intelligence;
+    
+    // Add equipment bonuses
+    if (Array.isArray(props.equippedArmor)) {
+      props.equippedArmor.forEach((item: any) => {
+        if (item.intelligence_bonus) {
+          totalIntelligence += item.intelligence_bonus;
+        }
+      });
+    }
+    
+    if (props.equippedWeapon?.intelligence_bonus) {
+      totalIntelligence += props.equippedWeapon.intelligence_bonus;
+    }
+    
+    // Add active effect bonuses
+    const effectBonus = effectsActions.getTotalStatBonus('intelligence');
+    totalIntelligence += effectBonus;
+    
+    // Formula: Base + (Level × 20) + (INT - 10) × 5
+    const baseMana = 100;
+    const levelBonus = props.character.level * 20;
+    const intelligenceBonus = (totalIntelligence - 10) * 5;
+    
+    return baseMana + levelBonus + intelligenceBonus;
+  };
+  
   // Calculate attack speed in ticks
   const calculateAttackTicks = (baseSpeed: number, dexterity: number): number => {
     // Dexterity is the primary factor, weapon speed is secondary
@@ -108,6 +138,7 @@ export function CombatEngine(props: CombatEngineProps) {
 
   const [state, setState] = createSignal<CombatState>({
     characterHealth: props.currentHealth,
+    characterMana: props.currentMana,
     mobHealth: props.mob.max_health,
     characterTicks: 0,
     mobTicks: 0,
@@ -151,9 +182,15 @@ export function CombatEngine(props: CombatEngineProps) {
   // Flag to prevent sync loops when we update health internally
   let isInternalHealthUpdate = false;
   
-  // Sync external mana changes
+  // Initialize mana at combat start only
+  // After that, mana is managed internally and should not sync with external changes
+  let manaInitialized = false;
   createEffect(() => {
-    setCurrentMana(props.currentMana);
+    // Only set mana once at the very start of combat
+    if (!manaInitialized && state().isActive) {
+      setCurrentMana(untrack(() => props.currentMana));
+      manaInitialized = true;
+    }
   });
   
   // Track previous constitution bonus to detect changes
@@ -291,12 +328,12 @@ export function CombatEngine(props: CombatEngineProps) {
     let didHeal = false;
 
     setState((currentState) => {
-      let newState = { ...currentState };
+      let newState = { ...currentState, characterMana: currentMana() };
       const newLog = [...currentState.log];
 
       // NEW EFFECT SYSTEM: Process if effects are loaded
       if (ability.effects && ability.effects.length > 0) {
-        console.log(`[useAbility] Processing ${ability.effects.length} effects for ${ability.name}`, ability.effects);
+        // console.log(`[useAbility] Processing ${ability.effects.length} effects for ${ability.name}`, ability.effects);
         
         ability.effects.forEach((effect: AbilityEffect) => {
           const result = EffectProcessor.processInstantEffect(effect, props.character, props.mob.defense);
@@ -512,7 +549,7 @@ export function CombatEngine(props: CombatEngineProps) {
 
         let newCharTicks = currentState.characterTicks + 1;
         let newMobTicks = currentState.mobTicks + 1;
-        let newState = { ...currentState };
+        let newState = { ...currentState, characterMana: currentMana() };
 
         // Handle in-combat regeneration (slower than out of combat)
         const currentRegenTicks = regenTicks() + 1;
@@ -859,7 +896,30 @@ export function CombatEngine(props: CombatEngineProps) {
                   if (action.type === 'ability' && action.ability) {
                     useAbility(action.ability);
                   } else if (action.type === 'consumable' && action.item && props.onUseConsumable) {
-                    await props.onUseConsumable(action.item.id);
+                    const result = await props.onUseConsumable(action.item.id);
+                    
+                    // Apply potion effects if returned
+                    if (result) {
+                      const maxHealth = getActualMaxHealth();
+                      const maxMana = getActualMaxMana();
+                      
+                      const newHealth = Math.min(maxHealth, state().characterHealth + result.healthRestore);
+                      const newMana = Math.min(maxMana, currentMana() + result.manaRestore);
+                      
+                      // Update internal HP/mana
+                      setState((currentState) => ({
+                        ...currentState,
+                        characterHealth: newHealth,
+                        characterMana: newMana
+                      }));
+                      
+                      setCurrentMana(newMana);
+                      
+                      // Notify parent so UI updates
+                      props.onHealthChange(newHealth, newMana);
+                      
+                      console.log('[POTION] Restored', result.healthRestore, 'HP and', result.manaRestore, 'mana');
+                    }
                   }
                 };
                 

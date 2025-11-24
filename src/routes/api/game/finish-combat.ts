@@ -235,6 +235,12 @@ export async function POST(event: APIEvent) {
         required_charisma: row.ability_required_charisma || row.required_charisma,
       }));
 
+      // Close the combat session
+      await db.execute({
+        sql: 'UPDATE combat_sessions SET status = ? WHERE character_id = ? AND status = ?',
+        args: ['victory', characterId, 'active'],
+      });
+
       return json({
         success: true,
         result: 'victory',
@@ -304,6 +310,12 @@ export async function POST(event: APIEvent) {
         required_wisdom: row.ability_required_wisdom || row.required_wisdom,
         required_charisma: row.ability_required_charisma || row.required_charisma,
       }));
+
+      // Close the combat session
+      await db.execute({
+        sql: 'UPDATE combat_sessions SET status = ? WHERE character_id = ? AND status = ?',
+        args: ['defeat', characterId, 'active'],
+      });
 
       return json({
         success: true,
