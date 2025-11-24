@@ -76,7 +76,7 @@ export async function createCharacter(
 
   // Calculate derived stats using new formula
   // Health: Base + (Level × 20) + (CON - 10) × 8
-  // Mana: Base + (Level × 10) + (INT - 10) × 5
+  // Mana: Base + (Level × 20) + (INT - 10) × 5
   // New characters start at level 1
   const maxHealth = calculateMaxHealth(1, stats.constitution);
   const maxMana = calculateMaxMana(1, stats.intelligence);
@@ -200,7 +200,7 @@ export async function assignStatPoints(
 
   if (stats.intelligence) {
     const newIntelligence = character.intelligence + stats.intelligence;
-    // New formula: Base + (Level × 10) + (INT - 10) × 5
+    // New formula: Base + (Level × 20) + (INT - 10) × 5
     const newBaseMaxMana = calculateMaxMana(character.level, newIntelligence);
     const manaIncrease = stats.intelligence * 5; // +5 mana per INT point
     updates.push('max_mana = ?', 'current_mana = current_mana + ?');
@@ -498,14 +498,14 @@ export async function processCombatRound(
     if (newExp >= expNeeded) {
       // On level up, increase max_health and max_mana based on new level
       // Health: Base + (Level × 20) + (CON - 10) × 8
-      // Mana: Base + (Level × 10) + (INT - 10) × 5
+      // Mana: Base + (Level × 20) + (INT - 10) × 5
       const newLevel = character.level + 1;
       const newBaseMaxHealth = calculateMaxHealth(newLevel, character.constitution);
       const newBaseMaxMana = calculateMaxMana(newLevel, character.intelligence);
       
-      // Give +20 HP and +10 mana per level
+      // Give +20 HP and +20 mana per level
       const healthIncrease = 20;
-      const manaIncrease = 10;
+      const manaIncrease = 20;
       
       await db.execute({
         sql: `UPDATE characters 
