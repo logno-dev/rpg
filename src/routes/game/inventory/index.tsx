@@ -154,6 +154,35 @@ export default function InventoryPage() {
     }
   };
 
+  // Handle use item
+  const handleUseItem = async (inventoryItemId: number, itemName: string, healthRestore: number, manaRestore: number) => {
+    try {
+      const response = await fetch('/api/game/use-item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          characterId: characterId(), 
+          inventoryItemId 
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok || result.error) {
+        console.error('Use item error:', result.error);
+        return;
+      }
+      
+      if (result.success) {
+        // Update character and inventory from API response
+        actions.setCharacter(result.character);
+        actions.setInventory(result.inventory);
+      }
+    } catch (error: any) {
+      console.error('Use item error:', error);
+    }
+  };
+
   // Handle drop item click (show modal)
   const handleDropClick = (inventoryItemId: number, itemName: string, quantity: number) => {
     setDropItemData({ inventoryItemId, itemName, quantity });
@@ -687,12 +716,12 @@ export default function InventoryPage() {
             </div>
           </Show>
           
-          <Show when={currentInventory().filter((i: any) => !i.equipped && i.slot && i.slot !== "weapon" && i.type === "equipment").length > 0}>
+          <Show when={currentInventory().filter((i: any) => !i.equipped && i.type === "armor").length > 0}>
             <h4 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", display: "flex", "align-items": "center", gap: "0.5rem", "font-size": "1.1rem" }}>
-              🛡️ Armor ({currentInventory().filter((i: any) => !i.equipped && i.slot && i.slot !== "weapon" && i.type === "equipment").length})
+              🛡️ Armor ({currentInventory().filter((i: any) => !i.equipped && i.type === "armor").length})
             </h4>
             <div style={{ "margin-bottom": "2rem" }}>
-              <For each={currentInventory().filter((i: any) => !i.equipped && i.slot && i.slot !== "weapon" && i.type === "equipment")}>
+              <For each={currentInventory().filter((i: any) => !i.equipped && i.type === "armor")}>
                 {(invItem: any) => {
                   const canSell = invItem.value && invItem.value > 0;
                   const isSelected = selectedItems().has(invItem.id);
@@ -932,7 +961,7 @@ export default function InventoryPage() {
             <For each={currentInventory().filter((i: any) => {
               if (i.equipped) return false;
               if (inventoryFilter() === "weapons") return i.slot === "weapon";
-              if (inventoryFilter() === "armor") return i.slot && i.slot !== "weapon" && i.type === "equipment";
+              if (inventoryFilter() === "armor") return i.type === "armor";
               if (inventoryFilter() === "scrolls") return i.type === "scroll";
               if (inventoryFilter() === "consumables") return i.type === "consumable";
               return false;
@@ -1041,6 +1070,7 @@ export default function InventoryPage() {
           onEquip={(id) => handleEquip(id, false)}
           onSell={handleSell}
           onLearnAbility={handleLearnAbility}
+          onUseItem={handleUseItem}
           onDrop={handleDropClick}
           isMerchantItem={selectedItemIsMerchant()}
         />

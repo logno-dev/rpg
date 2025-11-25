@@ -82,6 +82,8 @@ async function migrate() {
       '031_create_loot_tables.sql',
       '032_add_region_id_to_mobs.sql',
       '033_add_gm_role.sql',
+      '034_add_dungeon_session_state.sql',
+      '035_create_crafting_system.sql',
     ];
 
     for (const migrationFile of migrations) {
