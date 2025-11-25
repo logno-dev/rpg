@@ -7,10 +7,13 @@ import { getSelectedCharacterId, useBasicCharacterData } from '~/lib/game-helper
 
 export default function StatsRoute() {
   const navigate = useNavigate();
-  const characterId = () => getSelectedCharacterId();
-
+  
   // Use shared hook to initialize character context (uses server session!)
+  // This will redirect server-side if no character is selected
   const basicData = useBasicCharacterData();
+  
+  // Get character ID from localStorage (client-side only, for API calls)
+  const characterId = () => getSelectedCharacterId();
 
   // Redirect to active dungeon if one exists
   createEffect(() => {
@@ -37,13 +40,6 @@ export default function StatsRoute() {
 
   const [assigningStats, setAssigningStats] = createSignal(false);
   const [pendingStats, setPendingStats] = createSignal<Record<string, number>>({});
-
-  // Redirect if no character selected (client-side only)
-  createEffect(() => {
-    if (typeof window !== 'undefined' && !characterId()) {
-      navigate('/character-select');
-    }
-  });
 
   const currentCharacter = () => store.character;
   

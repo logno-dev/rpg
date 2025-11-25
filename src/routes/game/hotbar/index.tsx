@@ -7,17 +7,13 @@ import { getSelectedCharacterId, useBasicCharacterData } from "~/lib/game-helper
 
 export default function HotbarPage() {
   const navigate = useNavigate();
-  const characterId = () => getSelectedCharacterId();
-  
-  // Redirect if no character selected (client-side only)
-  createEffect(() => {
-    if (typeof window !== 'undefined' && !characterId()) {
-      navigate('/character-select');
-    }
-  });
   
   // Use shared hook to initialize character context (uses server session!)
+  // This will redirect server-side if no character is selected
   const basicData = useBasicCharacterData();
+  
+  // Get character ID from localStorage (client-side only, for API calls)
+  const characterId = () => getSelectedCharacterId();
   
   // Redirect to active dungeon if one exists
   createEffect(() => {

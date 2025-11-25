@@ -7,20 +7,13 @@ import { getSelectedCharacterId, useBasicCharacterData } from "~/lib/game-helper
 
 export default function InventoryPage() {
   const navigate = useNavigate();
-  const characterId = () => getSelectedCharacterId();
-  
-  // Redirect if no character selected (client-side only)
-  createEffect(() => {
-    const id = characterId();
-    console.log('[Inventory] Redirect check - characterId:', id);
-    if (typeof window !== 'undefined' && !id) {
-      console.log('[Inventory] No character ID in localStorage, redirecting to character-select');
-      navigate('/character-select');
-    }
-  });
   
   // Use shared hook to initialize character context (uses server session!)
+  // This will redirect server-side if no character is selected
   const basicData = useBasicCharacterData();
+  
+  // Get character ID from localStorage (client-side only, for API calls)
+  const characterId = () => getSelectedCharacterId();
   
   // Redirect to active dungeon if one exists
   createEffect(() => {
