@@ -89,6 +89,19 @@ export default function GamePage() {
   const [showDeathModal, setShowDeathModal] = createSignal(false);
   const [deathData, setDeathData] = createSignal<{expLost: number, goldLost: number} | null>(null);
   
+  // Helper function to get difficulty color based on level difference
+  const getDifficultyColor = (mobLevel: number, characterLevel: number) => {
+    const diff = mobLevel - characterLevel;
+    
+    if (diff <= -5) return { color: '#6b7280', label: 'Trivial' };      // Gray - 5+ levels below
+    if (diff <= -3) return { color: '#10b981', label: 'Easy' };         // Green - 3-4 levels below
+    if (diff <= -1) return { color: '#3b82f6', label: 'Moderate' };     // Blue - 1-2 levels below
+    if (diff === 0) return { color: '#8b5cf6', label: 'Fair' };         // Purple - same level
+    if (diff <= 2) return { color: '#eab308', label: 'Challenging' };   // Yellow - 1-2 levels above
+    if (diff <= 4) return { color: '#f97316', label: 'Difficult' };     // Orange - 3-4 levels above
+    return { color: '#ef4444', label: 'Deadly' };                       // Red - 5+ levels above
+  };
+  
   // Victory modal state
   const [showVictoryModal, setShowVictoryModal] = createSignal(false);
   const [victoryData, setVictoryData] = createSignal<{
@@ -1914,37 +1927,45 @@ export default function GamePage() {
                         "margin-top": "1rem"
                       }}>
                         <For each={availableMobs()}>
-                          {(mob) => (
-                            <button
-                              class="button secondary"
-                              onClick={() => handleStartCombat(mob)}
-                              style={{
-                                display: "flex",
-                                "flex-direction": "column",
-                                "align-items": "start",
-                                padding: "0.75rem",
-                                "text-align": "left",
-                                gap: "0.25rem"
-                              }}
-                            >
-                              <div style={{ 
-                                "font-weight": "bold",
-                                "font-size": "0.95rem"
-                              }}>
-                                {mob.aggressive === 1 ? '⚔️ ' : ''}{mob.name}
-                              </div>
-                              <div style={{ 
-                                "font-size": "0.75rem", 
-                                color: "var(--text-secondary)",
-                                display: "flex",
-                                gap: "0.5rem"
-                              }}>
-                                <span>Lvl {mob.level}</span>
-                                <span>•</span>
-                                <span>{mob.max_health} HP</span>
-                              </div>
-                            </button>
-                          )}
+                          {(mob) => {
+                            const difficulty = getDifficultyColor(mob.level, store.character?.level || 1);
+                            return (
+                              <button
+                                class="button secondary"
+                                onClick={() => handleStartCombat(mob)}
+                                style={{
+                                  display: "flex",
+                                  "flex-direction": "column",
+                                  "align-items": "start",
+                                  padding: "0.75rem",
+                                  "text-align": "left",
+                                  gap: "0.25rem",
+                                  "border-left": `4px solid ${difficulty.color}`,
+                                  "background": `linear-gradient(90deg, ${difficulty.color}15, transparent)`
+                                }}
+                              >
+                                <div style={{ 
+                                  "font-weight": "bold",
+                                  "font-size": "0.95rem",
+                                  color: difficulty.color
+                                }}>
+                                  {mob.aggressive === 1 ? '⚔️ ' : ''}{mob.name}
+                                </div>
+                                <div style={{ 
+                                  "font-size": "0.75rem", 
+                                  color: "var(--text-secondary)",
+                                  display: "flex",
+                                  gap: "0.5rem"
+                                }}>
+                                  <span>Lvl {mob.level}</span>
+                                  <span>•</span>
+                                  <span>{mob.max_health} HP</span>
+                                  <span>•</span>
+                                  <span style={{ color: difficulty.color, "font-weight": "600" }}>{difficulty.label}</span>
+                                </div>
+                              </button>
+                            );
+                          }}
                         </For>
                       </div>
                     </div>

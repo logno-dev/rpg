@@ -116,8 +116,16 @@ export default function CraftingPage() {
     fetchProfessionRecipes
   );
 
-  const professions = createMemo(() => craftingData()?.professions || []);
-  const materials = createMemo(() => craftingData()?.materials || []);
+  const professions = createMemo(() => {
+    const data = craftingData();
+    if (!data) return [];
+    return data.professions || [];
+  });
+  const materials = createMemo(() => {
+    const data = craftingData();
+    if (!data) return [];
+    return data.materials || [];
+  });
 
   const currentCharacter = () => store.character;
   const maxCraftingLevel = () => Math.floor((currentCharacter()?.level || 1) / 2);
@@ -223,8 +231,10 @@ export default function CraftingPage() {
       const data = await response.json();
 
       if (data.success) {
+        // Trigger immediate refetch to get updated profession data and wait for it
+        await refetchBasicData();
+        
         // Return the result data to display in modal immediately
-        // Refetch will happen when modal closes
         return data;
       } else {
         alert(data.error || "Failed to complete crafting");
@@ -264,7 +274,7 @@ export default function CraftingPage() {
                 <For each={Object.entries(PROFESSION_INFO)}>
                   {([key, info]) => {
                     const profession = key as Profession;
-                    const profData = getProfession(profession);
+                    const profData = createMemo(() => getProfession(profession));
                     
                     return (
                       <div 
@@ -285,7 +295,7 @@ export default function CraftingPage() {
                           "border-top": "1px solid var(--border)",
                           "text-align": "center"
                         }}>
-                          <span style={{ "font-weight": "bold", "font-size": "1.1rem" }}>Level {profData.level}</span>
+                          <span style={{ "font-weight": "bold", "font-size": "1.1rem" }}>Level {profData().level}</span>
                         </div>
                       </div>
                     );
@@ -298,7 +308,7 @@ export default function CraftingPage() {
             <Show when={selectedProfession()}>
               {(profession) => {
                 const info = PROFESSION_INFO[profession()];
-                const profData = getProfession(profession());
+                const profData = createMemo(() => getProfession(profession()));
                 
                 return (
                   <div>
@@ -329,14 +339,14 @@ export default function CraftingPage() {
                             }}>
                               <div>
                                 <span style={{ "font-weight": "bold", "font-size": "1.1rem" }}>
-                                  Level {profData.level}
+                                  Level {profData().level}
                                 </span>
                                 <span style={{ color: "var(--text-secondary)", "margin-left": "0.5rem" }}>
                                   / {maxCraftingLevel()} max
                                 </span>
                               </div>
                               <span style={{ color: "var(--text-secondary)", "font-size": "0.875rem" }}>
-                                {profData.experience} / {getXpForNextLevel(profData.level)} XP
+                                {profData().experience} / {getXpForNextLevel(profData().level)} XP
                               </span>
                             </div>
                             {/* XP Progress Bar */}
@@ -348,7 +358,7 @@ export default function CraftingPage() {
                               overflow: "hidden"
                             }}>
                               <div style={{ 
-                                width: `${getXpProgress(profData.experience, profData.level)}%`,
+                                width: `${getXpProgress(profData().experience, profData().level)}%`,
                                 height: "100%",
                                 background: "linear-gradient(90deg, var(--accent), var(--success))",
                                 transition: "width 0.3s ease"

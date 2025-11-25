@@ -121,6 +121,8 @@ export async function POST(event: APIEvent) {
         xpGained,
         levelUp,
         newLevel: newProfessionLevel,
+        newExperience: finalExp,
+        professionType: session.profession_type,
         craftedItem: craftedItem ? {
           name: (craftedItem as any).name,
           rarity: (craftedItem as any).rarity

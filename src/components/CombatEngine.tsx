@@ -52,6 +52,19 @@ type CombatEngineProps = {
 const TICK_INTERVAL = 100; // 100ms per tick
 const BASE_ATTACK_TICKS = 70; // Base 70 ticks = 7 seconds at dex 10, weapon speed 1.0
 
+// Helper function to get difficulty color based on level difference
+const getDifficultyColor = (mobLevel: number, characterLevel: number) => {
+  const diff = mobLevel - characterLevel;
+  
+  if (diff <= -5) return '#6b7280';      // Gray - 5+ levels below
+  if (diff <= -3) return '#10b981';      // Green - 3-4 levels below
+  if (diff <= -1) return '#3b82f6';      // Blue - 1-2 levels below
+  if (diff === 0) return '#8b5cf6';      // Purple - same level
+  if (diff <= 2) return '#eab308';       // Yellow - 1-2 levels above
+  if (diff <= 4) return '#f97316';       // Orange - 3-4 levels above
+  return '#ef4444';                      // Red - 5+ levels above
+};
+
 export function CombatEngine(props: CombatEngineProps) {
   const [effectsStore, effectsActions] = useActiveEffects();
   
@@ -764,13 +777,15 @@ export function CombatEngine(props: CombatEngineProps) {
   return (
     <div class="card">
       <h3 style={{ "margin-bottom": "1rem" }}>
-        Combat vs {props.mob.name}! {state().isActive ? "" : state().result === 'victory' ? "🎉" : "💀"}
+        Combat vs <span style={{ color: getDifficultyColor(props.mob.level, props.character.level) }}>{props.mob.name}</span>! {state().isActive ? "" : state().result === 'victory' ? "🎉" : "💀"}
       </h3>
 
       {/* Mob Health */}
       <div style={{ "margin-bottom": "1rem" }}>
         <div style={{ display: "flex", "justify-content": "space-between", "margin-bottom": "0.25rem" }}>
-          <strong>{props.mob.name} (Level {props.mob.level})</strong>
+          <strong style={{ color: getDifficultyColor(props.mob.level, props.character.level) }}>
+            {props.mob.name} (Level {props.mob.level})
+          </strong>
           <span>{state().mobHealth}/{props.mob.max_health} ({Math.round(mobHealthPercent())}%)</span>
         </div>
         <div class="progress-bar">
