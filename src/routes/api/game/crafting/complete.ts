@@ -44,13 +44,13 @@ export async function POST(event: APIEvent) {
     // Update profession XP
     const newProfessionExp = session.profession_exp + xpGained;
     
-    // Check for level up (simple: 1000 XP per level)
-    const XP_PER_LEVEL = 1000;
+    // Check for level up (matches character XP formula: level * 125)
+    const CRAFTING_XP_BASE = 125;
     let newProfessionLevel = session.profession_level;
     let levelUp = false;
     let finalExp = newProfessionExp;
 
-    if (newProfessionExp >= XP_PER_LEVEL * session.profession_level) {
+    if (newProfessionExp >= CRAFTING_XP_BASE * session.profession_level) {
       // Get character level to check max crafting level
       const charResult = await db.execute({
         sql: `SELECT level FROM characters WHERE id = ?`,
@@ -62,7 +62,7 @@ export async function POST(event: APIEvent) {
       // Only level up if not at max
       if (session.profession_level < maxCraftingLevel) {
         newProfessionLevel = session.profession_level + 1;
-        finalExp = newProfessionExp - (XP_PER_LEVEL * session.profession_level);
+        finalExp = newProfessionExp - (CRAFTING_XP_BASE * session.profession_level);
         levelUp = true;
       }
     }

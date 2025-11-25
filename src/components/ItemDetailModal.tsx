@@ -283,7 +283,7 @@ export function ItemDetailModal(props: ItemDetailModalProps) {
                       }}
                       onClick={() => {
                         props.onLearnAbility?.(item.id, item.name);
-                        props.onClose();
+                        // Don't close here - let the handler close it after updating inventory
                       }}
                       disabled={!canLearn}
                     >

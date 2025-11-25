@@ -102,12 +102,12 @@ export default function CraftingPage() {
     return data.recipes || [];
   };
 
-  const [craftingData, { refetch: refetchBasicData }] = createResource(
+  const [craftingData, { refetch: refetchBasicData, mutate: mutateBasicData }] = createResource(
     () => store.character?.id,
     fetchBasicCraftingData
   );
 
-  const [recipes, { refetch: refetchRecipes }] = createResource(
+  const [recipes, { refetch: refetchRecipes, mutate: mutateRecipes }] = createResource(
     () => {
       const charId = store.character?.id;
       const prof = selectedProfession();
@@ -122,8 +122,16 @@ export default function CraftingPage() {
   const currentCharacter = () => store.character;
   const maxCraftingLevel = () => Math.floor((currentCharacter()?.level || 1) / 2);
 
-  // Refetch crafting data (uses the resource refetch)
+  // XP per level formula (matches character XP formula: level * base XP)
+  const CRAFTING_XP_BASE = 125;
+
+  // Refetch crafting data (forces fresh fetch by clearing cache first)
   const refetchCraftingData = () => {
+    // Clear cached data to force refetch
+    mutateBasicData(undefined);
+    mutateRecipes(undefined);
+    
+    // Trigger refetch
     refetchBasicData();
     refetchRecipes();
   };
@@ -131,6 +139,17 @@ export default function CraftingPage() {
   // Get profession data
   const getProfession = (type: Profession) => {
     return professions().find((p: ProfessionData) => p.type === type) || { type, level: 1, experience: 0 };
+  };
+
+  // Calculate XP needed for next level (same formula as character XP: level * 125)
+  const getXpForNextLevel = (currentLevel: number) => {
+    return CRAFTING_XP_BASE * currentLevel;
+  };
+
+  // Calculate XP progress percentage
+  const getXpProgress = (currentXp: number, currentLevel: number) => {
+    const xpNeeded = getXpForNextLevel(currentLevel);
+    return Math.min((currentXp / xpNeeded) * 100, 100);
   };
 
   // Filter recipes by selected profession
@@ -261,16 +280,12 @@ export default function CraftingPage() {
                           {info.description}
                         </p>
                         <div style={{ 
-                          display: "flex", 
-                          "justify-content": "space-between", 
                           "margin-top": "1rem",
                           "padding-top": "1rem",
-                          "border-top": "1px solid var(--border)"
+                          "border-top": "1px solid var(--border)",
+                          "text-align": "center"
                         }}>
-                          <span>Level {profData.level}</span>
-                          <span style={{ color: "var(--text-secondary)" }}>
-                            {profData.experience} XP
-                          </span>
+                          <span style={{ "font-weight": "bold", "font-size": "1.1rem" }}>Level {profData.level}</span>
                         </div>
                       </div>
                     );
@@ -305,50 +320,43 @@ export default function CraftingPage() {
                           <p style={{ color: "var(--text-secondary)", margin: "0.25rem 0" }}>
                             {info.description}
                           </p>
-                          <div style={{ display: "flex", gap: "2rem", "margin-top": "0.5rem" }}>
-                            <span>Level: {profData.level} / {maxCraftingLevel()}</span>
-                            <span>Experience: {profData.experience}</span>
+                          <div style={{ "margin-top": "1rem" }}>
+                            <div style={{ 
+                              display: "flex", 
+                              "justify-content": "space-between",
+                              "align-items": "center",
+                              "margin-bottom": "0.5rem"
+                            }}>
+                              <div>
+                                <span style={{ "font-weight": "bold", "font-size": "1.1rem" }}>
+                                  Level {profData.level}
+                                </span>
+                                <span style={{ color: "var(--text-secondary)", "margin-left": "0.5rem" }}>
+                                  / {maxCraftingLevel()} max
+                                </span>
+                              </div>
+                              <span style={{ color: "var(--text-secondary)", "font-size": "0.875rem" }}>
+                                {profData.experience} / {getXpForNextLevel(profData.level)} XP
+                              </span>
+                            </div>
+                            {/* XP Progress Bar */}
+                            <div style={{ 
+                              width: "100%", 
+                              height: "8px", 
+                              background: "var(--bg-dark)", 
+                              "border-radius": "4px",
+                              overflow: "hidden"
+                            }}>
+                              <div style={{ 
+                                width: `${getXpProgress(profData.experience, profData.level)}%`,
+                                height: "100%",
+                                background: "linear-gradient(90deg, var(--accent), var(--success))",
+                                transition: "width 0.3s ease"
+                              }} />
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-
-                    {/* Materials Inventory */}
-                    <div class="card" style={{ "margin-bottom": "1rem" }}>
-                      <h3>Materials</h3>
-                      <div style={{ 
-                        display: "grid", 
-                        "grid-template-columns": "repeat(auto-fill, minmax(200px, 1fr))",
-                        gap: "0.5rem",
-                        "margin-top": "1rem"
-                      }}>
-                        <For each={materials().filter((m: Material) => m.quantity > 0)}>
-                          {(material) => (
-                            <div style={{ 
-                              padding: "0.5rem",
-                              background: "var(--bg-light)",
-                              "border-radius": "4px",
-                              display: "flex",
-                              "justify-content": "space-between",
-                              "align-items": "center"
-                            }}>
-                              <span>{material.name}</span>
-                              <span style={{ 
-                                "font-weight": "bold",
-                                color: material.rarity === "rare" ? "var(--accent)" : 
-                                       material.rarity === "uncommon" ? "#4ade80" : "inherit"
-                              }}>
-                                {material.quantity}
-                              </span>
-                            </div>
-                          )}
-                        </For>
-                      </div>
-                      <Show when={materials().filter((m: Material) => m.quantity > 0).length === 0}>
-                        <p style={{ color: "var(--text-secondary)", "text-align": "center", "margin-top": "1rem" }}>
-                          No materials yet. Defeat monsters to gather crafting supplies!
-                        </p>
-                      </Show>
                     </div>
 
                     {/* Recipes */}
@@ -424,6 +432,44 @@ export default function CraftingPage() {
                           </p>
                         </Show>
                       </Suspense>
+                    </div>
+
+                    {/* Materials Inventory */}
+                    <div class="card" style={{ "margin-top": "1rem" }}>
+                      <h3>Materials</h3>
+                      <div style={{ 
+                        display: "grid", 
+                        "grid-template-columns": "repeat(auto-fill, minmax(200px, 1fr))",
+                        gap: "0.5rem",
+                        "margin-top": "1rem"
+                      }}>
+                        <For each={materials().filter((m: Material) => m.quantity > 0)}>
+                          {(material) => (
+                            <div style={{ 
+                              padding: "0.5rem",
+                              background: "var(--bg-light)",
+                              "border-radius": "4px",
+                              display: "flex",
+                              "justify-content": "space-between",
+                              "align-items": "center"
+                            }}>
+                              <span>{material.name}</span>
+                              <span style={{ 
+                                "font-weight": "bold",
+                                color: material.rarity === "rare" ? "var(--accent)" : 
+                                       material.rarity === "uncommon" ? "#4ade80" : "inherit"
+                              }}>
+                                {material.quantity}
+                              </span>
+                            </div>
+                          )}
+                        </For>
+                      </div>
+                      <Show when={materials().filter((m: Material) => m.quantity > 0).length === 0}>
+                        <p style={{ color: "var(--text-secondary)", "text-align": "center", "margin-top": "1rem" }}>
+                          No materials yet. Defeat monsters to gather crafting supplies!
+                        </p>
+                      </Show>
                     </div>
                   </div>
                 );

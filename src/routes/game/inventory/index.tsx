@@ -62,6 +62,8 @@ export default function InventoryPage() {
   const [showDropModal, setShowDropModal] = createSignal(false);
   const [dropItemData, setDropItemData] = createSignal<{inventoryItemId: number, itemName: string, quantity: number} | null>(null);
   const [isEquipping, setIsEquipping] = createSignal(false);
+  const [showLearnResultModal, setShowLearnResultModal] = createSignal(false);
+  const [learnResultData, setLearnResultData] = createSignal<{success: boolean, message: string, abilityName?: string} | null>(null);
 
   // Computed values - use context as source of truth
   const currentInventory = () => store.inventory || [];
@@ -122,6 +124,10 @@ export default function InventoryPage() {
 
   // Handle learn ability
   const handleLearnAbility = async (inventoryItemId: number, itemName: string) => {
+    // Close the item detail modal first
+    setShowItemDetailModal(false);
+    setSelectedItem(null);
+    
     try {
       const response = await fetch('/api/game/learn-ability', {
         method: 'POST',
@@ -135,8 +141,12 @@ export default function InventoryPage() {
       const result = await response.json();
       
       if (!response.ok || result.error) {
-        // Show the actual error message from the server
-        alert(result.error || 'Failed to learn ability');
+        // Show error in modal
+        setLearnResultData({
+          success: false,
+          message: result.error || 'Failed to learn ability'
+        });
+        setShowLearnResultModal(true);
         return;
       }
       
@@ -145,12 +155,21 @@ export default function InventoryPage() {
         actions.setInventory(result.inventory);
         actions.setAbilities(result.abilities);
         
-        // Show success message
-        alert(result.message || `Learned ${result.ability?.name || 'ability'}!`);
+        // Show success in modal
+        setLearnResultData({
+          success: true,
+          message: result.message || `Learned ${result.ability?.name || 'ability'}!`,
+          abilityName: result.ability?.name
+        });
+        setShowLearnResultModal(true);
       }
     } catch (error: any) {
       console.error('Learn ability error:', error);
-      alert(error.message || 'Failed to learn ability');
+      setLearnResultData({
+        success: false,
+        message: error.message || 'Failed to learn ability'
+      });
+      setShowLearnResultModal(true);
     }
   };
 
@@ -1253,6 +1272,99 @@ export default function InventoryPage() {
                 Drop Item
               </button>
             </div>
+          </div>
+        </div>
+      </Show>
+
+      {/* Learn Ability Result Modal */}
+      <Show when={showLearnResultModal() && learnResultData()}>
+        <div 
+          style={{ 
+            position: "fixed", 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            background: "rgba(0, 0, 0, 0.85)", 
+            display: "flex", 
+            "align-items": "center", 
+            "justify-content": "center",
+            "z-index": 1000,
+            padding: "1rem"
+          }}
+          onClick={() => {
+            setShowLearnResultModal(false);
+            setLearnResultData(null);
+          }}
+        >
+          <div 
+            class="card"
+            style={{ 
+              "max-width": "450px",
+              width: "100%",
+              background: "var(--bg-dark)",
+              border: `2px solid ${learnResultData()?.success ? "var(--success)" : "var(--danger)"}`,
+              "text-align": "center"
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ 
+              "font-size": "4rem", 
+              "margin-bottom": "1rem" 
+            }}>
+              {learnResultData()?.success ? "✓" : "✗"}
+            </div>
+            
+            <h2 style={{ 
+              color: learnResultData()?.success ? "var(--success)" : "var(--danger)",
+              "margin-bottom": "1rem"
+            }}>
+              {learnResultData()?.success ? "Ability Learned!" : "Learning Failed"}
+            </h2>
+            
+            <p style={{ 
+              "font-size": "1.1rem",
+              "margin-bottom": "1.5rem",
+              color: "var(--text-secondary)"
+            }}>
+              {learnResultData()?.message}
+            </p>
+
+            <Show when={learnResultData()?.success && learnResultData()?.abilityName}>
+              <div style={{ 
+                padding: "1rem",
+                background: "rgba(34, 197, 94, 0.1)",
+                "border-radius": "6px",
+                "margin-bottom": "1.5rem",
+                border: "1px solid var(--success)"
+              }}>
+                <div style={{ 
+                  "font-size": "0.875rem", 
+                  color: "var(--text-secondary)",
+                  "margin-bottom": "0.25rem"
+                }}>
+                  New Ability
+                </div>
+                <div style={{ 
+                  "font-size": "1.25rem",
+                  "font-weight": "bold",
+                  color: "var(--success)"
+                }}>
+                  {learnResultData()?.abilityName}
+                </div>
+              </div>
+            </Show>
+
+            <button
+              class="button primary"
+              onClick={() => {
+                setShowLearnResultModal(false);
+                setLearnResultData(null);
+              }}
+              style={{ width: "100%" }}
+            >
+              Continue
+            </button>
           </div>
         </div>
       </Show>
