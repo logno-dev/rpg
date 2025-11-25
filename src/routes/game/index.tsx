@@ -1825,10 +1825,6 @@ export default function GamePage() {
               </div>
             </div>
 
-
-            {/* Active Effects */}
-            <ActiveEffectsDisplay combatHots={combatHots()} combatThorns={combatThorns()} />
-
             {/* Combat Engine - Always mounted but hidden when not in use */}
             <Show when={activeMob()}>
                 <CombatEngine
@@ -1856,6 +1852,9 @@ export default function GamePage() {
                   }}
                 />
             </Show>
+
+            {/* Active Effects */}
+            <ActiveEffectsDisplay combatHots={combatHots()} combatThorns={combatThorns()} />
 
             {/* Adventure View */}
             <Show when={!activeMob()}>

@@ -555,9 +555,6 @@ export default function DungeonRoute() {
           </div>
         </div>
         
-        {/* Active Effects */}
-        <ActiveEffectsDisplay combatHots={combatHots()} combatThorns={combatThorns()} />
-        
         {/* Header */}
         <div class="card" style={{ "margin-bottom": "2rem" }}>
           <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center" }}>
@@ -692,6 +689,9 @@ export default function DungeonRoute() {
               />
           </Show>
         </Show>
+        
+        {/* Active Effects */}
+        <ActiveEffectsDisplay combatHots={combatHots()} combatThorns={combatThorns()} />
       </Show>
       
       {/* Abandon Dungeon Modal */}

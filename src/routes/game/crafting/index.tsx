@@ -200,9 +200,7 @@ export default function CraftingPage() {
       if (data.success) {
         setMinigameData(data.session);
         setShowMinigame(true);
-        
-        // Refetch to get updated material quantities
-        refetchBasicData();
+        // Don't refetch here - materials will update when modal closes
       } else {
         alert(data.error || "Failed to start crafting");
       }
@@ -231,10 +229,8 @@ export default function CraftingPage() {
       const data = await response.json();
 
       if (data.success) {
-        // Trigger immediate refetch to get updated profession data and wait for it
-        await refetchBasicData();
-        
         // Return the result data to display in modal immediately
+        // Materials will be refetched when modal closes via onCancel
         return data;
       } else {
         alert(data.error || "Failed to complete crafting");
@@ -499,11 +495,13 @@ export default function CraftingPage() {
             targetY={minigameData()!.targetY}
             targetRadius={minigameData()!.targetRadius}
             onComplete={completeCraft}
-            onCancel={() => {
+            onCancel={async () => {
+              // Refetch data first to ensure materials are updated
+              await refetchBasicData();
+              
+              // Then close modal
               setShowMinigame(false);
               setMinigameData(null);
-              // Refetch data after closing modal
-              refetchCraftingData();
             }}
           />
         </Show>
