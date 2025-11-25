@@ -1,4 +1,4 @@
-import { createAsync, useParams, redirect, revalidate, useNavigate } from "@solidjs/router";
+import { createAsync, useParams, redirect, revalidate, useNavigate, A, cache } from "@solidjs/router";
 import { createSignal, Show, For, createEffect, onCleanup, createMemo, on, onMount, batch } from "solid-js";
 import { getUser } from "~/lib/auth";
 import { getCharacter, getInventory, getAllRegions, getRegion, getCharacterAbilities, getMerchantsInRegion, getDungeonsInRegion, getActiveDungeon, getHotbar, getAbilitiesWithEffects } from "~/lib/game";
@@ -12,8 +12,14 @@ import { ItemDetailModal } from "~/components/ItemDetailModal";
 import { useCharacter } from "~/lib/CharacterContext";
 import { useActiveEffects } from "~/lib/ActiveEffectsContext";
 
-async function getGameData(characterId: number) {
+const getGameData = cache(async (characterId: number | null) => {
   "use server";
+  
+  // Handle missing character ID (SSR or localStorage not set)
+  if (!characterId) {
+    throw redirect("/character-select");
+  }
+  
   let user;
   try {
     user = await getUser();
@@ -48,20 +54,36 @@ async function getGameData(characterId: number) {
   }
 
   return { character, inventory, regions, currentRegion, abilities, merchants, dungeons, activeDungeonProgress, hotbar };
-}
+}, "game-data");
 
 export default function GamePage() {
-  const params = useParams();
   const navigate = useNavigate();
-  const characterId = () => parseInt(params.id);
-  const data = createAsync(() => getGameData(characterId()));
+  
+  // Get character ID from localStorage
+  const characterId = () => {
+    if (typeof window === 'undefined') return null;
+    const stored = localStorage.getItem('selectedCharacterId');
+    if (!stored) {
+      return null;
+    }
+    return parseInt(stored);
+  };
+  
+  // Redirect if no character selected (client-side only)
+  createEffect(() => {
+    if (typeof window !== 'undefined' && !characterId()) {
+      navigate('/character-select');
+    }
+  });
+  
+  const data = createAsync(() => {
+    const id = characterId();
+    // Don't call server function if no ID - will handle redirect in effect
+    if (!id) return Promise.resolve(undefined);
+    return getGameData(id);
+  }, { deferStream: true });
   const [store, actions] = useCharacter();
   const [effectsStore, effectsActions] = useActiveEffects();
-
-  const [view, setView] = createSignal<"adventure" | "inventory" | "stats" | "hotbar">("adventure");
-  const [inventoryFilter, setInventoryFilter] = createSignal<"all" | "weapons" | "armor" | "scrolls" | "consumables">("all");
-  const [selectionMode, setSelectionMode] = createSignal(false);
-  const [selectedItems, setSelectedItems] = createSignal<Set<number>>(new Set());
   const [availableMobs, setAvailableMobs] = createSignal<Mob[]>([]);
   const [activeMob, setActiveMob] = createSignal<Mob | null>(null);
   const [activeNamedMobId, setActiveNamedMobId] = createSignal<number | null>(null);
@@ -1783,9 +1805,25 @@ export default function GamePage() {
       <div class="header">
         <div class="header-content">
           <h1 class="title">Fantasy RPG</h1>
-          <a href="/character-select" class="button secondary">
-            Character Select
-          </a>
+          <div style={{ display: "flex", gap: "1rem", "align-items": "center" }}>
+            <div class="button-group">
+              <A href="/game" class="button" activeClass="active" end>
+                Adventure
+              </A>
+              <A href="/game/inventory" class="button" activeClass="active">
+                Inventory
+              </A>
+              <A href="/game/stats" class="button" activeClass="active">
+                Stats
+              </A>
+              <A href="/game/hotbar" class="button" activeClass="active">
+                Hotbar
+              </A>
+            </div>
+            <a href="/character-select" class="button secondary">
+              Character Select
+            </a>
+          </div>
         </div>
       </div>
 
@@ -1956,42 +1994,12 @@ export default function GamePage() {
               </div>
             </div>
 
-            {/* Navigation */}
-            <div class="card">
-              <div class="button-group">
-                <button
-                  class={view() === "adventure" ? "button" : "button secondary"}
-                  onClick={() => setView("adventure")}
-                >
-                  Adventure
-                </button>
-                <button
-                  class={view() === "inventory" ? "button" : "button secondary"}
-                  onClick={() => setView("inventory")}
-                >
-                  Inventory
-                </button>
-                <button
-                  class={view() === "stats" ? "button" : "button secondary"}
-                  onClick={() => setView("stats")}
-                >
-                  Stats
-                </button>
-                <button
-                  class={view() === "hotbar" ? "button" : "button secondary"}
-                  onClick={() => setView("hotbar")}
-                >
-                  Hotbar
-                </button>
-              </div>
-            </div>
 
             {/* Active Effects */}
             <ActiveEffectsDisplay combatHots={combatHots()} combatThorns={combatThorns()} />
 
             {/* Combat Engine - Always mounted but hidden when not in use */}
             <Show when={activeMob()}>
-              <div style={{ display: view() === "adventure" ? "block" : "none" }}>
                 {/* Dungeon Progress Bar - Show during dungeon combat */}
                 <Show when={isDungeonCombat() && dungeonProgress()}>
                   <div class="card" style={{ 
@@ -2059,11 +2067,10 @@ export default function GamePage() {
                     }
                   }}
                 />
-              </div>
             </Show>
 
             {/* Adventure View */}
-            <Show when={view() === "adventure" && !activeMob()}>
+            <Show when={!activeMob()}>
                 {/* Current Region & Actions */}
                 <div class="card">
                   <h3 style={{ "margin-bottom": "0.5rem" }}>Current Location</h3>
@@ -2402,775 +2409,7 @@ export default function GamePage() {
                   </div>
                 </Show>
             </Show>
-
-            {/* Inventory View */}
-            <Show when={view() === "inventory"}>
-              {/* Equipment Slots */}
-              <div class="card">
-                <h3 style={{ "margin-bottom": "1rem" }}>Equipment</h3>
-                <div style={{ display: "grid", "grid-template-columns": "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
-                  <For each={["weapon", "head", "chest", "hands", "feet"]}>
-                    {(slotName) => {
-                      // Make the equippedItem reactive by wrapping in a memo
-                      const equippedItem = createMemo(() => 
-                        currentInventory().find((i: any) => i.slot === slotName && i.equipped === 1)
-                      );
-                      return (
-                        <div style={{
-                          padding: "1rem",
-                          background: "var(--bg-light)",
-                          "border-radius": "6px",
-                          border: equippedItem() ? "2px solid var(--accent)" : "2px dashed #444",
-                          "min-height": "120px",
-                          display: "flex",
-                          "flex-direction": "column",
-                          "justify-content": "space-between"
-                        }}>
-                          <div>
-                            <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "text-transform": "uppercase", "font-weight": "bold", "margin-bottom": "0.5rem" }}>
-                              {slotName}
-                            </div>
-                            <Show when={equippedItem()} fallback={
-                              <div style={{ color: "#666", "font-style": "italic", "font-size": "0.875rem" }}>Empty</div>
-                            }>
-                              {(item) => (
-                                <>
-                                  <div style={{ "font-weight": "bold", "margin-bottom": "0.25rem" }}>{item().name}</div>
-                                  <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "margin-bottom": "0.5rem" }}>
-                                    {item().rarity}
-                                  </div>
-                                  {/* Item Stats */}
-                                  <div style={{ "font-size": "0.75rem", "margin-bottom": "0.5rem" }}>
-                                    <Show when={item().damage_min && item().damage_max}>
-                                      <div style={{ color: "var(--danger)" }}>⚔️ {item().damage_min}-{item().damage_max} Damage</div>
-                                    </Show>
-                                    <Show when={item().armor}>
-                                      <div style={{ color: "var(--accent)" }}>🛡️ {item().armor} Armor</div>
-                                    </Show>
-                                    <Show when={item().attack_speed && item().attack_speed !== 1}>
-                                      <div style={{ color: "var(--success)" }}>⚡ {item().attack_speed}x Speed</div>
-                                    </Show>
-                                    <Show when={item().strength_bonus}>
-                                      <div>💪 +{item().strength_bonus} STR</div>
-                                    </Show>
-                                    <Show when={item().dexterity_bonus}>
-                                      <div>🏃 +{item().dexterity_bonus} DEX</div>
-                                    </Show>
-                                    <Show when={item().constitution_bonus}>
-                                      <div>❤️ +{item().constitution_bonus} CON</div>
-                                    </Show>
-                                    <Show when={item().intelligence_bonus}>
-                                      <div>🧠 +{item().intelligence_bonus} INT</div>
-                                    </Show>
-                                    <Show when={item().wisdom_bonus}>
-                                      <div>✨ +{item().wisdom_bonus} WIS</div>
-                                    </Show>
-                                    <Show when={item().charisma_bonus}>
-                                      <div>💫 +{item().charisma_bonus} CHA</div>
-                                    </Show>
-                                  </div>
-                                  <button
-                                    class="button danger"
-                                    style={{ width: "100%", "font-size": "0.75rem", padding: "0.4rem" }}
-                                    onClick={() => handleEquip(item().id, true)}
-                                  >
-                                    Unequip
-                                  </button>
-                                </>
-                              )}
-                            </Show>
-                          </div>
-                        </div>
-                      );
-                    }}
-                  </For>
-                </div>
-              </div>
-
-              {/* General Inventory */}
-              <div class="card">
-                <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center", "margin-bottom": "1rem" }}>
-                  <h3 style={{ margin: 0 }}>Inventory</h3>
-                  <button
-                    class={selectionMode() ? "button" : "button secondary"}
-                    onClick={() => {
-                      setSelectionMode(!selectionMode());
-                      setSelectedItems(new Set());
-                    }}
-                    style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
-                  >
-                    {selectionMode() ? "Cancel Selection" : "Select Items"}
-                  </button>
-                </div>
-                
-                {/* Bulk Action Buttons */}
-                <Show when={selectionMode() && selectedItems().size > 0}>
-                  <div style={{
-                    padding: "1rem",
-                    background: "var(--bg-light)",
-                    "border-radius": "6px",
-                    "margin-bottom": "1rem",
-                    display: "flex",
-                    gap: "1rem",
-                    "align-items": "center",
-                    "justify-content": "space-between"
-                  }}>
-                    <div>
-                      <div style={{ "font-weight": "bold" }}>{selectedItems().size} item{selectedItems().size !== 1 ? 's' : ''} selected</div>
-                      <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
-                        Total value: {calculateBulkSellValue()}g (at 40%)
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: "0.5rem" }}>
-                      <button
-                        class="button secondary"
-                        onClick={toggleSelectAll}
-                        style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
-                      >
-                        {selectedItems().size === currentInventory().filter((i: any) => !i.equipped && i.value && i.value > 0).length ? "Deselect All" : "Select All"}
-                      </button>
-                      <button
-                        class="button"
-                        onClick={() => setShowBulkSellModal(true)}
-                        style={{ "font-size": "0.875rem", padding: "0.5rem 1rem", background: "var(--warning)", color: "var(--bg-dark)" }}
-                      >
-                        Sell Selected
-                      </button>
-                    </div>
-                  </div>
-                </Show>
-                
-                {/* Filter Tabs */}
-                <div style={{ 
-                  display: "flex", 
-                  gap: "0.5rem", 
-                  "margin-bottom": "1.5rem",
-                  "flex-wrap": "wrap"
-                }}>
-                  <button 
-                    class={inventoryFilter() === "all" ? "button" : "button secondary"}
-                    onClick={() => setInventoryFilter("all")}
-                    style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
-                  >
-                    All
-                  </button>
-                  <button 
-                    class={inventoryFilter() === "weapons" ? "button" : "button secondary"}
-                    onClick={() => setInventoryFilter("weapons")}
-                    style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
-                  >
-                    ⚔️ Weapons
-                  </button>
-                  <button 
-                    class={inventoryFilter() === "armor" ? "button" : "button secondary"}
-                    onClick={() => setInventoryFilter("armor")}
-                    style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
-                  >
-                    🛡️ Armor
-                  </button>
-                  <button 
-                    class={inventoryFilter() === "scrolls" ? "button" : "button secondary"}
-                    onClick={() => setInventoryFilter("scrolls")}
-                    style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
-                  >
-                    📜 Scrolls
-                  </button>
-                  <button 
-                    class={inventoryFilter() === "consumables" ? "button" : "button secondary"}
-                    onClick={() => setInventoryFilter("consumables")}
-                    style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
-                  >
-                    🧪 Consumables
-                  </button>
-                </div>
-                
-                {/* Categorized "All" View */}
-                <Show when={inventoryFilter() === "all"}>
-                  <Show when={currentInventory().filter((i: any) => !i.equipped && i.slot === "weapon").length > 0}>
-                    <h4 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", display: "flex", "align-items": "center", gap: "0.5rem", "font-size": "1.1rem" }}>
-                      ⚔️ Weapons ({currentInventory().filter((i: any) => !i.equipped && i.slot === "weapon").length})
-                    </h4>
-                    <div style={{ "margin-bottom": "2rem" }}>
-                      <For each={currentInventory().filter((i: any) => !i.equipped && i.slot === "weapon")}>
-                        {(invItem: any) => {
-                          const canSell = invItem.value && invItem.value > 0;
-                          const isSelected = selectedItems().has(invItem.id);
-                          
-                          return (
-                            <div 
-                              style={{
-                                display: "flex",
-                                "justify-content": "space-between",
-                                "align-items": "center",
-                                padding: "0.75rem 1rem",
-                                background: isSelected ? "rgba(251, 191, 36, 0.1)" : "var(--bg-light)",
-                                "border-radius": "6px",
-                                "margin-bottom": "0.5rem",
-                                cursor: "pointer",
-                                transition: "all 0.2s ease",
-                                border: isSelected ? "1px solid var(--warning)" : "1px solid transparent"
-                              }}
-                              onMouseEnter={(e) => {
-                                if (!isSelected) {
-                                  e.currentTarget.style.background = "var(--bg-dark)";
-                                  e.currentTarget.style.borderColor = "var(--accent)";
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                if (!isSelected) {
-                                  e.currentTarget.style.background = "var(--bg-light)";
-                                  e.currentTarget.style.borderColor = "transparent";
-                                }
-                              }}
-                              onClick={() => {
-                                if (selectionMode() && canSell) {
-                                  toggleItemSelection(invItem.id);
-                                } else if (!selectionMode()) {
-                                  handleViewItem(invItem, false);
-                                }
-                              }}
-                            >
-                              <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
-                                <Show when={selectionMode()}>
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    disabled={!canSell}
-                                    style={{ width: "18px", height: "18px", cursor: canSell ? "pointer" : "not-allowed" }}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onChange={() => canSell && toggleItemSelection(invItem.id)}
-                                  />
-                                </Show>
-                                <div style={{ flex: 1, opacity: selectionMode() && !canSell ? 0.5 : 1 }}>
-                                  <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
-                                  <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
-                                    {invItem.slot && `${invItem.slot} • `}
-                                    <Show when={invItem.damage_min && invItem.damage_max}>
-                                      ⚔️ {invItem.damage_min}-{invItem.damage_max} Dmg
-                                    </Show>
-                                    <Show when={selectionMode() && invItem.value}>
-                                       • {Math.floor(invItem.value * 0.4 * invItem.quantity)}g
-                                    </Show>
-                                  </div>
-                                </div>
-                                <Show when={invItem.quantity > 1}>
-                                  <div style={{ "font-weight": "bold", color: "var(--accent)" }}>x{invItem.quantity}</div>
-                                </Show>
-                              </div>
-                              <Show when={!selectionMode()}>
-                                <div style={{ color: "var(--text-secondary)", "font-size": "1.25rem" }}>›</div>
-                              </Show>
-                            </div>
-                          );
-                        }}
-                      </For>
-                    </div>
-                  </Show>
-                  
-                  <Show when={currentInventory().filter((i: any) => !i.equipped && i.slot && i.slot !== "weapon" && i.type === "equipment").length > 0}>
-                    <h4 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", display: "flex", "align-items": "center", gap: "0.5rem", "font-size": "1.1rem" }}>
-                      🛡️ Armor ({currentInventory().filter((i: any) => !i.equipped && i.slot && i.slot !== "weapon" && i.type === "equipment").length})
-                    </h4>
-                    <div style={{ "margin-bottom": "2rem" }}>
-                      <For each={currentInventory().filter((i: any) => !i.equipped && i.slot && i.slot !== "weapon" && i.type === "equipment")}>
-                        {(invItem: any) => {
-                          const canSell = invItem.value && invItem.value > 0;
-                          const isSelected = selectedItems().has(invItem.id);
-                          
-                          return (
-                            <div 
-                              style={{
-                                display: "flex",
-                                "justify-content": "space-between",
-                                "align-items": "center",
-                                padding: "0.75rem 1rem",
-                                background: isSelected ? "rgba(251, 191, 36, 0.1)" : "var(--bg-light)",
-                                "border-radius": "6px",
-                                "margin-bottom": "0.5rem",
-                                cursor: "pointer",
-                                transition: "all 0.2s ease",
-                                border: isSelected ? "1px solid var(--warning)" : "1px solid transparent"
-                              }}
-                              onMouseEnter={(e) => {
-                                if (!isSelected) {
-                                  e.currentTarget.style.background = "var(--bg-dark)";
-                                  e.currentTarget.style.borderColor = "var(--accent)";
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                if (!isSelected) {
-                                  e.currentTarget.style.background = "var(--bg-light)";
-                                  e.currentTarget.style.borderColor = "transparent";
-                                }
-                              }}
-                              onClick={() => {
-                                if (selectionMode() && canSell) {
-                                  toggleItemSelection(invItem.id);
-                                } else if (!selectionMode()) {
-                                  handleViewItem(invItem, false);
-                                }
-                              }}
-                            >
-                              <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
-                                <Show when={selectionMode()}>
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    disabled={!canSell}
-                                    style={{ width: "18px", height: "18px", cursor: canSell ? "pointer" : "not-allowed" }}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onChange={() => canSell && toggleItemSelection(invItem.id)}
-                                  />
-                                </Show>
-                                <div style={{ flex: 1, opacity: selectionMode() && !canSell ? 0.5 : 1 }}>
-                                  <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
-                                  <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
-                                    {invItem.slot && `${invItem.slot} • `}
-                                    <Show when={invItem.armor}>🛡️ {invItem.armor} Armor</Show>
-                                    <Show when={selectionMode() && invItem.value}>
-                                       • {Math.floor(invItem.value * 0.4 * invItem.quantity)}g
-                                    </Show>
-                                  </div>
-                                </div>
-                                <Show when={invItem.quantity > 1}>
-                                  <div style={{ "font-weight": "bold", color: "var(--accent)" }}>x{invItem.quantity}</div>
-                                </Show>
-                              </div>
-                              <Show when={!selectionMode()}>
-                                <div style={{ color: "var(--text-secondary)", "font-size": "1.25rem" }}>›</div>
-                              </Show>
-                            </div>
-                          );
-                        }}
-                      </For>
-                    </div>
-                  </Show>
-                  
-                  <Show when={currentInventory().filter((i: any) => !i.equipped && i.type === "scroll").length > 0}>
-                    <h4 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", display: "flex", "align-items": "center", gap: "0.5rem", "font-size": "1.1rem" }}>
-                      📜 Scrolls ({currentInventory().filter((i: any) => !i.equipped && i.type === "scroll").length})
-                    </h4>
-                    <div style={{ "margin-bottom": "2rem" }}>
-                      <For each={currentInventory().filter((i: any) => !i.equipped && i.type === "scroll")}>
-                        {(invItem: any) => {
-                          const scrollStatus = getScrollAbilityStatus(invItem);
-                          const canSell = invItem.value && invItem.value > 0;
-                          const isSelected = selectedItems().has(invItem.id);
-                          
-                          return (
-                            <div 
-                              style={{
-                                display: "flex",
-                                "justify-content": "space-between",
-                                "align-items": "center",
-                                padding: "0.75rem 1rem",
-                                background: isSelected ? "rgba(251, 191, 36, 0.1)" : "var(--bg-light)",
-                                "border-radius": "6px",
-                                "margin-bottom": "0.5rem",
-                                cursor: "pointer",
-                                transition: "all 0.2s ease",
-                                border: isSelected ? "1px solid var(--warning)" : "1px solid transparent"
-                              }}
-                              onMouseEnter={(e) => {
-                                if (!isSelected) {
-                                  e.currentTarget.style.background = "var(--bg-dark)";
-                                  e.currentTarget.style.borderColor = "var(--accent)";
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                if (!isSelected) {
-                                  e.currentTarget.style.background = "var(--bg-light)";
-                                  e.currentTarget.style.borderColor = "transparent";
-                                }
-                              }}
-                              onClick={() => {
-                                if (selectionMode() && canSell) {
-                                  toggleItemSelection(invItem.id);
-                                } else if (!selectionMode()) {
-                                  handleViewItem(invItem, false);
-                                }
-                              }}
-                            >
-                              <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
-                                <Show when={selectionMode()}>
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    disabled={!canSell}
-                                    style={{ width: "18px", height: "18px", cursor: canSell ? "pointer" : "not-allowed" }}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onChange={() => canSell && toggleItemSelection(invItem.id)}
-                                  />
-                                </Show>
-                                <div style={{ flex: 1, opacity: selectionMode() && !canSell ? 0.5 : 1 }}>
-                                  <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
-                                  <div style={{ "font-size": "0.875rem", color: scrollStatus.alreadyLearned ? "var(--success)" : scrollStatus.hasBetter ? "var(--warning)" : "var(--text-secondary)" }}>
-                                    {scrollStatus.alreadyLearned ? "✓ Already Learned" : scrollStatus.hasBetter ? "⚠ You have better" : "Ability Scroll"}
-                                    <Show when={selectionMode() && invItem.value}>
-                                       • {Math.floor(invItem.value * 0.4 * invItem.quantity)}g
-                                    </Show>
-                                  </div>
-                                </div>
-                                <Show when={invItem.quantity > 1}>
-                                  <div style={{ "font-weight": "bold", color: "var(--accent)" }}>x{invItem.quantity}</div>
-                                </Show>
-                              </div>
-                              <Show when={!selectionMode()}>
-                                <div style={{ color: "var(--text-secondary)", "font-size": "1.25rem" }}>›</div>
-                              </Show>
-                            </div>
-                          );
-                        }}
-                      </For>
-                    </div>
-                  </Show>
-                  
-                  <Show when={currentInventory().filter((i: any) => !i.equipped && i.type === "consumable").length > 0}>
-                    <h4 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", display: "flex", "align-items": "center", gap: "0.5rem", "font-size": "1.1rem" }}>
-                      🧪 Consumables ({currentInventory().filter((i: any) => !i.equipped && i.type === "consumable").length})
-                    </h4>
-                    <div style={{ "margin-bottom": "2rem" }}>
-                      <For each={currentInventory().filter((i: any) => !i.equipped && i.type === "consumable")}>
-                        {(invItem: any) => {
-                          const canSell = invItem.value && invItem.value > 0;
-                          const isSelected = selectedItems().has(invItem.id);
-                          
-                          return (
-                            <div 
-                              style={{
-                                display: "flex",
-                                "justify-content": "space-between",
-                                "align-items": "center",
-                                padding: "0.75rem 1rem",
-                                background: isSelected ? "rgba(251, 191, 36, 0.1)" : "var(--bg-light)",
-                                "border-radius": "6px",
-                                "margin-bottom": "0.5rem",
-                                cursor: "pointer",
-                                transition: "all 0.2s ease",
-                                border: isSelected ? "1px solid var(--warning)" : "1px solid transparent"
-                              }}
-                              onMouseEnter={(e) => {
-                                if (!isSelected) {
-                                  e.currentTarget.style.background = "var(--bg-dark)";
-                                  e.currentTarget.style.borderColor = "var(--accent)";
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                if (!isSelected) {
-                                  e.currentTarget.style.background = "var(--bg-light)";
-                                  e.currentTarget.style.borderColor = "transparent";
-                                }
-                              }}
-                              onClick={() => {
-                                if (selectionMode() && canSell) {
-                                  toggleItemSelection(invItem.id);
-                                } else if (!selectionMode()) {
-                                  handleViewItem(invItem, false);
-                                }
-                              }}
-                            >
-                              <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
-                                <Show when={selectionMode()}>
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    disabled={!canSell}
-                                    style={{ width: "18px", height: "18px", cursor: canSell ? "pointer" : "not-allowed" }}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onChange={() => canSell && toggleItemSelection(invItem.id)}
-                                  />
-                                </Show>
-                                <div style={{ flex: 1, opacity: selectionMode() && !canSell ? 0.5 : 1 }}>
-                                  <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
-                                  <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
-                                    <Show when={invItem.health_restore}>❤️ +{invItem.health_restore} HP</Show>
-                                    <Show when={invItem.health_restore && invItem.mana_restore}> • </Show>
-                                    <Show when={invItem.mana_restore}>✨ +{invItem.mana_restore} MP</Show>
-                                    <Show when={selectionMode() && invItem.value}>
-                                       • {Math.floor(invItem.value * 0.4 * invItem.quantity)}g
-                                    </Show>
-                                  </div>
-                                </div>
-                                <Show when={invItem.quantity > 1}>
-                                  <div style={{ "font-weight": "bold", color: "var(--accent)" }}>x{invItem.quantity}</div>
-                                </Show>
-                              </div>
-                              <Show when={!selectionMode()}>
-                                <div style={{ color: "var(--text-secondary)", "font-size": "1.25rem" }}>›</div>
-                              </Show>
-                            </div>
-                          );
-                        }}
-                      </For>
-                    </div>
-                  </Show>
-                </Show>
-                
-                {/* Filtered View */}
-                <Show when={inventoryFilter() !== "all"}>
-                  <div>
-                    <For each={currentInventory().filter((i: any) => {
-                      if (i.equipped) return false;
-                      if (inventoryFilter() === "weapons") return i.slot === "weapon";
-                      if (inventoryFilter() === "armor") return i.slot && i.slot !== "weapon" && i.type === "equipment";
-                      if (inventoryFilter() === "scrolls") return i.type === "scroll";
-                      if (inventoryFilter() === "consumables") return i.type === "consumable";
-                      return false;
-                    })}>
-                      {(invItem: any) => {
-                        const scrollStatus = invItem.type === "scroll" ? getScrollAbilityStatus(invItem) : { alreadyLearned: false, hasBetter: false };
-                        const canSell = invItem.value && invItem.value > 0;
-                        const isSelected = selectedItems().has(invItem.id);
-                        
-                        return (
-                          <div 
-                            style={{
-                              display: "flex",
-                              "justify-content": "space-between",
-                              "align-items": "center",
-                              padding: "0.75rem 1rem",
-                              background: isSelected ? "rgba(251, 191, 36, 0.1)" : "var(--bg-light)",
-                              "border-radius": "6px",
-                              "margin-bottom": "0.5rem",
-                              cursor: "pointer",
-                              transition: "all 0.2s ease",
-                              border: isSelected ? "1px solid var(--warning)" : "1px solid transparent"
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!isSelected) {
-                                e.currentTarget.style.background = "var(--bg-dark)";
-                                e.currentTarget.style.borderColor = "var(--accent)";
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (!isSelected) {
-                                e.currentTarget.style.background = "var(--bg-light)";
-                                e.currentTarget.style.borderColor = "transparent";
-                              }
-                            }}
-                            onClick={() => {
-                              if (selectionMode() && canSell) {
-                                toggleItemSelection(invItem.id);
-                              } else if (!selectionMode()) {
-                                handleViewItem(invItem, false);
-                              }
-                            }}
-                          >
-                            <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
-                              <Show when={selectionMode()}>
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  disabled={!canSell}
-                                  style={{ width: "18px", height: "18px", cursor: canSell ? "pointer" : "not-allowed" }}
-                                  onClick={(e) => e.stopPropagation()}
-                                  onChange={() => canSell && toggleItemSelection(invItem.id)}
-                                />
-                              </Show>
-                              <div style={{ flex: 1, opacity: selectionMode() && !canSell ? 0.5 : 1 }}>
-                                <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
-                                <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
-                                  <Show when={invItem.slot}>
-                                    {invItem.slot}
-                                    <Show when={invItem.damage_min}> • ⚔️ {invItem.damage_min}-{invItem.damage_max} Dmg</Show>
-                                    <Show when={invItem.armor}> • 🛡️ {invItem.armor} Armor</Show>
-                                  </Show>
-                                  <Show when={invItem.type === "scroll"}>
-                                    <span style={{ color: scrollStatus.alreadyLearned ? "var(--success)" : scrollStatus.hasBetter ? "var(--warning)" : "var(--text-secondary)" }}>
-                                      {scrollStatus.alreadyLearned ? "✓ Already Learned" : scrollStatus.hasBetter ? "⚠ You have better" : "Ability Scroll"}
-                                    </span>
-                                  </Show>
-                                  <Show when={invItem.type === "consumable"}>
-                                    <Show when={invItem.health_restore}>❤️ +{invItem.health_restore} HP</Show>
-                                    <Show when={invItem.health_restore && invItem.mana_restore}> • </Show>
-                                    <Show when={invItem.mana_restore}>✨ +{invItem.mana_restore} MP</Show>
-                                  </Show>
-                                  <Show when={selectionMode() && invItem.value}>
-                                     • {Math.floor(invItem.value * 0.4 * invItem.quantity)}g
-                                  </Show>
-                                </div>
-                              </div>
-                              <Show when={invItem.quantity > 1}>
-                                <div style={{ "font-weight": "bold", color: "var(--accent)" }}>x{invItem.quantity}</div>
-                              </Show>
-                            </div>
-                            <Show when={!selectionMode()}>
-                              <div style={{ color: "var(--text-secondary)", "font-size": "1.25rem" }}>›</div>
-                            </Show>
-                          </div>
-                        );
-                      }}
-                    </For>
-                  </div>
-                </Show>
-              </div>
-            </Show>
-
             {/* Stats View */}
-            <Show when={view() === "stats"}>
-              <div class="card">
-                <h3 style={{ "margin-bottom": "1rem" }}>Character Stats</h3>
-                
-                <Show when={currentCharacter()?.available_points > 0}>
-                  <div style={{ 
-                    padding: "1rem", 
-                    background: "var(--warning)", 
-                    color: "var(--bg-dark)", 
-                    "border-radius": "6px",
-                    "margin-bottom": "1.5rem",
-                    "text-align": "center",
-                    "font-weight": "bold"
-                  }}>
-                    {availablePoints()} Stat Points Available
-                  </div>
-                </Show>
-
-                {/* Stats Legend */}
-                <div style={{ 
-                  display: "grid", 
-                  "grid-template-columns": "1fr auto auto auto", 
-                  gap: "0.5rem",
-                  padding: "0.75rem",
-                  background: "var(--bg-dark)",
-                  "border-radius": "6px",
-                  "margin-bottom": "1rem",
-                  "font-size": "0.875rem",
-                  "font-weight": "bold",
-                  color: "var(--text-secondary)"
-                }}>
-                  <div>Attribute</div>
-                  <div style={{ "text-align": "center" }}>Base</div>
-                  <div style={{ "text-align": "center" }}>Equipment</div>
-                  <div style={{ "text-align": "center" }}>Total</div>
-                </div>
-
-                <div style={{ display: "grid", gap: "1rem" }}>
-                  <For each={[
-                    { key: 'strength', name: 'Strength', emoji: '💪', desc: 'Increases melee damage' },
-                    { key: 'dexterity', name: 'Dexterity', emoji: '🏃', desc: 'Increases attack speed' },
-                    { key: 'constitution', name: 'Constitution', emoji: '❤️', desc: 'Increases max health & HP regen' },
-                    { key: 'intelligence', name: 'Intelligence', emoji: '🧠', desc: 'Increases max mana & spell power' },
-                    { key: 'wisdom', name: 'Wisdom', emoji: '✨', desc: 'Increases mana regen & healing' },
-                    { key: 'charisma', name: 'Charisma', emoji: '💫', desc: 'Affects luck & fortune' },
-                  ]}>
-                    {(stat) => {
-                      const character = currentCharacter();
-                      if (!character) return null;
-                      
-                      const baseStat = () => character[stat.key];
-                      const equipBonus = () => equipmentBonuses()[stat.key];
-                      const pending = () => pendingStats()[stat.key] || 0;
-                      const total = () => baseStat() + equipBonus() + pending();
-                      
-                      return (
-                        <div style={{ 
-                          padding: "1rem", 
-                          background: "var(--bg-light)", 
-                          "border-radius": "6px"
-                        }}>
-                          <div style={{ 
-                            display: "grid", 
-                            "grid-template-columns": "1fr auto auto auto auto", 
-                            gap: "1rem",
-                            "align-items": "center"
-                          }}>
-                            <div>
-                              <div style={{ "font-weight": "bold", "font-size": "1.1rem" }}>{stat.emoji} {stat.name}</div>
-                              <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
-                                {stat.desc}
-                              </div>
-                            </div>
-                            <div style={{ "text-align": "center", "font-size": "1.25rem" }}>
-                              {baseStat()}
-                              <Show when={pending() > 0}>
-                                <span style={{ color: "var(--success)", "font-size": "0.875rem", "margin-left": "0.25rem" }}>
-                                  +{pending()}
-                                </span>
-                              </Show>
-                            </div>
-                            <div style={{ "text-align": "center", "font-size": "1.25rem", color: equipBonus() > 0 ? "var(--success)" : "var(--text-secondary)" }}>
-                              {equipBonus() > 0 ? `+${equipBonus()}` : "—"}
-                            </div>
-                            <div style={{ "text-align": "center", "font-size": "1.5rem", "font-weight": "bold", color: "var(--accent)" }}>
-                              {total()}
-                            </div>
-                            <Show when={currentCharacter()?.available_points > 0}>
-                              <div style={{ display: "flex", gap: "0.5rem" }}>
-                                <button
-                                  class="button secondary"
-                                  onClick={() => adjustPendingStat(stat.key as any, -1)}
-                                  disabled={pending() === 0}
-                                  style={{ padding: "0.5rem 0.75rem", "font-size": "0.875rem" }}
-                                >
-                                  −
-                                </button>
-                                <button
-                                  class="button"
-                                  onClick={() => adjustPendingStat(stat.key as any, 1)}
-                                  disabled={availablePoints() === 0}
-                                  style={{ padding: "0.5rem 0.75rem", "font-size": "0.875rem" }}
-                                >
-                                  +
-                                </button>
-                              </div>
-                            </Show>
-                          </div>
-                        </div>
-                      );
-                    }}
-                  </For>
-                </div>
-
-                <Show when={totalPendingPoints() > 0}>
-                  <div style={{ "margin-top": "1.5rem", display: "flex", gap: "1rem" }}>
-                    <button
-                      class="button success"
-                      onClick={handleAssignStats}
-                      disabled={assigningStats()}
-                      style={{ flex: 1 }}
-                    >
-                      {assigningStats() ? "Assigning..." : `Assign ${totalPendingPoints()} Points`}
-                    </button>
-                    <button
-                      class="button secondary"
-                      onClick={() => setPendingStats({})}
-                      disabled={assigningStats()}
-                    >
-                      Reset
-                    </button>
-                  </div>
-                </Show>
-              </div>
-            </Show>
-
-            {/* Hotbar View */}
-            <Show when={view() === "hotbar"}>
-              <HotbarManager
-                characterId={characterId()}
-                abilities={currentAbilities()}
-                consumables={currentInventory().filter((i: any) => 
-                  i.type === 'consumable' && 
-                  (i.health_restore > 0 || i.mana_restore > 0) &&
-                  !i.teaches_ability_id
-                )}
-                hotbar={currentHotbar()}
-                onHotbarChange={async () => {
-                  console.log('[Game] Hotbar changed, updating context...');
-                  // Fetch updated hotbar
-                  try {
-                    const response = await fetch(`/api/game/get-hotbar?characterId=${characterId()}`);
-                    const result = await response.json();
-                    if (result.hotbar) {
-                      actions.setHotbar(result.hotbar);
-                      console.log('[Game] Hotbar updated in context');
-                    }
-                  } catch (error) {
-                    console.error('[Game] Failed to update hotbar:', error);
-                  }
-                }}
-              />
-            </Show>
-
             {/* Victory Modal */}
             <Show when={showVictoryModal() && victoryData()}>
               {(data) => (

@@ -1,8 +1,7 @@
-import { createAsync, redirect } from "@solidjs/router";
+import { createAsync, redirect, useNavigate, A } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import { getUser } from "~/lib/auth";
 import { getCharactersByUser } from "~/lib/game";
-import { A, useNavigate } from "@solidjs/router";
 
 async function getUserCharacters() {
   "use server";
@@ -18,6 +17,11 @@ async function getUserCharacters() {
 export default function CharacterSelect() {
   const data = createAsync(() => getUserCharacters());
   const navigate = useNavigate();
+
+  const handleSelectCharacter = (characterId: number) => {
+    localStorage.setItem('selectedCharacterId', characterId.toString());
+    navigate('/game');
+  };
 
   const handleLogout = async () => {
     try {
@@ -46,7 +50,7 @@ export default function CharacterSelect() {
           <div style={{ display: "grid", gap: "1rem", "grid-template-columns": "repeat(auto-fill, minmax(300px, 1fr))" }}>
             <For each={data()!.characters}>
               {(character) => (
-                <A href={`/game/${character.id}`} class="card" style={{ cursor: "pointer", "text-decoration": "none", color: "inherit" }}>
+                <div onClick={() => handleSelectCharacter(character.id)} class="card" style={{ cursor: "pointer" }}>
                   <h3 style={{ "margin-bottom": "0.5rem" }}>{character.name}</h3>
                   <p style={{ color: "var(--text-secondary)" }}>
                     Level {character.level} - {character.gold} Gold
@@ -65,7 +69,7 @@ export default function CharacterSelect() {
                       </div>
                     </div>
                   </div>
-                </A>
+                </div>
               )}
             </For>
 
