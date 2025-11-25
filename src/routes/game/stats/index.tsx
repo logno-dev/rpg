@@ -1,16 +1,39 @@
-import { createSignal, Show, For, createEffect } from 'solid-js';
+import { createSignal, Show, For, createEffect, Suspense } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { useCharacter } from '~/lib/CharacterContext';
 import { useActiveEffects } from '~/lib/ActiveEffectsContext';
 import { GameLayout } from '~/components/GameLayout';
-import { getSelectedCharacterId } from '~/lib/game-helpers';
+import { getSelectedCharacterId, useBasicCharacterData } from '~/lib/game-helpers';
 
 export default function StatsRoute() {
   const navigate = useNavigate();
   const characterId = () => getSelectedCharacterId();
 
+  // Use shared hook to initialize character context (uses server session!)
+  const basicData = useBasicCharacterData();
+
+  // Redirect to active dungeon if one exists
+  createEffect(() => {
+    const data = basicData();
+    if (data?.activeDungeonProgress) {
+      console.log('[Stats] Active dungeon found, redirecting to:', data.activeDungeonProgress.dungeon_id);
+      navigate(`/game/dungeon/${data.activeDungeonProgress.dungeon_id}`);
+    }
+  });
+
   const [store, actions] = useCharacter();
   const [effectsStore, effectsActions] = useActiveEffects();
+
+  // Initialize context with basic data when it arrives
+  createEffect(() => {
+    const data = basicData();
+    if (data && !store.character) {
+      actions.setCharacter(data.character);
+      actions.setInventory(data.inventory as any);
+      actions.setAbilities(data.abilities);
+      actions.setHotbar(data.hotbar);
+    }
+  });
 
   const [assigningStats, setAssigningStats] = createSignal(false);
   const [pendingStats, setPendingStats] = createSignal<Record<string, number>>({});
@@ -172,8 +195,25 @@ export default function StatsRoute() {
     }
   };
 
+  const LoadingSkeleton = () => (
+    <div class="card">
+      <div style={{ height: "400px", display: "flex", "align-items": "center", "justify-content": "center", "flex-direction": "column", gap: "1rem", animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite" }}>
+        <div style={{ "font-size": "3rem" }}>📊</div>
+        <div style={{ "font-size": "1.25rem", color: "var(--text-secondary)" }}>Loading stats...</div>
+      </div>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+      `}</style>
+    </div>
+  );
+
   return (
     <GameLayout>
+      <Suspense fallback={<LoadingSkeleton />}>
+      <Show when={basicData()}>
       <div class="card">
         <h3 style={{ "margin-bottom": "1rem" }}>Character Stats</h3>
         
@@ -307,6 +347,8 @@ export default function StatsRoute() {
           </div>
         </Show>
       </div>
+      </Show>
+      </Suspense>
     </GameLayout>
   );
 }

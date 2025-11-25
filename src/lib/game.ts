@@ -1489,6 +1489,54 @@ export async function clearHotbarSlot(characterId: number, slot: number) {
   });
 }
 
+/**
+ * Upgrades hotbar slots when a character learns an upgraded version of an ability
+ * @param characterId - The character's ID
+ * @param newAbilityId - The ID of the newly learned ability
+ * @param baseId - The base_id that groups all versions of this ability together
+ * @param newLevel - The level of the newly learned ability
+ */
+export async function upgradeHotbarAbilities(characterId: number, newAbilityId: number, baseId: number, newLevel: number) {
+  'use server';
+  
+  console.log('[upgradeHotbarAbilities] Called with:', { characterId, newAbilityId, baseId, newLevel });
+  
+  // Find all abilities with the same base_id but lower level
+  const lowerTiersResult = await db.execute({
+    sql: 'SELECT id FROM abilities WHERE base_id = ? AND level < ?',
+    args: [baseId, newLevel],
+  });
+  
+  if (lowerTiersResult.rows.length === 0) {
+    console.log('[upgradeHotbarAbilities] No lower tier abilities found');
+    return;
+  }
+  
+  const lowerTierIds = lowerTiersResult.rows.map((row: any) => row.id);
+  console.log('[upgradeHotbarAbilities] Lower tier ability IDs:', lowerTierIds);
+  
+  // Find hotbar slots that have any of the lower tier abilities
+  const hotbarSlotsResult = await db.execute({
+    sql: `SELECT slot, ability_id FROM character_hotbar 
+          WHERE character_id = ? AND type = 'ability' AND ability_id IN (${lowerTierIds.map(() => '?').join(',')})`,
+    args: [characterId, ...lowerTierIds],
+  });
+  
+  console.log('[upgradeHotbarAbilities] Found', hotbarSlotsResult.rows.length, 'slots to upgrade');
+  
+  // Update each hotbar slot to use the new ability
+  for (const slot of hotbarSlotsResult.rows as any[]) {
+    console.log('[upgradeHotbarAbilities] Upgrading slot', slot.slot, 'from ability', slot.ability_id, 'to', newAbilityId);
+    
+    await db.execute({
+      sql: 'UPDATE character_hotbar SET ability_id = ?, updated_at = strftime(\'%s\', \'now\') WHERE character_id = ? AND slot = ?',
+      args: [newAbilityId, characterId, slot.slot],
+    });
+  }
+  
+  console.log('[upgradeHotbarAbilities] Hotbar upgrade complete');
+}
+
 // Ability Effects System
 export async function getAbilityEffects(abilityId: number) {
   'use server';

@@ -138,6 +138,27 @@ export async function logout(): Promise<void> {
   const session = await getSessionInternal();
   await session.update((data: any) => {
     data.userId = undefined;
+    data.selectedCharacterId = undefined;
     return data;
   });
+}
+
+export async function setSelectedCharacter(characterId: number): Promise<void> {
+  'use server';
+  const session = await getSessionInternal();
+  await session.update((data: any) => {
+    data.selectedCharacterId = characterId;
+    return data;
+  });
+}
+
+export async function getSelectedCharacter(): Promise<number | null> {
+  'use server';
+  try {
+    const session = await getSessionInternal();
+    return session.data.selectedCharacterId || null;
+  } catch (error) {
+    console.error('Error getting selected character:', error);
+    return null;
+  }
 }

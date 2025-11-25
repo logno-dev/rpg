@@ -1,39 +1,9 @@
 import { createAsync, useParams, redirect, useNavigate, cache } from "@solidjs/router";
-import { createSignal, Show, For, createMemo, createEffect } from "solid-js";
-import { getUser } from "~/lib/auth";
-import { getCharacter, getInventory } from "~/lib/game";
+import { createSignal, Show, For, createMemo, createEffect, Suspense } from "solid-js";
 import { GameLayout } from "~/components/GameLayout";
 import { ItemDetailModal } from "~/components/ItemDetailModal";
 import { useCharacter } from "~/lib/CharacterContext";
-import { getSelectedCharacterId } from "~/lib/game-helpers";
-
-const getInventoryData = cache(async (characterId: number | null) => {
-  "use server";
-  
-  // Handle missing character ID (SSR or localStorage not set)
-  if (!characterId) {
-    throw redirect("/character-select");
-  }
-  
-  let user;
-  try {
-    user = await getUser();
-  } catch (error) {
-    console.error("Error getting user:", error);
-    throw redirect("/");
-  }
-  
-  if (!user) throw redirect("/");
-
-  const character = await getCharacter(characterId);
-  if (!character || character.user_id !== user.id) {
-    throw redirect("/character-select");
-  }
-
-  const inventory = await getInventory(characterId);
-  
-  return { character, inventory };
-}, "inventory-data");
+import { getSelectedCharacterId, useBasicCharacterData } from "~/lib/game-helpers";
 
 export default function InventoryPage() {
   const navigate = useNavigate();
@@ -41,27 +11,43 @@ export default function InventoryPage() {
   
   // Redirect if no character selected (client-side only)
   createEffect(() => {
-    if (typeof window !== 'undefined' && !characterId()) {
+    const id = characterId();
+    console.log('[Inventory] Redirect check - characterId:', id);
+    if (typeof window !== 'undefined' && !id) {
+      console.log('[Inventory] No character ID in localStorage, redirecting to character-select');
       navigate('/character-select');
     }
   });
   
-  // Only fetch data if we have a character ID
-  const data = createAsync(() => {
-    const id = characterId();
-    // Don't call server function if no ID - will handle redirect in effect
-    if (!id) return Promise.resolve(undefined);
-    return getInventoryData(id);
-  }, { deferStream: true });
+  // Use shared hook to initialize character context (uses server session!)
+  const basicData = useBasicCharacterData();
+  
+  // Redirect to active dungeon if one exists
+  createEffect(() => {
+    const data = basicData();
+    if (data?.activeDungeonProgress) {
+      console.log('[Inventory] Active dungeon found, redirecting to:', data.activeDungeonProgress.dungeon_id);
+      navigate(`/game/dungeon/${data.activeDungeonProgress.dungeon_id}`);
+    }
+  });
   
   const [store, actions] = useCharacter();
 
-  // Initialize store with fetched data
+  // Initialize context with basic data when it arrives
   createEffect(() => {
-    const gameData = data();
-    if (gameData && !store.character) {
-      actions.setCharacter(gameData.character);
-      actions.setInventory(gameData.inventory as any);
+    const data = basicData();
+    console.log('[Inventory] basicData changed:', data ? 'HAS DATA' : 'NO DATA');
+    console.log('[Inventory] store.character:', store.character ? 'EXISTS' : 'NULL');
+    
+    if (data && !store.character) {
+      console.log('[Inventory] Initializing context with data');
+      actions.setCharacter(data.character);
+      actions.setInventory(data.inventory as any);
+      actions.setAbilities(data.abilities);
+      actions.setHotbar(data.hotbar);
+      console.log('[Inventory] Context initialized');
+    } else if (data && store.character) {
+      console.log('[Inventory] Data exists but character already set');
     }
   });
 
@@ -75,9 +61,9 @@ export default function InventoryPage() {
   const [showBulkSellModal, setShowBulkSellModal] = createSignal(false);
   const [isEquipping, setIsEquipping] = createSignal(false);
 
-  // Computed values
-  const currentInventory = () => store.inventory || data()?.inventory || [];
-  const currentCharacter = () => store.character || data()?.character;
+  // Computed values - use context as source of truth
+  const currentInventory = () => store.inventory || [];
+  const currentCharacter = () => store.character;
   const currentAbilities = () => store.abilities || [];
 
   // Handle equip/unequip
@@ -315,8 +301,27 @@ export default function InventoryPage() {
     };
   };
 
+  const LoadingSkeleton = () => (
+    <>
+      <div class="card">
+        <div style={{ height: "400px", display: "flex", "align-items": "center", "justify-content": "center", "flex-direction": "column", gap: "1rem", animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite" }}>
+          <div style={{ "font-size": "3rem" }}>📦</div>
+          <div style={{ "font-size": "1.25rem", color: "var(--text-secondary)" }}>Loading inventory...</div>
+        </div>
+      </div>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+      `}</style>
+    </>
+  );
+
   return (
     <GameLayout>
+      <Suspense fallback={<LoadingSkeleton />}>
+      <Show when={basicData()}>
       {/* Equipment Slots */}
       <div class="card">
         <h3 style={{ "margin-bottom": "1rem" }}>Equipment</h3>
@@ -1022,6 +1027,8 @@ export default function InventoryPage() {
           </div>
         </div>
       </Show>
+      </Show>
+      </Suspense>
     </GameLayout>
   );
 }

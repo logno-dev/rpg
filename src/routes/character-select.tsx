@@ -1,6 +1,6 @@
 import { createAsync, redirect, useNavigate, A } from "@solidjs/router";
 import { For, Show } from "solid-js";
-import { getUser } from "~/lib/auth";
+import { getUser, setSelectedCharacter } from "~/lib/auth";
 import { getCharactersByUser } from "~/lib/game";
 
 async function getUserCharacters() {
@@ -18,9 +18,17 @@ export default function CharacterSelect() {
   const data = createAsync(() => getUserCharacters());
   const navigate = useNavigate();
 
-  const handleSelectCharacter = (characterId: number) => {
-    localStorage.setItem('selectedCharacterId', characterId.toString());
-    navigate('/game');
+  const handleSelectCharacter = async (characterId: number) => {
+    console.log('[CharacterSelect] Selecting character:', characterId);
+    
+    // Save to server session
+    try {
+      await setSelectedCharacter(characterId);
+      console.log('[CharacterSelect] Character saved to session');
+      navigate('/game');
+    } catch (error) {
+      console.error('[CharacterSelect] Error saving character:', error);
+    }
   };
 
   const handleLogout = async () => {

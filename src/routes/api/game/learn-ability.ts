@@ -1,6 +1,7 @@
 import { json } from '@solidjs/router';
 import type { APIEvent } from '@solidjs/start/server';
 import { db } from '~/lib/db';
+import { upgradeHotbarAbilities } from '~/lib/game';
 
 export async function POST(event: APIEvent) {
   try {
@@ -92,6 +93,9 @@ export async function POST(event: APIEvent) {
           args: [characterId, lowerTier.id],
         });
       }
+      
+      // Auto-upgrade hotbar slots that have lower tier versions
+      await upgradeHotbarAbilities(characterId, invItem.teaches_ability_id, ability.base_id, ability.level);
     }
     
     // Learn the ability

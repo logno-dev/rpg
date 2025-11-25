@@ -1,6 +1,6 @@
 import { createAsync, useParams, redirect, revalidate, useNavigate, A, cache } from "@solidjs/router";
 import { createSignal, Show, For, createEffect, onCleanup, createMemo, on, onMount, batch } from "solid-js";
-import { getUser } from "~/lib/auth";
+import { getUser, getSelectedCharacter as getSelectedCharacterFromSession } from "~/lib/auth";
 import { getCharacter, getInventory, getAllRegions, getRegion, getCharacterAbilities, getMerchantsInRegion, getDungeonsInRegion, getActiveDungeon, getHotbar, getAbilitiesWithEffects } from "~/lib/game";
 import { db, type Mob, type Item, type Region, type NamedMob } from "~/lib/db";
 import { CombatEngine } from "~/components/CombatEngine";
@@ -12,76 +12,62 @@ import { ItemDetailModal } from "~/components/ItemDetailModal";
 import { useCharacter } from "~/lib/CharacterContext";
 import { useActiveEffects } from "~/lib/ActiveEffectsContext";
 
-const getGameData = cache(async (characterId: number | null) => {
+const getGameData = cache(async () => {
   "use server";
   
-  // Handle missing character ID (SSR or localStorage not set)
-  if (!characterId) {
-    throw redirect("/character-select");
-  }
-  
-  let user;
-  try {
-    user = await getUser();
-  } catch (error) {
-    console.error("Error getting user:", error);
-    throw redirect("/");
-  }
-  
+  const user = await getUser();
   if (!user) throw redirect("/");
+  
+  // Get character ID from session
+  const characterId = await getSelectedCharacterFromSession();
+  if (!characterId) throw redirect("/character-select");
 
+  // Fetch character and verify ownership
   const character = await getCharacter(characterId);
   if (!character || character.user_id !== user.id) {
     throw redirect("/character-select");
   }
 
-  const inventory = await getInventory(characterId);
-  const regions = await getAllRegions(character.level, characterId);
-  const abilities = await getAbilitiesWithEffects(characterId);
-  const hotbar = await getHotbar(characterId);
+  // Check for active dungeon - return it in data so client can handle redirect
+  const activeDungeonProgress = await getActiveDungeon(characterId);
+
+  // Fetch essential data in parallel (merchants/dungeons lazy-loaded)
+  const [inventory, regions, abilities, hotbar] = await Promise.all([
+    getInventory(characterId),
+    getAllRegions(character.level, characterId),
+    getAbilitiesWithEffects(characterId),
+    getHotbar(characterId),
+  ]);
   
-  // Ensure character has a current region set (default to 1 if null)
+  // Get current region info
   const regionId = character.current_region ?? 1;
   const currentRegion = await getRegion(regionId);
-  const merchants = await getMerchantsInRegion(regionId);
-  const dungeons = await getDungeonsInRegion(regionId);
-  const activeDungeonProgress = await getActiveDungeon(characterId);
   
   if (!currentRegion) {
-    // Fallback to first region if somehow the region doesn't exist
     const fallbackRegion = regions[0];
-    return { character, inventory, regions, currentRegion: fallbackRegion, abilities, merchants: [], dungeons: [], activeDungeonProgress: null, hotbar: [] };
+    return { character, inventory, regions, currentRegion: fallbackRegion, abilities, hotbar, activeDungeonProgress };
   }
 
-  return { character, inventory, regions, currentRegion, abilities, merchants, dungeons, activeDungeonProgress, hotbar };
+  return { character, inventory, regions, currentRegion, abilities, hotbar, activeDungeonProgress };
 }, "game-data");
 
 export default function GamePage() {
   const navigate = useNavigate();
   
-  // Get character ID from localStorage
-  const characterId = () => {
-    if (typeof window === 'undefined') return null;
-    const stored = localStorage.getItem('selectedCharacterId');
-    if (!stored) {
-      return null;
-    }
-    return parseInt(stored);
-  };
+  // Fetch data from session
+  const data = createAsync(() => getGameData());
   
-  // Redirect if no character selected (client-side only)
+  // Redirect to dungeon if active dungeon session exists
   createEffect(() => {
-    if (typeof window !== 'undefined' && !characterId()) {
-      navigate('/character-select');
+    const gameData = data();
+    if (gameData?.activeDungeonProgress) {
+      console.log('[GAME] Active dungeon found, redirecting to:', gameData.activeDungeonProgress.dungeon_id);
+      navigate(`/game/dungeon/${gameData.activeDungeonProgress.dungeon_id}`);
     }
   });
   
-  const data = createAsync(() => {
-    const id = characterId();
-    // Don't call server function if no ID - will handle redirect in effect
-    if (!id) return Promise.resolve(undefined);
-    return getGameData(id);
-  }, { deferStream: true });
+  // Get character ID from loaded data (for client-side API calls)
+  const characterId = () => data()?.character?.id ?? null;
   const [store, actions] = useCharacter();
   const [effectsStore, effectsActions] = useActiveEffects();
   const [availableMobs, setAvailableMobs] = createSignal<Mob[]>([]);
@@ -167,14 +153,10 @@ export default function GamePage() {
   const [showBulkSellModal, setShowBulkSellModal] = createSignal(false);
   
   // Dungeon state
-  const [activeDungeon, setActiveDungeon] = createSignal<any | null>(null);
   const [namedMobEncounter, setNamedMobEncounter] = createSignal<NamedMob | null>(null);
   // Derived from dungeonSession - if we have a session, we're in a dungeon
   const isDungeonCombat = () => !!store.dungeonSession;
   
-  // Track if we're actively in dungeon flow (to prevent interruption modal between battles)
-  const [isInActiveDungeonFlow, setIsInActiveDungeonFlow] = createSignal(false);
-  const [dungeonProgress, setDungeonProgress] = createSignal<{current: number, total: number} | null>(null);
   
   // Regional data from context store
   const currentMerchants = () => store.merchants;
@@ -193,45 +175,35 @@ export default function GamePage() {
   // After that, we update CharacterContext directly from API responses
   const [isInitialized, setIsInitialized] = createSignal(false);
   
+  // Lazy load merchants and dungeons for a region
+  const loadRegionalData = async (regionId: number) => {
+    try {
+      const response = await fetch(`/api/game/region-data?regionId=${regionId}`);
+      if (!response.ok) throw new Error('Failed to load regional data');
+      const { merchants, dungeons } = await response.json();
+      actions.setMerchants(merchants || []);
+      actions.setDungeons(dungeons || []);
+    } catch (error) {
+      console.error('[LAZY LOAD] Error:', error);
+    }
+  };
+  
   createEffect(() => {
     const gameData = data();
     if (gameData && !isInitialized()) {
       console.log('[DATA] Initial load - initializing CharacterContext');
       
       // On initial load, use all server data as-is
+      // NOTE: If there's an active dungeon, client-side effect redirects before we initialize
       actions.setCharacter(gameData.character);
       actions.setInventory(gameData.inventory);
       actions.setAbilities(gameData.abilities);
       actions.setHotbar(gameData.hotbar || []);
       actions.setRegions(gameData.regions);
       actions.setCurrentRegion(gameData.currentRegion);
-      actions.setMerchants(gameData.merchants || []);
-      actions.setDungeons(gameData.dungeons || []);
-      
-      // Set active dungeon if there is one
-      if (gameData.activeDungeonProgress) {
-        setActiveDungeon(gameData.activeDungeonProgress);
-        
-        // Set dungeon session in CharacterContext (source of truth for HP/mana)
-        actions.setDungeonSession({
-          id: gameData.activeDungeonProgress.id,
-          dungeon_id: gameData.activeDungeonProgress.dungeon_id,
-          current_encounter: gameData.activeDungeonProgress.current_encounter,
-          total_encounters: gameData.activeDungeonProgress.total_encounters,
-          session_health: gameData.activeDungeonProgress.session_health,
-          session_mana: gameData.activeDungeonProgress.session_mana,
-          boss_mob_id: gameData.activeDungeonProgress.boss_mob_id,
-          dungeon_name: gameData.activeDungeonProgress.dungeon_name
-        });
-        
-        // Set dungeon progress for UI
-        if (gameData.activeDungeonProgress.total_encounters) {
-          setDungeonProgress({
-            current: gameData.activeDungeonProgress.current_encounter,
-            total: gameData.activeDungeonProgress.total_encounters
-          });
-        }
-      }
+      // Merchants and dungeons lazy-loaded
+      actions.setMerchants([]);
+      actions.setDungeons([]);
       
       console.log('[DATA] CharacterContext initialized:', {
         character: gameData.character.name,
@@ -242,6 +214,11 @@ export default function GamePage() {
       });
       
       setIsInitialized(true);
+      
+      // Lazy load merchants and dungeons after initial render
+      if (gameData.currentRegion) {
+        loadRegionalData(gameData.currentRegion.id);
+      }
     } else if (gameData && isInitialized()) {
       console.log('[DATA] Route data updated but already initialized - preserving CharacterContext');
       // After initial load, CharacterContext is the source of truth
@@ -254,26 +231,6 @@ export default function GamePage() {
         updatedChar.max_health = gameData.character.max_health;
         updatedChar.max_mana = gameData.character.max_mana;
         actions.setCharacter(updatedChar);
-      }
-      
-      // Check for dungeon status changes
-      if (gameData.activeDungeonProgress && !store.dungeonSession) {
-        // Dungeon started externally, sync it
-        setActiveDungeon(gameData.activeDungeonProgress);
-        actions.setDungeonSession({
-          id: gameData.activeDungeonProgress.id,
-          dungeon_id: gameData.activeDungeonProgress.dungeon_id,
-          current_encounter: gameData.activeDungeonProgress.current_encounter,
-          total_encounters: gameData.activeDungeonProgress.total_encounters,
-          session_health: gameData.activeDungeonProgress.session_health,
-          session_mana: gameData.activeDungeonProgress.session_mana,
-          boss_mob_id: gameData.activeDungeonProgress.boss_mob_id,
-          dungeon_name: gameData.activeDungeonProgress.dungeon_name
-        });
-      } else if (!gameData.activeDungeonProgress && store.dungeonSession && !activeMob()) {
-        // Dungeon ended externally (abandoned), clear it
-        setActiveDungeon(null);
-        actions.setDungeonSession(null);
       }
     }
   });
@@ -591,12 +548,8 @@ export default function GamePage() {
       // Refetch in background to sync (health/mana already preserved above)
       await refetchData();
       
-      // Manually fetch merchants and dungeons for the new region
-      const gameData = await getGameData(characterId());
-      if (gameData) {
-        actions.setMerchants(gameData.merchants || []);
-        actions.setDungeons(gameData.dungeons || []);
-      }
+      // Lazy load merchants and dungeons for new region
+      await loadRegionalData(regionId);
     } catch (error: any) {
       alert(error.message);
       console.error('Travel error:', error);
@@ -882,7 +835,7 @@ export default function GamePage() {
       console.error('[USE ITEM] Error:', error);
       alert('Failed to use item: ' + error.message);
       // Revert by refetching from server
-      const gameData = await getGameData(characterId());
+      const gameData = await getGameData();
       actions.setCharacter(gameData.character);
       actions.setInventory(gameData.inventory);
     }
@@ -1595,94 +1548,10 @@ export default function GamePage() {
       }
 
       // Navigate to dedicated dungeon route
-      navigate(`/game/${characterId()}/dungeon/${dungeonId}`);
+      navigate(`/game/dungeon/${dungeonId}`);
     } catch (error: any) {
       console.error('Start dungeon error:', error);
       alert('Failed to start dungeon: ' + error.message);
-    }
-  };
-
-  const handleAdvanceDungeon = async () => {
-    try {
-      // Get current health/mana to save in dungeon session
-      const currentH = currentHealth();
-      const currentM = currentMana();
-      
-      const response = await fetch('/api/game/advance-dungeon', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          characterId: characterId(),
-          currentHealth: currentH,
-          currentMana: currentM
-        }),
-      });
-
-      const result = await response.json();
-      if (result.error) {
-        throw new Error(result.error);
-      }
-
-      if (result.completed) {
-        // Dungeon complete! Transfer dungeon session HP/mana to character before clearing
-        const finalHealth = currentH;
-        const finalMana = currentM;
-        
-        // Update character with final dungeon HP/mana FIRST
-        actions.updateHealth(finalHealth, finalMana);
-        
-        // Then clear ALL dungeon state in a batch
-        batch(() => {
-          setActiveDungeon(null);
-          setDungeonProgress(null);
-          setIsInActiveDungeonFlow(false);
-          actions.setDungeonSession(null); // Clear dungeon session LAST
-        });
-        
-        setCombatLog([...combatLog(), '🎉 Dungeon completed! The boss has been defeated!']);
-        
-        return { completed: true };
-      } else {
-        // Start next encounter immediately
-        if (result.combat && result.mob) {
-          setActiveMob(result.mob);
-          
-          // Update dungeon session encounter count
-          if (store.dungeonSession && result.progress) {
-            actions.setDungeonSession({
-              ...store.dungeonSession,
-              current_encounter: result.progress.current,
-              total_encounters: result.progress.total
-            });
-          }
-          
-          // Update encounter progress for UI
-          if (result.progress) {
-            setDungeonProgress(result.progress);
-          } else if (result.encounterProgress) {
-            setDungeonProgress(result.encounterProgress);
-          }
-          
-          if (result.isBoss && result.namedMob) {
-            setActiveNamedMobId(result.namedMob.id); // Track boss ID for loot
-            const title = result.namedMob?.title ? ` ${result.namedMob.title}` : '';
-            setCombatLog([`The final boss appears!`, `${result.mob.name}${title} blocks your path!`]);
-          } else {
-            setActiveNamedMobId(null); // Regular dungeon mob
-            setCombatLog([`Next encounter!`, `${result.mob.name} attacks!`]);
-          }
-          
-          return { completed: false };
-        } else {
-          console.error('[DUNGEON ADVANCE] Missing combat or mob data:', result);
-          alert('Error: Failed to start next encounter - missing data');
-          return { completed: false, error: true };
-        }
-      }
-    } catch (error: any) {
-      console.error('Advance dungeon error:', error);
-      alert('Failed to advance dungeon: ' + error.message);
-      return { completed: false, error: true };
     }
   };
 
@@ -1743,10 +1612,7 @@ export default function GamePage() {
       }
 
       // Clear client-side dungeon state immediately
-      setActiveDungeon(null);
       actions.setDungeonSession(null);
-      setDungeonProgress(null);
-      setIsInActiveDungeonFlow(false);
       setActiveMob(null);
       setActiveNamedMobId(null);
       
@@ -1762,7 +1628,7 @@ export default function GamePage() {
     if (!store.dungeonSession) return;
 
     // Navigate to the dedicated dungeon route
-    navigate(`/game/${characterId()}/dungeon/${store.dungeonSession.dungeon_id}`);
+    navigate(`/game/dungeon/${store.dungeonSession.dungeon_id}`);
   };
 
   // Auto-scroll adventure combat log
@@ -1919,7 +1785,7 @@ export default function GamePage() {
             currentMana={currentMana}
             constitution={() => totalStats().constitution}
             wisdom={() => totalStats().wisdom}
-            isInCombat={() => !!activeMob() || !!activeDungeon()}
+            isInCombat={() => !!activeMob()}
             onRegenTick={handleRegenTick}
             onRegenComplete={(health, mana) => {
               // Update store, sync will happen automatically
@@ -2000,49 +1866,6 @@ export default function GamePage() {
 
             {/* Combat Engine - Always mounted but hidden when not in use */}
             <Show when={activeMob()}>
-                {/* Dungeon Progress Bar - Show during dungeon combat */}
-                <Show when={isDungeonCombat() && dungeonProgress()}>
-                  <div class="card" style={{ 
-                    "margin-bottom": "1rem",
-                    border: "2px solid var(--accent)",
-                    background: "linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(99, 102, 241, 0.1))"
-                  }}>
-                    <div style={{ 
-                      display: "flex",
-                      "justify-content": "space-between",
-                      "align-items": "center",
-                      "margin-bottom": "0.75rem"
-                    }}>
-                      <div style={{ 
-                        "font-size": "1rem",
-                        "font-weight": "bold",
-                        color: "var(--accent)"
-                      }}>
-                        🏰 Dungeon Progress
-                      </div>
-                      <div style={{ 
-                        "font-size": "0.875rem",
-                        color: "var(--text-secondary)"
-                      }}>
-                        Encounter {dungeonProgress()!.current}/{dungeonProgress()!.total}
-                      </div>
-                    </div>
-                    <div style={{ 
-                      background: "var(--bg-dark)",
-                      height: "8px",
-                      "border-radius": "4px",
-                      overflow: "hidden"
-                    }}>
-                      <div style={{ 
-                        background: "var(--accent)",
-                        height: "100%",
-                        width: `${(dungeonProgress()!.current / dungeonProgress()!.total) * 100}%`,
-                        transition: "width 0.3s ease"
-                      }} />
-                    </div>
-                  </div>
-                </Show>
-
                 <CombatEngine
                   character={data()!.character}
                   mob={activeMob()!}
@@ -2252,7 +2075,7 @@ export default function GamePage() {
                 </div>
 
                 {/* Dungeons */}
-                <Show when={currentDungeons().length > 0 && !activeDungeon()}>
+                <Show when={currentDungeons().length > 0}>
                   <div class="card">
                     <h3 style={{ "margin-bottom": "1rem" }}>Dungeons</h3>
                     <div style={{ display: "grid", gap: "1rem" }}>
@@ -2303,73 +2126,6 @@ export default function GamePage() {
                         )}
                       </For>
                     </div>
-                  </div>
-                </Show>
-
-                {/* Dungeon Progress Indicator */}
-                <Show when={activeDungeon()}>
-                  <div class="card" style={{ 
-                    border: "2px solid var(--accent)",
-                    background: "linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(99, 102, 241, 0.1))"
-                  }}>
-                    <h3 style={{ color: "var(--accent)", "margin-bottom": "0.5rem" }}>
-                      🏰 Active Dungeon
-                    </h3>
-                    <div style={{ 
-                      "font-size": "1.125rem",
-                      "font-weight": "bold",
-                      "margin-bottom": "0.25rem"
-                    }}>
-                      {activeDungeon().dungeon_name}
-                    </div>
-                    <Show when={dungeonProgress()}>
-                      <div style={{ 
-                        "font-size": "0.875rem",
-                        color: "var(--text-secondary)",
-                        "margin-bottom": "0.75rem"
-                      }}>
-                        Encounter {dungeonProgress()!.current}/{dungeonProgress()!.total}
-                      </div>
-                      <div style={{ 
-                        background: "var(--bg-dark)",
-                        height: "8px",
-                        "border-radius": "4px",
-                        overflow: "hidden"
-                      }}>
-                        <div style={{ 
-                          background: "var(--accent)",
-                          height: "100%",
-                          width: `${(dungeonProgress()!.current / dungeonProgress()!.total) * 100}%`,
-                          transition: "width 0.3s ease"
-                        }} />
-                      </div>
-                    </Show>
-                    <Show when={!dungeonProgress()}>
-                      <div style={{ 
-                        "font-size": "0.875rem",
-                        color: "var(--text-secondary)"
-                      }}>
-                        In Progress...
-                      </div>
-                    </Show>
-                    <div style={{ 
-                      "margin-top": "1rem",
-                      padding: "0.75rem",
-                      background: "var(--bg-dark)",
-                      "border-radius": "6px",
-                      "text-align": "center",
-                      color: "var(--warning)",
-                      "font-weight": "bold"
-                    }}>
-                      ⚠️ Defeat all enemies to complete the dungeon!
-                    </div>
-                    <button
-                      class="button secondary"
-                      style={{ width: "100%", "margin-top": "1rem" }}
-                      onClick={handleAbandonDungeon}
-                    >
-                      Abandon Dungeon
-                    </button>
                   </div>
                 </Show>
 
@@ -2572,37 +2328,12 @@ export default function GamePage() {
                       class="button success"
                       style={{ width: "100%" }}
                       onClick={async () => {
-                        // If in a dungeon, handle dungeon advancement
-                        if (isDungeonCombat() && activeDungeon()) {
-                          const result = await handleAdvanceDungeon();
-                          if (result?.completed) {
-                            // Dungeon complete! Close modal and refetch to update regions
-                            setShowVictoryModal(false);
-                            setVictoryData(null);
-                            await refetchData();
-                            const gameData = await getGameData(characterId());
-                            if (gameData) {
-                              actions.setMerchants(gameData.merchants || []);
-                              actions.setDungeons(gameData.dungeons || []);
-                            }
-                          } else if (!result?.error) {
-                            // Next combat started, close modal and combat UI shows
-                            setShowVictoryModal(false);
-                            setVictoryData(null);
-                            return;
-                          }
-                        } else {
-                          // Normal combat, just close modal
-                          setShowVictoryModal(false);
-                          setVictoryData(null);
-                        }
+                        // Adventure mode - just close modal
+                        setShowVictoryModal(false);
+                        setVictoryData(null);
                       }}
                     >
-                      {isDungeonCombat() && activeDungeon() && dungeonProgress() && dungeonProgress()!.current < dungeonProgress()!.total 
-                        ? "Next Encounter →" 
-                        : isDungeonCombat() && activeDungeon()
-                        ? "Complete Dungeon 🎉"
-                        : "Continue Adventure"}
+                      Continue Adventure
                     </button>
                   </div>
                 </div>
@@ -2756,7 +2487,7 @@ export default function GamePage() {
             </Show>
 
             {/* Interrupted Dungeon Modal - Blocks all actions until resolved */}
-            <Show when={store.dungeonSession && !activeMob() && !isInActiveDungeonFlow()}>
+            <Show when={store.dungeonSession && !activeMob()}>
               <div 
                 style={{ 
                   position: "fixed", 

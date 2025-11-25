@@ -1,38 +1,58 @@
 import { createAsync, useParams, useNavigate, redirect, revalidate } from "@solidjs/router";
 import { createSignal, Show, For, createEffect, onCleanup, createMemo, onMount } from "solid-js";
 import { getActiveDungeon, getCharacter, getInventory, getAbilitiesWithEffects, getHotbar } from "~/lib/game";
-import { getUser } from "~/lib/auth";
+import { getUser, getSelectedCharacter as getSelectedCharacterFromSession } from "~/lib/auth";
 import { CombatEngine } from "~/components/CombatEngine";
 import { ActiveEffectsDisplay } from "~/components/ActiveEffectsDisplay";
 import { useCharacter } from "~/lib/CharacterContext";
 import { db } from "~/lib/db";
 
-async function getDungeonData(characterId: number, dungeonId: number) {
+async function getDungeonData(dungeonId: number) {
   "use server";
   
-  // Verify user owns this character
-  const user = await getUser();
-  if (!user) throw redirect("/");
+  console.log('[getDungeonData] Starting fetch from session');
   
+  // Verify user is logged in
+  const user = await getUser();
+  if (!user) {
+    console.log('[getDungeonData] No user, redirecting to /');
+    throw redirect("/");
+  }
+  
+  // Get character ID from session
+  const characterId = await getSelectedCharacterFromSession();
+  console.log('[getDungeonData] Character ID from session:', characterId);
+  
+  if (!characterId) {
+    console.log('[getDungeonData] No character selected, redirecting');
+    throw redirect("/character-select");
+  }
+  
+  // Verify character belongs to user
   const charResult = await db.execute({
     sql: "SELECT * FROM characters WHERE id = ? AND user_id = ?",
     args: [characterId, user.id]
   });
   const character = charResult.rows[0];
-  if (!character) throw redirect("/character-select");
+  if (!character) {
+    console.log('[getDungeonData] Character not found or not owned, redirecting');
+    throw redirect("/character-select");
+  }
   
   // Get active dungeon progress
   const progressData = await getActiveDungeon(characterId);
   
   if (!progressData) {
     // No active dungeon, redirect back to game
-    throw redirect(`/game/${characterId}`);
+    console.log('[getDungeonData] No active dungeon, redirecting to /game');
+    throw redirect(`/game`);
   }
   
   // Verify this is the correct dungeon
   if (progressData.dungeon_id !== dungeonId) {
     // Wrong dungeon, redirect to correct one
-    throw redirect(`/game/${characterId}/dungeon/${progressData.dungeon_id}`);
+    console.log('[getDungeonData] Wrong dungeon, redirecting to correct dungeon');
+    throw redirect(`/game/dungeon/${progressData.dungeon_id}`);
   }
   
   // Fetch full dungeon info
@@ -51,7 +71,7 @@ async function getDungeonData(characterId: number, dungeonId: number) {
   const dungeon = dungeonResult.rows[0] as any;
   
   if (!dungeon) {
-    throw redirect(`/game/${characterId}`);
+    throw redirect(`/game`);
   }
   
   // Load character data for CharacterContext
@@ -72,12 +92,14 @@ async function getDungeonData(characterId: number, dungeonId: number) {
 }
 
 export default function DungeonRoute() {
-  const params = useParams<{ id: string; dungeonId: string }>();
+  const params = useParams<{ dungeonId: string }>();
   const navigate = useNavigate();
-  const characterId = () => parseInt(params.id!);
   const dungeonId = () => parseInt(params.dungeonId!);
   
-  const data = createAsync(() => getDungeonData(characterId(), dungeonId()));
+  const data = createAsync(() => getDungeonData(dungeonId()));
+  
+  // Get character ID from loaded data
+  const characterId = () => data()?.characterId ?? null;
   const [store, actions] = useCharacter();
   
   const [currentEncounter, setCurrentEncounter] = createSignal<any>(null);
@@ -276,7 +298,7 @@ export default function DungeonRoute() {
         actions.setDungeonSession(null);
         
         // Navigate back to game
-        navigate(`/game/${characterId()}`);
+        navigate(`/game`);
       }
     } catch (error) {
       console.error('Failed to abandon dungeon:', error);
@@ -672,6 +694,65 @@ export default function DungeonRoute() {
         </Show>
       </Show>
       
+      {/* Abandon Dungeon Modal */}
+      <Show when={showAbandonModal()}>
+        <div 
+          style={{ 
+            position: "fixed", 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            background: "rgba(0, 0, 0, 0.9)", 
+            display: "flex", 
+            "align-items": "center", 
+            "justify-content": "center",
+            "z-index": 1000,
+            padding: "1rem"
+          }}
+          onClick={() => setShowAbandonModal(false)}
+        >
+          <div 
+            class="card" 
+            style={{ 
+              "max-width": "500px",
+              width: "100%",
+              padding: "2rem",
+              "text-align": "center"
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ "font-size": "3rem", "margin-bottom": "1rem" }}>⚠️</div>
+            <h2 style={{ "margin-bottom": "1rem", color: "var(--danger)" }}>
+              Abandon Dungeon?
+            </h2>
+            <p style={{ "font-size": "1rem", "margin-bottom": "2rem", color: "var(--text-secondary)" }}>
+              Are you sure you want to abandon this dungeon? You will lose all progress and return to town.
+            </p>
+            
+            <div style={{ display: "flex", gap: "1rem" }}>
+              <button 
+                class="button secondary" 
+                style={{ flex: 1 }}
+                onClick={() => setShowAbandonModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                class="button danger" 
+                style={{ flex: 1 }}
+                onClick={async () => {
+                  setShowAbandonModal(false);
+                  await handleAbandonDungeon();
+                }}
+              >
+                Abandon
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
+
       {/* Dungeon Completion Modal */}
       <Show when={showCompletionModal()}>
         <div 
@@ -690,7 +771,7 @@ export default function DungeonRoute() {
           }}
           onClick={() => {
             setShowCompletionModal(false);
-            navigate(`/game/${characterId()}`);
+            navigate(`/game`);
           }}
         >
           <div 
@@ -717,7 +798,7 @@ export default function DungeonRoute() {
               style={{ width: "100%", "font-size": "1.1rem", padding: "1rem" }}
               onClick={() => {
                 setShowCompletionModal(false);
-                navigate(`/game/${characterId()}`);
+                navigate(`/game`);
               }}
             >
               Return to Town

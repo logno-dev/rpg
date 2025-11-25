@@ -2,13 +2,91 @@
  * Shared game helper functions used across multiple game routes
  */
 
+import { createAsync, cache, redirect } from "@solidjs/router";
+import { getUser, getSelectedCharacter as getSelectedCharacterFromSession } from "~/lib/auth";
+import { getCharacter, getInventory, getAbilitiesWithEffects, getHotbar, getActiveDungeon } from "~/lib/game";
+
 /**
- * Get the currently selected character ID from localStorage
+ * Get the currently selected character ID from localStorage (client-side fallback)
  */
 export function getSelectedCharacterId(): number | null {
   if (typeof window === 'undefined') return null;
   const stored = localStorage.getItem('selectedCharacterId');
   return stored ? parseInt(stored) : null;
+}
+
+/**
+ * Server function to get basic character data for context initialization
+ * This fetches minimal data needed to initialize the character context
+ * Uses session to get character ID - works on SSR!
+ */
+async function fetchBasicCharacterDataFromSession() {
+  "use server";
+  
+  console.log('[fetchBasicCharacterDataFromSession] Server called');
+  
+  const user = await getUser();
+  console.log('[fetchBasicCharacterDataFromSession] User:', user ? user.id : 'NULL');
+  
+  if (!user) {
+    console.log('[fetchBasicCharacterDataFromSession] No user, redirecting to /');
+    throw redirect("/");
+  }
+
+  // Get character ID from session (works on SSR!)
+  const characterId = await getSelectedCharacterFromSession();
+  console.log('[fetchBasicCharacterDataFromSession] Character ID from session:', characterId);
+  
+  if (!characterId) {
+    console.log('[fetchBasicCharacterDataFromSession] No character selected, redirecting');
+    throw redirect("/character-select");
+  }
+
+  const character = await getCharacter(characterId);
+  console.log('[fetchBasicCharacterDataFromSession] Character:', character ? character.id : 'NULL');
+  
+  if (!character || character.user_id !== user.id) {
+    console.log('[fetchBasicCharacterDataFromSession] Character not found or not owned, redirecting');
+    throw redirect("/character-select");
+  }
+
+  console.log('[fetchBasicCharacterDataFromSession] Fetching parallel data...');
+  
+  // Check for active dungeon - return it so client can redirect
+  const activeDungeonProgress = await getActiveDungeon(characterId);
+  
+  // Fetch minimal data in parallel for fast context initialization
+  const [inventory, abilities, hotbar] = await Promise.all([
+    getInventory(characterId),
+    getAbilitiesWithEffects(characterId),
+    getHotbar(characterId),
+  ]);
+
+  console.log('[fetchBasicCharacterDataFromSession] Data fetched:', {
+    inventory: inventory.length,
+    abilities: abilities.length,
+    hotbar: hotbar.length,
+    activeDungeon: activeDungeonProgress ? activeDungeonProgress.dungeon_id : 'none'
+  });
+
+  return { character, inventory, abilities, hotbar, activeDungeonProgress };
+}
+
+/**
+ * Hook to get basic character data for context initialization
+ * Uses server session - works on SSR and refresh!
+ */
+export function useBasicCharacterData() {
+  return createAsync(async () => {
+    console.log('[useBasicCharacterData] Fetching from session');
+    try {
+      return await fetchBasicCharacterDataFromSession();
+    } catch (error) {
+      console.error('[useBasicCharacterData] Error:', error);
+      // If it's a redirect, let it through
+      throw error;
+    }
+  });
 }
 
 export function getEquipmentComparison(item: any, currentInventory: any[]) {

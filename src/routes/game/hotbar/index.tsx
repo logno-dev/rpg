@@ -1,41 +1,9 @@
 import { createAsync, useParams, redirect, useNavigate, cache } from "@solidjs/router";
-import { createEffect } from "solid-js";
-import { getUser } from "~/lib/auth";
-import { getCharacter, getInventory, getAbilitiesWithEffects, getHotbar } from "~/lib/game";
+import { createEffect, Show, For, Suspense } from "solid-js";
 import { GameLayout } from "~/components/GameLayout";
 import { HotbarManager } from "~/components/HotbarManager";
 import { useCharacter } from "~/lib/CharacterContext";
-import { getSelectedCharacterId } from "~/lib/game-helpers";
-
-const getHotbarData = cache(async (characterId: number | null) => {
-  "use server";
-  
-  // Handle missing character ID (SSR or localStorage not set)
-  if (!characterId) {
-    throw redirect("/character-select");
-  }
-  
-  let user;
-  try {
-    user = await getUser();
-  } catch (error) {
-    console.error("Error getting user:", error);
-    throw redirect("/");
-  }
-  
-  if (!user) throw redirect("/");
-
-  const character = await getCharacter(characterId);
-  if (!character || character.user_id !== user.id) {
-    throw redirect("/character-select");
-  }
-
-  const inventory = await getInventory(characterId);
-  const abilities = await getAbilitiesWithEffects(characterId);
-  const hotbar = await getHotbar(characterId);
-  
-  return { character, inventory, abilities, hotbar };
-}, "hotbar-data");
+import { getSelectedCharacterId, useBasicCharacterData } from "~/lib/game-helpers";
 
 export default function HotbarPage() {
   const navigate = useNavigate();
@@ -48,34 +16,55 @@ export default function HotbarPage() {
     }
   });
   
-  // Only fetch data if we have a character ID
-  const data = createAsync(() => {
-    const id = characterId();
-    // Don't call server function if no ID - will handle redirect in effect
-    if (!id) return Promise.resolve(undefined);
-    return getHotbarData(id);
-  }, { deferStream: true });
+  // Use shared hook to initialize character context (uses server session!)
+  const basicData = useBasicCharacterData();
+  
+  // Redirect to active dungeon if one exists
+  createEffect(() => {
+    const data = basicData();
+    if (data?.activeDungeonProgress) {
+      console.log('[Hotbar] Active dungeon found, redirecting to:', data.activeDungeonProgress.dungeon_id);
+      navigate(`/game/dungeon/${data.activeDungeonProgress.dungeon_id}`);
+    }
+  });
   
   const [store, actions] = useCharacter();
 
-  // Initialize store with fetched data
+  // Initialize context with basic data when it arrives
   createEffect(() => {
-    const gameData = data();
-    if (gameData && !store.character) {
-      actions.setCharacter(gameData.character);
-      actions.setInventory(gameData.inventory as any);
-      actions.setAbilities(gameData.abilities);
-      actions.setHotbar(gameData.hotbar);
+    const data = basicData();
+    if (data && !store.character) {
+      actions.setCharacter(data.character);
+      actions.setInventory(data.inventory as any);
+      actions.setAbilities(data.abilities);
+      actions.setHotbar(data.hotbar);
     }
   });
 
-  // Computed values
-  const currentInventory = () => store.inventory || data()?.inventory || [];
-  const currentAbilities = () => store.abilities || data()?.abilities || [];
-  const currentHotbar = () => store.hotbar || data()?.hotbar || [];
+  // Computed values - use context as source of truth
+  const currentInventory = () => store.inventory || [];
+  const currentAbilities = () => store.abilities || [];
+  const currentHotbar = () => store.hotbar || [];
+
+  const LoadingSkeleton = () => (
+    <div class="card">
+      <div style={{ height: "400px", display: "flex", "align-items": "center", "justify-content": "center", "flex-direction": "column", gap: "1rem", animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite" }}>
+        <div style={{ "font-size": "3rem" }}>🎮</div>
+        <div style={{ "font-size": "1.25rem", color: "var(--text-secondary)" }}>Loading hotbar...</div>
+      </div>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+      `}</style>
+    </div>
+  );
 
   return (
     <GameLayout>
+      <Suspense fallback={<LoadingSkeleton />}>
+      <Show when={basicData()}>
       <HotbarManager
         characterId={characterId() || 0}
         abilities={currentAbilities()}
@@ -101,6 +90,8 @@ export default function HotbarPage() {
           }
         }}
       />
+      </Show>
+      </Suspense>
     </GameLayout>
   );
 }
