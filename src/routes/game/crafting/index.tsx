@@ -88,7 +88,9 @@ export default function CraftingPage() {
   const fetchBasicCraftingData = async (characterId: number | undefined) => {
     if (!characterId) return null;
     
-    const response = await fetch(`/api/game/crafting/basic-data?characterId=${characterId}`);
+    // Add timestamp to prevent caching
+    const timestamp = Date.now();
+    const response = await fetch(`/api/game/crafting/basic-data?characterId=${characterId}&t=${timestamp}`);
     const data = await response.json();
     return data;
   };
@@ -124,7 +126,9 @@ export default function CraftingPage() {
   const materials = createMemo(() => {
     const data = craftingData();
     if (!data) return [];
-    return data.materials || [];
+    const mats = data.materials || [];
+    console.log('[Materials memo]', mats.slice(0, 3).map((m: any) => ({ name: m.name, qty: m.quantity })));
+    return mats;
   });
 
   const currentCharacter = () => store.character;
@@ -382,14 +386,15 @@ export default function CraftingPage() {
                         }}>
                           <For each={availableRecipes()}>
                             {(recipe) => {
-                              const hasMateriels = canCraft(recipe);
+                              // Use createMemo to make hasMateriels reactive
+                              const hasMateriels = createMemo(() => canCraft(recipe));
                               
                               return (
                                 <div 
                                   class="card"
                                   style={{ 
                                     background: "var(--bg-medium)",
-                                    opacity: hasMateriels ? 1 : 0.6
+                                    opacity: hasMateriels() ? 1 : 0.6
                                   }}
                                 >
                                   <h4 style={{ margin: "0 0 0.5rem 0" }}>{recipe.name}</h4>
@@ -402,18 +407,24 @@ export default function CraftingPage() {
                                     <strong>Materials:</strong>
                                     <For each={recipe.materials}>
                                       {(rm) => {
-                                        const material = materials().find((m: Material) => m.id === rm.material_id);
-                                        const hasEnough = material && material.quantity >= rm.quantity;
+                                        // Use createMemo to ensure proper reactivity tracking
+                                        const material = createMemo(() => 
+                                          materials().find((m: Material) => m.id === rm.material_id)
+                                        );
+                                        const hasEnough = createMemo(() => {
+                                          const mat = material();
+                                          return mat && mat.quantity >= rm.quantity;
+                                        });
                                         
                                         return (
                                           <div style={{ 
                                             display: "flex",
                                             "justify-content": "space-between",
                                             "margin-top": "0.25rem",
-                                            color: hasEnough ? "inherit" : "var(--error)"
+                                            color: hasEnough() ? "inherit" : "var(--error)"
                                           }}>
                                             <span>{rm.material_name}</span>
-                                            <span>{material?.quantity || 0} / {rm.quantity}</span>
+                                            <span>{material()?.quantity || 0} / {rm.quantity}</span>
                                           </div>
                                         );
                                       }}
@@ -422,7 +433,7 @@ export default function CraftingPage() {
                                   <button 
                                     class="button primary"
                                     style={{ "margin-top": "1rem", width: "100%" }}
-                                    disabled={!hasMateriels || crafting()}
+                                    disabled={!hasMateriels() || crafting()}
                                     onClick={() => startCraft(recipe)}
                                   >
                                     {crafting() ? "Starting..." : "Craft"}
@@ -496,12 +507,20 @@ export default function CraftingPage() {
             targetRadius={minigameData()!.targetRadius}
             onComplete={completeCraft}
             onCancel={async () => {
-              // Refetch data first to ensure materials are updated
-              await refetchBasicData();
-              
-              // Then close modal
+              // Close modal first
               setShowMinigame(false);
               setMinigameData(null);
+              
+              // Clear cache and force refetch
+              console.log('[Crafting] Clearing cache and refetching materials...');
+              mutateBasicData(undefined);
+              const result = await refetchBasicData();
+              console.log('[Crafting] Refetch complete:', result?.materials?.length, 'materials');
+              
+              // Log first few materials to see actual quantities
+              if (result?.materials) {
+                console.log('[Crafting] Sample materials:', result.materials.slice(0, 5).map((m: any) => ({ name: m.name, qty: m.quantity })));
+              }
             }}
           />
         </Show>

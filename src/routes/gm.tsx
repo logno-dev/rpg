@@ -1954,6 +1954,28 @@ export default function GMPage() {
                 </div>
                 
                 <div style={{ "grid-column": "1 / -1", "margin-top": "0.5rem" }}>
+                  <h4 style={{ "font-size": "1rem", "margin-bottom": "0.5rem", color: "var(--accent)" }}>Consumable Settings</h4>
+                </div>
+                
+                <div>
+                  <label>Health Restore</label>
+                  <input type="number" min="0" value={editingItem()?.health_restore || 0} 
+                         onInput={(e) => setEditingItem({...editingItem()!, health_restore: parseInt(e.currentTarget.value)})} />
+                  <small style={{ display: "block", "font-size": "0.75rem", color: "var(--text-secondary)", "margin-top": "0.25rem" }}>
+                    HP restored when consumed (for potions)
+                  </small>
+                </div>
+                
+                <div>
+                  <label>Mana Restore</label>
+                  <input type="number" min="0" value={editingItem()?.mana_restore || 0} 
+                         onInput={(e) => setEditingItem({...editingItem()!, mana_restore: parseInt(e.currentTarget.value)})} />
+                  <small style={{ display: "block", "font-size": "0.75rem", color: "var(--text-secondary)", "margin-top": "0.25rem" }}>
+                    MP restored when consumed (for potions)
+                  </small>
+                </div>
+                
+                <div style={{ "grid-column": "1 / -1", "margin-top": "0.5rem" }}>
                   <h4 style={{ "font-size": "1rem", "margin-bottom": "0.5rem", color: "var(--accent)" }}>Scroll Settings</h4>
                 </div>
                 
