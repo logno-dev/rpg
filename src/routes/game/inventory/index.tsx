@@ -12,8 +12,8 @@ export default function InventoryPage() {
   // This will redirect server-side if no character is selected
   const basicData = useBasicCharacterData();
   
-  // Get character ID from localStorage (client-side only, for API calls)
-  const characterId = () => getSelectedCharacterId();
+  // Get character ID from context (falls back to localStorage for client-side calls)
+  const characterId = () => store.character?.id || getSelectedCharacterId();
   
   // Redirect to active dungeon if one exists
   createEffect(() => {
@@ -79,6 +79,63 @@ export default function InventoryPage() {
       console.error("Failed to equip item:", error);
     } finally {
       setIsEquipping(false);
+    }
+  };
+
+  // Handle sell item
+  const handleSell = async (inventoryItemId: number, itemName: string, value: number, quantity: number) => {
+    try {
+      const response = await fetch('/api/game/sell', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          characterId: characterId(), 
+          inventoryItemId, 
+          quantity 
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to sell item');
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        actions.setCharacter({ ...store.character!, gold: result.character.gold });
+        actions.setInventory(result.inventory);
+      }
+    } catch (error) {
+      console.error('Sell error:', error);
+      alert('Failed to sell item');
+    }
+  };
+
+  // Handle learn ability
+  const handleLearnAbility = async (inventoryItemId: number, itemName: string) => {
+    try {
+      const response = await fetch('/api/game/learn-ability', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          characterId: characterId(), 
+          inventoryItemId 
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to learn ability');
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        actions.setInventory(result.inventory);
+        actions.setAbilities(result.abilities);
+      }
+    } catch (error) {
+      console.error('Learn ability error:', error);
+      alert('Failed to learn ability');
     }
   };
 
@@ -926,6 +983,9 @@ export default function InventoryPage() {
           formatRequirements={formatRequirements}
           getScrollAbilityStatus={getScrollAbilityStatus}
           getEquipmentComparison={getEquipmentComparison}
+          onEquip={(id) => handleEquip(id, false)}
+          onSell={handleSell}
+          onLearnAbility={handleLearnAbility}
           isMerchantItem={selectedItemIsMerchant()}
         />
       </Show>

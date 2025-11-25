@@ -12,8 +12,11 @@ export default function StatsRoute() {
   // This will redirect server-side if no character is selected
   const basicData = useBasicCharacterData();
   
-  // Get character ID from localStorage (client-side only, for API calls)
-  const characterId = () => getSelectedCharacterId();
+  const [store, actions] = useCharacter();
+  const [effectsStore, effectsActions] = useActiveEffects();
+  
+  // Get character ID from context (falls back to localStorage for client-side calls)
+  const characterId = () => store.character?.id || getSelectedCharacterId();
 
   // Redirect to active dungeon if one exists
   createEffect(() => {
@@ -23,9 +26,6 @@ export default function StatsRoute() {
       navigate(`/game/dungeon/${data.activeDungeonProgress.dungeon_id}`);
     }
   });
-
-  const [store, actions] = useCharacter();
-  const [effectsStore, effectsActions] = useActiveEffects();
 
   // Initialize context with basic data when it arrives
   createEffect(() => {

@@ -12,8 +12,10 @@ export default function HotbarPage() {
   // This will redirect server-side if no character is selected
   const basicData = useBasicCharacterData();
   
-  // Get character ID from localStorage (client-side only, for API calls)
-  const characterId = () => getSelectedCharacterId();
+  const [store, actions] = useCharacter();
+  
+  // Get character ID from context (falls back to localStorage for client-side calls)
+  const characterId = () => store.character?.id || getSelectedCharacterId();
   
   // Redirect to active dungeon if one exists
   createEffect(() => {
@@ -23,8 +25,6 @@ export default function HotbarPage() {
       navigate(`/game/dungeon/${data.activeDungeonProgress.dungeon_id}`);
     }
   });
-  
-  const [store, actions] = useCharacter();
 
   // Initialize context with basic data when it arrives
   createEffect(() => {
