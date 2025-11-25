@@ -9,6 +9,7 @@ import { ActiveEffectsDisplay } from "~/components/ActiveEffectsDisplay";
 import { HotbarManager } from "~/components/HotbarManager";
 import { InventoryItemCard } from "~/components/InventoryItemCard";
 import { ItemDetailModal } from "~/components/ItemDetailModal";
+import { Swords, Backpack, TrendingUp, Grid3x3, User } from "lucide-solid";
 import { useCharacter } from "~/lib/CharacterContext";
 import { useActiveEffects } from "~/lib/ActiveEffectsContext";
 
@@ -1668,30 +1669,58 @@ export default function GamePage() {
 
   return (
     <div>
-      <div class="header">
+      {/* Desktop Header */}
+      <div class="header desktop-nav">
         <div class="header-content">
           <h1 class="title">Fantasy RPG</h1>
-          <div style={{ display: "flex", gap: "1rem", "align-items": "center" }}>
-            <div class="button-group">
-              <A href="/game" class="button" activeClass="active" end>
-                Adventure
-              </A>
-              <A href="/game/inventory" class="button" activeClass="active">
-                Inventory
-              </A>
-              <A href="/game/stats" class="button" activeClass="active">
-                Stats
-              </A>
-              <A href="/game/hotbar" class="button" activeClass="active">
-                Hotbar
-              </A>
-            </div>
-            <a href="/character-select" class="button secondary">
-              Character Select
-            </a>
+          <div class="button-group">
+            <A href="/game" class="button" activeClass="active" end>
+              <Swords size={18} style={{ "margin-right": "0.5rem" }} />
+              Adventure
+            </A>
+            <A href="/game/inventory" class="button" activeClass="active">
+              <Backpack size={18} style={{ "margin-right": "0.5rem" }} />
+              Inventory
+            </A>
+            <A href="/game/stats" class="button" activeClass="active">
+              <TrendingUp size={18} style={{ "margin-right": "0.5rem" }} />
+              Stats
+            </A>
+            <A href="/game/hotbar" class="button" activeClass="active">
+              <Grid3x3 size={18} style={{ "margin-right": "0.5rem" }} />
+              Hotbar
+            </A>
           </div>
+          <A href="/character-select" class="button secondary">
+            <User size={18} style={{ "margin-right": "0.5rem" }} />
+            Character Select
+          </A>
         </div>
       </div>
+
+      {/* Mobile Bottom Navigation */}
+      <nav class="mobile-nav">
+        <A href="/game" class="nav-item" activeClass="active" end>
+          <Swords size={24} />
+          <span>Adventure</span>
+        </A>
+        <A href="/game/inventory" class="nav-item" activeClass="active">
+          <Backpack size={24} />
+          <span>Inventory</span>
+        </A>
+        <A href="/game/stats" class="nav-item" activeClass="active">
+          <TrendingUp size={24} />
+          <span>Stats</span>
+        </A>
+        <A href="/game/hotbar" class="nav-item" activeClass="active">
+          <Grid3x3 size={24} />
+          <span>Hotbar</span>
+        </A>
+        <A href="/character-select" class="nav-item" activeClass="active">
+          <User size={24} />
+          <span>Character</span>
+        </A>
+      </nav>
 
       {/* Sticky Character Stats Header */}
       <Show when={isScrolled() && data()}>
@@ -1776,7 +1805,7 @@ export default function GamePage() {
       </Show>
 
       <Show when={data()}>
-        <div class="container">
+        <div class="container" style={{ "padding-bottom": "calc(5rem + env(safe-area-inset-bottom, 0px))" }}>
           {/* Passive Health/Mana Regeneration */}
           <HealthRegen
             maxHealth={currentMaxHealth}
