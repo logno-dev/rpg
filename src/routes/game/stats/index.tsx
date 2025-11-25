@@ -30,11 +30,25 @@ export default function StatsRoute() {
   // Initialize context with basic data when it arrives
   createEffect(() => {
     const data = basicData();
-    if (data && !store.character) {
-      actions.setCharacter(data.character);
+    if (data) {
+      console.log('[Stats] basicData loaded:', {
+        character: data.character?.name,
+        abilities: data.abilities?.length,
+        hotbar: data.hotbar?.length,
+        inventory: data.inventory?.length
+      });
+      
+      // Only set character if not already set
+      if (!store.character) {
+        actions.setCharacter(data.character);
+      }
+      
+      // Always sync abilities, hotbar, and inventory (they may have changed)
       actions.setInventory(data.inventory as any);
       actions.setAbilities(data.abilities);
       actions.setHotbar(data.hotbar);
+      
+      console.log('[Stats] Context updated');
     }
   });
 

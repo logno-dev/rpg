@@ -69,7 +69,7 @@ export default function GamePage() {
   
   // Get character ID from loaded data (for client-side API calls)
   const characterId = () => data()?.character?.id ?? null;
-  const [store, actions] = useCharacter();
+  const [store, actions, computed] = useCharacter();
   const [effectsStore, effectsActions] = useActiveEffects();
   const [availableMobs, setAvailableMobs] = createSignal<Mob[]>([]);
   const [activeMob, setActiveMob] = createSignal<Mob | null>(null);
@@ -423,36 +423,9 @@ export default function GamePage() {
     };
   });
 
-  // Calculate max health and mana with equipment bonuses
-  const currentMaxHealth = createMemo(() => {
-    const char = currentCharacter();
-    const stats = totalStats();
-    if (!char) return 100;
-    
-    // New formula: Base + (Level × 20) + (CON - 10) × 8
-    // This scales health with both level progression and constitution
-    // Example: Level 15, 33 CON = 100 + 300 + 184 = 584 HP
-    const baseHealth = 100;
-    const levelBonus = char.level * 20;
-    const constitutionBonus = (stats.constitution - 10) * 8;
-    
-    return baseHealth + levelBonus + constitutionBonus;
-  });
-
-  const currentMaxMana = createMemo(() => {
-    const char = currentCharacter();
-    const stats = totalStats();
-    if (!char) return 100;
-    
-    // New formula: Base + (Level × 20) + (INT - 10) × 5
-    // This scales mana aggressively with level progression and intelligence (same rate as health)
-    // Example: Level 8, 31 INT = 100 + 160 + 105 = 365 Mana
-    const baseMana = 100;
-    const levelBonus = char.level * 20;
-    const intelligenceBonus = (stats.intelligence - 10) * 5;
-    
-    return baseMana + levelBonus + intelligenceBonus;
-  });
+  // Use max health and mana from character context (computed values)
+  const currentMaxHealth = computed.maxHealth;
+  const currentMaxMana = computed.maxMana;
 
   // Track previous constitution bonus to detect changes (outside combat)
   const [prevConBonusOutsideCombat, setPrevConBonusOutsideCombat] = createSignal(0);

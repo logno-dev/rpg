@@ -1,4 +1,4 @@
-import { createContext, useContext, ParentComponent, createEffect } from "solid-js";
+import { createContext, useContext, ParentComponent, createEffect, createMemo } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import type { Character, Item, Region, Ability } from "~/lib/db";
 
@@ -124,6 +124,18 @@ type CharacterContextValue = [
     removeAbility: (abilityId: number) => void;
     setLoading: (loading: boolean) => void;
     reset: () => void;
+  },
+  computed: {
+    maxHealth: () => number;
+    maxMana: () => number;
+    totalStats: () => {
+      constitution: number;
+      intelligence: number;
+      wisdom: number;
+      strength: number;
+      dexterity: number;
+      charisma: number;
+    };
   }
 ];
 
@@ -331,8 +343,91 @@ export const CharacterProvider: ParentComponent<{ initialData?: Partial<Characte
     },
   };
 
+  // Computed values - create memos separately to avoid circular dependencies
+  const equipmentBonuses = createMemo(() => {
+    const bonuses = {
+      constitution: 0,
+      intelligence: 0,
+      wisdom: 0,
+      strength: 0,
+      dexterity: 0,
+      charisma: 0,
+    };
+
+    store.inventory.forEach((item) => {
+      if (item.equipped === 1) {
+        bonuses.constitution += item.constitution_bonus || 0;
+        bonuses.intelligence += item.intelligence_bonus || 0;
+        bonuses.wisdom += item.wisdom_bonus || 0;
+        bonuses.strength += item.strength_bonus || 0;
+        bonuses.dexterity += item.dexterity_bonus || 0;
+        bonuses.charisma += item.charisma_bonus || 0;
+      }
+    });
+
+    return bonuses;
+  });
+
+  // Total stats (base + equipment)
+  const totalStats = createMemo(() => {
+    const char = store.character;
+    const equipBonus = equipmentBonuses();
+    
+    if (!char) {
+      return {
+        constitution: 10,
+        intelligence: 10,
+        wisdom: 10,
+        strength: 10,
+        dexterity: 10,
+        charisma: 10,
+      };
+    }
+
+    return {
+      constitution: char.constitution + equipBonus.constitution,
+      intelligence: char.intelligence + equipBonus.intelligence,
+      wisdom: char.wisdom + equipBonus.wisdom,
+      strength: char.strength + equipBonus.strength,
+      dexterity: char.dexterity + equipBonus.dexterity,
+      charisma: char.charisma + equipBonus.charisma,
+    };
+  });
+
+  // Max Health: Base + (Level × 20) + (CON - 10) × 8
+  const maxHealth = createMemo(() => {
+    const char = store.character;
+    if (!char) return 100;
+
+    const stats = totalStats();
+    const baseHealth = 100;
+    const levelBonus = char.level * 20;
+    const constitutionBonus = (stats.constitution - 10) * 8;
+
+    return baseHealth + levelBonus + constitutionBonus;
+  });
+
+  // Max Mana: Base + (Level × 20) + (INT - 10) × 5
+  const maxMana = createMemo(() => {
+    const char = store.character;
+    if (!char) return 100;
+
+    const stats = totalStats();
+    const baseMana = 100;
+    const levelBonus = char.level * 20;
+    const intelligenceBonus = (stats.intelligence - 10) * 5;
+
+    return baseMana + levelBonus + intelligenceBonus;
+  });
+
+  const computed = {
+    maxHealth,
+    maxMana,
+    totalStats,
+  };
+
   return (
-    <CharacterContext.Provider value={[store, actions]}>
+    <CharacterContext.Provider value={[store, actions, computed]}>
       {props.children}
     </CharacterContext.Provider>
   );

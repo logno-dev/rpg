@@ -1,6 +1,7 @@
 import { A } from "@solidjs/router";
 import { createSignal, createMemo, onMount, Show } from "solid-js";
 import { useCharacter } from "~/lib/CharacterContext";
+import { HealthRegen } from "~/components/HealthRegen";
 import { Swords, Backpack, TrendingUp, Grid3x3, User } from "lucide-solid";
 
 type GameLayoutProps = {
@@ -8,7 +9,7 @@ type GameLayoutProps = {
 };
 
 export function GameLayout(props: GameLayoutProps) {
-  const [store] = useCharacter();
+  const [store, actions, computed] = useCharacter();
   const [isScrolled, setIsScrolled] = createSignal(false);
 
   const currentCharacter = () => store.character;
@@ -29,19 +30,33 @@ export function GameLayout(props: GameLayoutProps) {
     return store.character?.current_mana || 0;
   });
 
-  const currentMaxHealth = createMemo(() => {
-    if (!currentCharacter()) return 1;
-    const base = 50 + (currentCharacter()!.level - 1) * 10;
-    const conBonus = currentCharacter()!.constitution * 5;
-    return base + conBonus;
-  });
+  // Use computed values from context
+  const currentMaxHealth = computed.maxHealth;
+  const currentMaxMana = computed.maxMana;
+  const totalStats = computed.totalStats;
 
-  const currentMaxMana = createMemo(() => {
-    if (!currentCharacter()) return 1;
-    const base = 30 + (currentCharacter()!.level - 1) * 5;
-    const intBonus = currentCharacter()!.intelligence * 3;
-    return base + intBonus;
-  });
+  // Handle regen tick
+  const handleRegenTick = async (health: number, mana: number) => {
+    if (!currentCharacter()) return;
+    
+    // Update context optimistically
+    actions.updateHealth(health, mana);
+    
+    // Sync to server in background (fire and forget)
+    try {
+      await fetch('/api/game/update-health', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          characterId: currentCharacter()!.id,
+          health,
+          mana,
+        }),
+      });
+    } catch (error) {
+      console.error('[HealthRegen] Failed to sync health/mana:', error);
+    }
+  };
 
   // Scroll detection for sticky header
   onMount(() => {
@@ -193,6 +208,18 @@ export function GameLayout(props: GameLayoutProps) {
 
       <Show when={currentCharacter()}>
         <div class="container" style={{ "padding-bottom": "calc(5rem + env(safe-area-inset-bottom, 0px))" }}>
+          {/* Passive Health/Mana Regeneration */}
+          <HealthRegen
+            maxHealth={currentMaxHealth}
+            maxMana={currentMaxMana}
+            currentHealth={currentHealth}
+            currentMana={currentMana}
+            constitution={() => totalStats().constitution}
+            wisdom={() => totalStats().wisdom}
+            isInCombat={() => false}
+            onRegenTick={handleRegenTick}
+          />
+          
           {/* Character Info Panel */}
           <div class="card">
             <div style={{ display: "flex", "justify-content": "space-between", "align-items": "start", "flex-wrap": "wrap", gap: "1rem" }}>

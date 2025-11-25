@@ -149,10 +149,21 @@ export async function POST(event: APIEvent) {
       required_charisma: row.ability_required_charisma || row.required_charisma,
     }));
 
+    // Get updated abilities list
+    const abilitiesResult = await db.execute({
+      sql: `SELECT abilities.*, 0 as last_used_at
+            FROM character_abilities
+            JOIN abilities ON character_abilities.ability_id = abilities.id
+            WHERE character_abilities.character_id = ?
+            ORDER BY abilities.name`,
+      args: [characterId],
+    });
+
     return json({ 
       success: true, 
       ability,
       inventory,
+      abilities: abilitiesResult.rows,
       message: `Learned ${ability.name}!`
     });
   } catch (error: any) {

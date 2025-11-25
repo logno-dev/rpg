@@ -29,18 +29,25 @@ export default function InventoryPage() {
   // Initialize context with basic data when it arrives
   createEffect(() => {
     const data = basicData();
-    console.log('[Inventory] basicData changed:', data ? 'HAS DATA' : 'NO DATA');
-    console.log('[Inventory] store.character:', store.character ? 'EXISTS' : 'NULL');
-    
-    if (data && !store.character) {
-      console.log('[Inventory] Initializing context with data');
-      actions.setCharacter(data.character);
+    if (data) {
+      console.log('[Inventory] basicData loaded:', {
+        character: data.character?.name,
+        abilities: data.abilities?.length,
+        hotbar: data.hotbar?.length,
+        inventory: data.inventory?.length
+      });
+      
+      // Only set character if not already set
+      if (!store.character) {
+        actions.setCharacter(data.character);
+      }
+      
+      // Always sync abilities, hotbar, and inventory (they may have changed)
       actions.setInventory(data.inventory as any);
       actions.setAbilities(data.abilities);
       actions.setHotbar(data.hotbar);
-      console.log('[Inventory] Context initialized');
-    } else if (data && store.character) {
-      console.log('[Inventory] Data exists but character already set');
+      
+      console.log('[Inventory] Context updated');
     }
   });
 
@@ -125,19 +132,25 @@ export default function InventoryPage() {
         }),
       });
       
-      if (!response.ok) {
-        throw new Error('Failed to learn ability');
-      }
-      
       const result = await response.json();
       
+      if (!response.ok || result.error) {
+        // Show the actual error message from the server
+        alert(result.error || 'Failed to learn ability');
+        return;
+      }
+      
       if (result.success) {
+        // Update inventory and abilities from API response
         actions.setInventory(result.inventory);
         actions.setAbilities(result.abilities);
+        
+        // Show success message
+        alert(result.message || `Learned ${result.ability?.name || 'ability'}!`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Learn ability error:', error);
-      alert('Failed to learn ability');
+      alert(error.message || 'Failed to learn ability');
     }
   };
 
