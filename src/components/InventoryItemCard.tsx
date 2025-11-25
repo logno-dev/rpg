@@ -1,10 +1,11 @@
-import { Show } from "solid-js";
+import { Show, For } from "solid-js";
 
 type InventoryItemCardProps = {
   item: any;
   meetsRequirements: (item: any) => boolean;
   formatRequirements: (item: any) => string[];
   getScrollAbilityStatus: (item: any) => { alreadyLearned: boolean; hasBetter: boolean; status: string };
+  getEquipmentComparison?: (item: any) => { equippedItem: any; comparisons: Array<{stat: string, current: number, new: number, diff: number}> } | null;
   onLearnAbility: (id: number, name: string) => void;
   onUseItem: (id: number, name: string, healthRestore: number, manaRestore: number) => void;
   onEquip: (id: number, showModal: boolean) => void;
@@ -68,6 +69,51 @@ export function InventoryItemCard(props: InventoryItemCardProps) {
           <div style={{ color: "var(--warning)" }}>💰 {invItem.value} Gold</div>
         </Show>
       </div>
+
+      {/* Equipment Comparison */}
+      <Show when={props.getEquipmentComparison && props.getEquipmentComparison(invItem)}>
+        {(comparison) => (
+          <Show when={comparison().comparisons.length > 0}>
+            <div style={{ 
+              "font-size": "0.75rem", 
+              "margin-bottom": "0.5rem",
+              padding: "0.5rem",
+              background: "rgba(59, 130, 246, 0.1)",
+              "border-radius": "4px",
+              border: "1px solid var(--accent)"
+            }}>
+              <div style={{ 
+                color: "var(--accent)",
+                "font-weight": "bold",
+                "margin-bottom": "0.25rem"
+              }}>
+                ⚖️ Compared to {comparison().equippedItem.name}:
+              </div>
+              <div style={{ display: "flex", "flex-direction": "column", gap: "0.15rem" }}>
+                <For each={comparison().comparisons}>
+                  {(comp) => {
+                    // For attack speed, diff is already inverted (positive = better/faster)
+                    const displayValue = comp.stat === 'Damage' ? comp.diff.toFixed(1) : comp.diff.toFixed(2);
+                    return (
+                      <div style={{ 
+                        display: "flex", 
+                        "justify-content": "space-between",
+                        color: comp.diff > 0 ? "var(--success)" : comp.diff < 0 ? "var(--danger)" : "var(--text-secondary)"
+                      }}>
+                        <span>{comp.stat}:</span>
+                        <span style={{ "font-weight": "bold" }}>
+                          {comp.diff > 0 ? '+' : ''}{displayValue}
+                          {comp.stat === 'Attack Speed' && 'x'}
+                        </span>
+                      </div>
+                    );
+                  }}
+                </For>
+              </div>
+            </div>
+          </Show>
+        )}
+      </Show>
 
       {/* Requirements */}
       <Show when={props.formatRequirements(invItem).length > 0}>

@@ -8,6 +8,7 @@ import { HealthRegen } from "~/components/HealthRegen";
 import { ActiveEffectsDisplay } from "~/components/ActiveEffectsDisplay";
 import { HotbarManager } from "~/components/HotbarManager";
 import { InventoryItemCard } from "~/components/InventoryItemCard";
+import { ItemDetailModal } from "~/components/ItemDetailModal";
 import { useCharacter } from "~/lib/CharacterContext";
 import { useActiveEffects } from "~/lib/ActiveEffectsContext";
 
@@ -59,6 +60,8 @@ export default function GamePage() {
 
   const [view, setView] = createSignal<"adventure" | "inventory" | "stats" | "hotbar">("adventure");
   const [inventoryFilter, setInventoryFilter] = createSignal<"all" | "weapons" | "armor" | "scrolls" | "consumables">("all");
+  const [selectionMode, setSelectionMode] = createSignal(false);
+  const [selectedItems, setSelectedItems] = createSignal<Set<number>>(new Set());
   const [availableMobs, setAvailableMobs] = createSignal<Mob[]>([]);
   const [activeMob, setActiveMob] = createSignal<Mob | null>(null);
   const [activeNamedMobId, setActiveNamedMobId] = createSignal<number | null>(null);
@@ -132,6 +135,14 @@ export default function GamePage() {
   
   // Equipment loading state
   const [isEquipping, setIsEquipping] = createSignal(false);
+  
+  // Item detail modal state
+  const [showItemDetailModal, setShowItemDetailModal] = createSignal(false);
+  const [selectedItem, setSelectedItem] = createSignal<any | null>(null);
+  const [selectedItemIsMerchant, setSelectedItemIsMerchant] = createSignal(false);
+  
+  // Bulk sell modal state
+  const [showBulkSellModal, setShowBulkSellModal] = createSignal(false);
   
   // Dungeon state
   const [activeDungeon, setActiveDungeon] = createSignal<any | null>(null);
@@ -1324,6 +1335,159 @@ export default function GamePage() {
     return reqs;
   };
 
+  // Helper to compare item with currently equipped item in same slot
+  const getEquipmentComparison = (item: any) => {
+    if (!item.slot) return null; // Not equipment
+    
+    const equippedItem = currentInventory().find((i: any) => i.slot === item.slot && i.equipped === 1);
+    if (!equippedItem) return null; // No item equipped in this slot
+    
+    const comparisons: Array<{stat: string, current: number, new: number, diff: number}> = [];
+    
+    // Compare damage
+    if (item.damage_min || item.damage_max) {
+      const newAvg = ((item.damage_min || 0) + (item.damage_max || 0)) / 2;
+      const currentAvg = ((equippedItem.damage_min || 0) + (equippedItem.damage_max || 0)) / 2;
+      if (newAvg > 0 || currentAvg > 0) {
+        comparisons.push({
+          stat: 'Damage',
+          current: currentAvg,
+          new: newAvg,
+          diff: newAvg - currentAvg
+        });
+      }
+    }
+    
+    // Compare armor
+    if (item.armor || equippedItem.armor) {
+      comparisons.push({
+        stat: 'Armor',
+        current: equippedItem.armor || 0,
+        new: item.armor || 0,
+        diff: (item.armor || 0) - (equippedItem.armor || 0)
+      });
+    }
+    
+    // Compare attack speed (lower is better - inverted for display)
+    if (item.attack_speed && item.attack_speed !== 1 || equippedItem.attack_speed && equippedItem.attack_speed !== 1) {
+      const currentSpeed = equippedItem.attack_speed || 1;
+      const newSpeed = item.attack_speed || 1;
+      // Invert the diff since lower attack speed is better
+      const diff = currentSpeed - newSpeed; // Positive means improvement
+      comparisons.push({
+        stat: 'Attack Speed',
+        current: currentSpeed,
+        new: newSpeed,
+        diff: diff
+      });
+    }
+    
+    // Compare stat bonuses
+    const stats = [
+      { key: 'strength_bonus', label: 'Strength' },
+      { key: 'dexterity_bonus', label: 'Dexterity' },
+      { key: 'constitution_bonus', label: 'Constitution' },
+      { key: 'intelligence_bonus', label: 'Intelligence' },
+      { key: 'wisdom_bonus', label: 'Wisdom' },
+      { key: 'charisma_bonus', label: 'Charisma' }
+    ];
+    
+    stats.forEach(({ key, label }) => {
+      const newValue = item[key] || 0;
+      const currentValue = equippedItem[key] || 0;
+      if (newValue > 0 || currentValue > 0) {
+        comparisons.push({
+          stat: label,
+          current: currentValue,
+          new: newValue,
+          diff: newValue - currentValue
+        });
+      }
+    });
+    
+    return {
+      equippedItem,
+      comparisons: comparisons.filter(c => c.diff !== 0) // Only show differences
+    };
+  };
+
+  const handleViewItem = (item: any, isMerchant: boolean = false) => {
+    console.log('[DEBUG] handleViewItem called with:', item?.name);
+    setSelectedItem(item);
+    setSelectedItemIsMerchant(isMerchant);
+    setShowItemDetailModal(true);
+    console.log('[DEBUG] Signals set - isOpen:', showItemDetailModal(), 'item:', selectedItem()?.name);
+  };
+
+  const toggleItemSelection = (itemId: number) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const sellableItems = currentInventory().filter((i: any) => 
+      !i.equipped && i.value && i.value > 0
+    );
+    
+    if (selectedItems().size === sellableItems.length) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(sellableItems.map((i: any) => i.id)));
+    }
+  };
+
+  const calculateBulkSellValue = () => {
+    return currentInventory()
+      .filter((i: any) => selectedItems().has(i.id))
+      .reduce((total: number, item: any) => {
+        return total + (Math.floor(item.value * 0.4) * item.quantity);
+      }, 0);
+  };
+
+  const handleBulkSell = async () => {
+    const itemIds = Array.from(selectedItems());
+    if (itemIds.length === 0) return;
+
+    try {
+      const response = await fetch('/api/game/bulk-sell', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ characterId: characterId(), itemIds })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Update character gold in store
+        actions.setCharacter({ ...store.character!, gold: result.newGold });
+        
+        // Remove sold items from inventory
+        const newInventory = currentInventory().filter((i: any) => !itemIds.includes(i.id));
+        actions.setInventory(newInventory);
+        
+        // Clear selection and exit selection mode
+        setSelectedItems(new Set());
+        setSelectionMode(false);
+        setShowBulkSellModal(false);
+        
+        console.log(`[BULK SELL] Sold ${result.itemsSold} items for ${result.goldEarned}g`);
+      } else {
+        console.error('[BULK SELL] Error:', result.error);
+        alert(result.error || 'Failed to sell items');
+      }
+    } catch (error) {
+      console.error('Bulk sell error:', error);
+      alert('Failed to sell items');
+    }
+  };
+
   const handleOpenMerchant = async (merchant: any) => {
     setActiveMerchant(merchant);
     try {
@@ -2325,7 +2489,56 @@ export default function GamePage() {
 
               {/* General Inventory */}
               <div class="card">
-                <h3 style={{ "margin-bottom": "1rem" }}>Inventory</h3>
+                <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center", "margin-bottom": "1rem" }}>
+                  <h3 style={{ margin: 0 }}>Inventory</h3>
+                  <button
+                    class={selectionMode() ? "button" : "button secondary"}
+                    onClick={() => {
+                      setSelectionMode(!selectionMode());
+                      setSelectedItems(new Set());
+                    }}
+                    style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
+                  >
+                    {selectionMode() ? "Cancel Selection" : "Select Items"}
+                  </button>
+                </div>
+                
+                {/* Bulk Action Buttons */}
+                <Show when={selectionMode() && selectedItems().size > 0}>
+                  <div style={{
+                    padding: "1rem",
+                    background: "var(--bg-light)",
+                    "border-radius": "6px",
+                    "margin-bottom": "1rem",
+                    display: "flex",
+                    gap: "1rem",
+                    "align-items": "center",
+                    "justify-content": "space-between"
+                  }}>
+                    <div>
+                      <div style={{ "font-weight": "bold" }}>{selectedItems().size} item{selectedItems().size !== 1 ? 's' : ''} selected</div>
+                      <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
+                        Total value: {calculateBulkSellValue()}g (at 40%)
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button
+                        class="button secondary"
+                        onClick={toggleSelectAll}
+                        style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
+                      >
+                        {selectedItems().size === currentInventory().filter((i: any) => !i.equipped && i.value && i.value > 0).length ? "Deselect All" : "Select All"}
+                      </button>
+                      <button
+                        class="button"
+                        onClick={() => setShowBulkSellModal(true)}
+                        style={{ "font-size": "0.875rem", padding: "0.5rem 1rem", background: "var(--warning)", color: "var(--bg-dark)" }}
+                      >
+                        Sell Selected
+                      </button>
+                    </div>
+                  </div>
+                </Show>
                 
                 {/* Filter Tabs */}
                 <div style={{ 
@@ -2377,21 +2590,79 @@ export default function GamePage() {
                     <h4 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", display: "flex", "align-items": "center", gap: "0.5rem", "font-size": "1.1rem" }}>
                       ⚔️ Weapons ({currentInventory().filter((i: any) => !i.equipped && i.slot === "weapon").length})
                     </h4>
-                    <div class="item-grid" style={{ "margin-bottom": "2rem" }}>
+                    <div style={{ "margin-bottom": "2rem" }}>
                       <For each={currentInventory().filter((i: any) => !i.equipped && i.slot === "weapon")}>
-                        {(invItem: any) => (
-                          <InventoryItemCard
-                            item={invItem}
-                            meetsRequirements={meetsRequirements}
-                            formatRequirements={formatRequirements}
-                            getScrollAbilityStatus={getScrollAbilityStatus}
-                            onLearnAbility={handleLearnAbility}
-                            onUseItem={handleUseItem}
-                            onEquip={handleEquip}
-                            onSell={handleSellClick}
-                            onDrop={handleDropClick}
-                          />
-                        )}
+                        {(invItem: any) => {
+                          const canSell = invItem.value && invItem.value > 0;
+                          const isSelected = selectedItems().has(invItem.id);
+                          
+                          return (
+                            <div 
+                              style={{
+                                display: "flex",
+                                "justify-content": "space-between",
+                                "align-items": "center",
+                                padding: "0.75rem 1rem",
+                                background: isSelected ? "rgba(251, 191, 36, 0.1)" : "var(--bg-light)",
+                                "border-radius": "6px",
+                                "margin-bottom": "0.5rem",
+                                cursor: "pointer",
+                                transition: "all 0.2s ease",
+                                border: isSelected ? "1px solid var(--warning)" : "1px solid transparent"
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.background = "var(--bg-dark)";
+                                  e.currentTarget.style.borderColor = "var(--accent)";
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.background = "var(--bg-light)";
+                                  e.currentTarget.style.borderColor = "transparent";
+                                }
+                              }}
+                              onClick={() => {
+                                if (selectionMode() && canSell) {
+                                  toggleItemSelection(invItem.id);
+                                } else if (!selectionMode()) {
+                                  handleViewItem(invItem, false);
+                                }
+                              }}
+                            >
+                              <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
+                                <Show when={selectionMode()}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    disabled={!canSell}
+                                    style={{ width: "18px", height: "18px", cursor: canSell ? "pointer" : "not-allowed" }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={() => canSell && toggleItemSelection(invItem.id)}
+                                  />
+                                </Show>
+                                <div style={{ flex: 1, opacity: selectionMode() && !canSell ? 0.5 : 1 }}>
+                                  <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
+                                  <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
+                                    {invItem.slot && `${invItem.slot} • `}
+                                    <Show when={invItem.damage_min && invItem.damage_max}>
+                                      ⚔️ {invItem.damage_min}-{invItem.damage_max} Dmg
+                                    </Show>
+                                    <Show when={selectionMode() && invItem.value}>
+                                       • {Math.floor(invItem.value * 0.4 * invItem.quantity)}g
+                                    </Show>
+                                  </div>
+                                </div>
+                                <Show when={invItem.quantity > 1}>
+                                  <div style={{ "font-weight": "bold", color: "var(--accent)" }}>x{invItem.quantity}</div>
+                                </Show>
+                              </div>
+                              <Show when={!selectionMode()}>
+                                <div style={{ color: "var(--text-secondary)", "font-size": "1.25rem" }}>›</div>
+                              </Show>
+                            </div>
+                          );
+                        }}
                       </For>
                     </div>
                   </Show>
@@ -2400,21 +2671,77 @@ export default function GamePage() {
                     <h4 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", display: "flex", "align-items": "center", gap: "0.5rem", "font-size": "1.1rem" }}>
                       🛡️ Armor ({currentInventory().filter((i: any) => !i.equipped && i.slot && i.slot !== "weapon" && i.type === "equipment").length})
                     </h4>
-                    <div class="item-grid" style={{ "margin-bottom": "2rem" }}>
+                    <div style={{ "margin-bottom": "2rem" }}>
                       <For each={currentInventory().filter((i: any) => !i.equipped && i.slot && i.slot !== "weapon" && i.type === "equipment")}>
-                        {(invItem: any) => (
-                          <InventoryItemCard
-                            item={invItem}
-                            meetsRequirements={meetsRequirements}
-                            formatRequirements={formatRequirements}
-                            getScrollAbilityStatus={getScrollAbilityStatus}
-                            onLearnAbility={handleLearnAbility}
-                            onUseItem={handleUseItem}
-                            onEquip={handleEquip}
-                            onSell={handleSellClick}
-                            onDrop={handleDropClick}
-                          />
-                        )}
+                        {(invItem: any) => {
+                          const canSell = invItem.value && invItem.value > 0;
+                          const isSelected = selectedItems().has(invItem.id);
+                          
+                          return (
+                            <div 
+                              style={{
+                                display: "flex",
+                                "justify-content": "space-between",
+                                "align-items": "center",
+                                padding: "0.75rem 1rem",
+                                background: isSelected ? "rgba(251, 191, 36, 0.1)" : "var(--bg-light)",
+                                "border-radius": "6px",
+                                "margin-bottom": "0.5rem",
+                                cursor: "pointer",
+                                transition: "all 0.2s ease",
+                                border: isSelected ? "1px solid var(--warning)" : "1px solid transparent"
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.background = "var(--bg-dark)";
+                                  e.currentTarget.style.borderColor = "var(--accent)";
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.background = "var(--bg-light)";
+                                  e.currentTarget.style.borderColor = "transparent";
+                                }
+                              }}
+                              onClick={() => {
+                                if (selectionMode() && canSell) {
+                                  toggleItemSelection(invItem.id);
+                                } else if (!selectionMode()) {
+                                  handleViewItem(invItem, false);
+                                }
+                              }}
+                            >
+                              <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
+                                <Show when={selectionMode()}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    disabled={!canSell}
+                                    style={{ width: "18px", height: "18px", cursor: canSell ? "pointer" : "not-allowed" }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={() => canSell && toggleItemSelection(invItem.id)}
+                                  />
+                                </Show>
+                                <div style={{ flex: 1, opacity: selectionMode() && !canSell ? 0.5 : 1 }}>
+                                  <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
+                                  <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
+                                    {invItem.slot && `${invItem.slot} • `}
+                                    <Show when={invItem.armor}>🛡️ {invItem.armor} Armor</Show>
+                                    <Show when={selectionMode() && invItem.value}>
+                                       • {Math.floor(invItem.value * 0.4 * invItem.quantity)}g
+                                    </Show>
+                                  </div>
+                                </div>
+                                <Show when={invItem.quantity > 1}>
+                                  <div style={{ "font-weight": "bold", color: "var(--accent)" }}>x{invItem.quantity}</div>
+                                </Show>
+                              </div>
+                              <Show when={!selectionMode()}>
+                                <div style={{ color: "var(--text-secondary)", "font-size": "1.25rem" }}>›</div>
+                              </Show>
+                            </div>
+                          );
+                        }}
                       </For>
                     </div>
                   </Show>
@@ -2423,21 +2750,77 @@ export default function GamePage() {
                     <h4 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", display: "flex", "align-items": "center", gap: "0.5rem", "font-size": "1.1rem" }}>
                       📜 Scrolls ({currentInventory().filter((i: any) => !i.equipped && i.type === "scroll").length})
                     </h4>
-                    <div class="item-grid" style={{ "margin-bottom": "2rem" }}>
+                    <div style={{ "margin-bottom": "2rem" }}>
                       <For each={currentInventory().filter((i: any) => !i.equipped && i.type === "scroll")}>
-                        {(invItem: any) => (
-                          <InventoryItemCard
-                            item={invItem}
-                            meetsRequirements={meetsRequirements}
-                            formatRequirements={formatRequirements}
-                            getScrollAbilityStatus={getScrollAbilityStatus}
-                            onLearnAbility={handleLearnAbility}
-                            onUseItem={handleUseItem}
-                            onEquip={handleEquip}
-                            onSell={handleSellClick}
-                            onDrop={handleDropClick}
-                          />
-                        )}
+                        {(invItem: any) => {
+                          const scrollStatus = getScrollAbilityStatus(invItem);
+                          const canSell = invItem.value && invItem.value > 0;
+                          const isSelected = selectedItems().has(invItem.id);
+                          
+                          return (
+                            <div 
+                              style={{
+                                display: "flex",
+                                "justify-content": "space-between",
+                                "align-items": "center",
+                                padding: "0.75rem 1rem",
+                                background: isSelected ? "rgba(251, 191, 36, 0.1)" : "var(--bg-light)",
+                                "border-radius": "6px",
+                                "margin-bottom": "0.5rem",
+                                cursor: "pointer",
+                                transition: "all 0.2s ease",
+                                border: isSelected ? "1px solid var(--warning)" : "1px solid transparent"
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.background = "var(--bg-dark)";
+                                  e.currentTarget.style.borderColor = "var(--accent)";
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.background = "var(--bg-light)";
+                                  e.currentTarget.style.borderColor = "transparent";
+                                }
+                              }}
+                              onClick={() => {
+                                if (selectionMode() && canSell) {
+                                  toggleItemSelection(invItem.id);
+                                } else if (!selectionMode()) {
+                                  handleViewItem(invItem, false);
+                                }
+                              }}
+                            >
+                              <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
+                                <Show when={selectionMode()}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    disabled={!canSell}
+                                    style={{ width: "18px", height: "18px", cursor: canSell ? "pointer" : "not-allowed" }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={() => canSell && toggleItemSelection(invItem.id)}
+                                  />
+                                </Show>
+                                <div style={{ flex: 1, opacity: selectionMode() && !canSell ? 0.5 : 1 }}>
+                                  <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
+                                  <div style={{ "font-size": "0.875rem", color: scrollStatus.alreadyLearned ? "var(--success)" : scrollStatus.hasBetter ? "var(--warning)" : "var(--text-secondary)" }}>
+                                    {scrollStatus.alreadyLearned ? "✓ Already Learned" : scrollStatus.hasBetter ? "⚠ You have better" : "Ability Scroll"}
+                                    <Show when={selectionMode() && invItem.value}>
+                                       • {Math.floor(invItem.value * 0.4 * invItem.quantity)}g
+                                    </Show>
+                                  </div>
+                                </div>
+                                <Show when={invItem.quantity > 1}>
+                                  <div style={{ "font-weight": "bold", color: "var(--accent)" }}>x{invItem.quantity}</div>
+                                </Show>
+                              </div>
+                              <Show when={!selectionMode()}>
+                                <div style={{ color: "var(--text-secondary)", "font-size": "1.25rem" }}>›</div>
+                              </Show>
+                            </div>
+                          );
+                        }}
                       </For>
                     </div>
                   </Show>
@@ -2446,21 +2829,78 @@ export default function GamePage() {
                     <h4 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", display: "flex", "align-items": "center", gap: "0.5rem", "font-size": "1.1rem" }}>
                       🧪 Consumables ({currentInventory().filter((i: any) => !i.equipped && i.type === "consumable").length})
                     </h4>
-                    <div class="item-grid" style={{ "margin-bottom": "2rem" }}>
+                    <div style={{ "margin-bottom": "2rem" }}>
                       <For each={currentInventory().filter((i: any) => !i.equipped && i.type === "consumable")}>
-                        {(invItem: any) => (
-                          <InventoryItemCard
-                            item={invItem}
-                            meetsRequirements={meetsRequirements}
-                            formatRequirements={formatRequirements}
-                            getScrollAbilityStatus={getScrollAbilityStatus}
-                            onLearnAbility={handleLearnAbility}
-                            onUseItem={handleUseItem}
-                            onEquip={handleEquip}
-                            onSell={handleSellClick}
-                            onDrop={handleDropClick}
-                          />
-                        )}
+                        {(invItem: any) => {
+                          const canSell = invItem.value && invItem.value > 0;
+                          const isSelected = selectedItems().has(invItem.id);
+                          
+                          return (
+                            <div 
+                              style={{
+                                display: "flex",
+                                "justify-content": "space-between",
+                                "align-items": "center",
+                                padding: "0.75rem 1rem",
+                                background: isSelected ? "rgba(251, 191, 36, 0.1)" : "var(--bg-light)",
+                                "border-radius": "6px",
+                                "margin-bottom": "0.5rem",
+                                cursor: "pointer",
+                                transition: "all 0.2s ease",
+                                border: isSelected ? "1px solid var(--warning)" : "1px solid transparent"
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.background = "var(--bg-dark)";
+                                  e.currentTarget.style.borderColor = "var(--accent)";
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.background = "var(--bg-light)";
+                                  e.currentTarget.style.borderColor = "transparent";
+                                }
+                              }}
+                              onClick={() => {
+                                if (selectionMode() && canSell) {
+                                  toggleItemSelection(invItem.id);
+                                } else if (!selectionMode()) {
+                                  handleViewItem(invItem, false);
+                                }
+                              }}
+                            >
+                              <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
+                                <Show when={selectionMode()}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    disabled={!canSell}
+                                    style={{ width: "18px", height: "18px", cursor: canSell ? "pointer" : "not-allowed" }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={() => canSell && toggleItemSelection(invItem.id)}
+                                  />
+                                </Show>
+                                <div style={{ flex: 1, opacity: selectionMode() && !canSell ? 0.5 : 1 }}>
+                                  <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
+                                  <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
+                                    <Show when={invItem.health_restore}>❤️ +{invItem.health_restore} HP</Show>
+                                    <Show when={invItem.health_restore && invItem.mana_restore}> • </Show>
+                                    <Show when={invItem.mana_restore}>✨ +{invItem.mana_restore} MP</Show>
+                                    <Show when={selectionMode() && invItem.value}>
+                                       • {Math.floor(invItem.value * 0.4 * invItem.quantity)}g
+                                    </Show>
+                                  </div>
+                                </div>
+                                <Show when={invItem.quantity > 1}>
+                                  <div style={{ "font-weight": "bold", color: "var(--accent)" }}>x{invItem.quantity}</div>
+                                </Show>
+                              </div>
+                              <Show when={!selectionMode()}>
+                                <div style={{ color: "var(--text-secondary)", "font-size": "1.25rem" }}>›</div>
+                              </Show>
+                            </div>
+                          );
+                        }}
                       </For>
                     </div>
                   </Show>
@@ -2468,7 +2908,7 @@ export default function GamePage() {
                 
                 {/* Filtered View */}
                 <Show when={inventoryFilter() !== "all"}>
-                  <div class="item-grid">
+                  <div>
                     <For each={currentInventory().filter((i: any) => {
                       if (i.equipped) return false;
                       if (inventoryFilter() === "weapons") return i.slot === "weapon";
@@ -2477,19 +2917,89 @@ export default function GamePage() {
                       if (inventoryFilter() === "consumables") return i.type === "consumable";
                       return false;
                     })}>
-                      {(invItem: any) => (
-                        <InventoryItemCard
-                          item={invItem}
-                          meetsRequirements={meetsRequirements}
-                          formatRequirements={formatRequirements}
-                          getScrollAbilityStatus={getScrollAbilityStatus}
-                          onLearnAbility={handleLearnAbility}
-                          onUseItem={handleUseItem}
-                          onEquip={handleEquip}
-                          onSell={handleSellClick}
-                          onDrop={handleDropClick}
-                        />
-                      )}
+                      {(invItem: any) => {
+                        const scrollStatus = invItem.type === "scroll" ? getScrollAbilityStatus(invItem) : { alreadyLearned: false, hasBetter: false };
+                        const canSell = invItem.value && invItem.value > 0;
+                        const isSelected = selectedItems().has(invItem.id);
+                        
+                        return (
+                          <div 
+                            style={{
+                              display: "flex",
+                              "justify-content": "space-between",
+                              "align-items": "center",
+                              padding: "0.75rem 1rem",
+                              background: isSelected ? "rgba(251, 191, 36, 0.1)" : "var(--bg-light)",
+                              "border-radius": "6px",
+                              "margin-bottom": "0.5rem",
+                              cursor: "pointer",
+                              transition: "all 0.2s ease",
+                              border: isSelected ? "1px solid var(--warning)" : "1px solid transparent"
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isSelected) {
+                                e.currentTarget.style.background = "var(--bg-dark)";
+                                e.currentTarget.style.borderColor = "var(--accent)";
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isSelected) {
+                                e.currentTarget.style.background = "var(--bg-light)";
+                                e.currentTarget.style.borderColor = "transparent";
+                              }
+                            }}
+                            onClick={() => {
+                              if (selectionMode() && canSell) {
+                                toggleItemSelection(invItem.id);
+                              } else if (!selectionMode()) {
+                                handleViewItem(invItem, false);
+                              }
+                            }}
+                          >
+                            <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
+                              <Show when={selectionMode()}>
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  disabled={!canSell}
+                                  style={{ width: "18px", height: "18px", cursor: canSell ? "pointer" : "not-allowed" }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={() => canSell && toggleItemSelection(invItem.id)}
+                                />
+                              </Show>
+                              <div style={{ flex: 1, opacity: selectionMode() && !canSell ? 0.5 : 1 }}>
+                                <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
+                                <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
+                                  <Show when={invItem.slot}>
+                                    {invItem.slot}
+                                    <Show when={invItem.damage_min}> • ⚔️ {invItem.damage_min}-{invItem.damage_max} Dmg</Show>
+                                    <Show when={invItem.armor}> • 🛡️ {invItem.armor} Armor</Show>
+                                  </Show>
+                                  <Show when={invItem.type === "scroll"}>
+                                    <span style={{ color: scrollStatus.alreadyLearned ? "var(--success)" : scrollStatus.hasBetter ? "var(--warning)" : "var(--text-secondary)" }}>
+                                      {scrollStatus.alreadyLearned ? "✓ Already Learned" : scrollStatus.hasBetter ? "⚠ You have better" : "Ability Scroll"}
+                                    </span>
+                                  </Show>
+                                  <Show when={invItem.type === "consumable"}>
+                                    <Show when={invItem.health_restore}>❤️ +{invItem.health_restore} HP</Show>
+                                    <Show when={invItem.health_restore && invItem.mana_restore}> • </Show>
+                                    <Show when={invItem.mana_restore}>✨ +{invItem.mana_restore} MP</Show>
+                                  </Show>
+                                  <Show when={selectionMode() && invItem.value}>
+                                     • {Math.floor(invItem.value * 0.4 * invItem.quantity)}g
+                                  </Show>
+                                </div>
+                              </div>
+                              <Show when={invItem.quantity > 1}>
+                                <div style={{ "font-weight": "bold", color: "var(--accent)" }}>x{invItem.quantity}</div>
+                              </Show>
+                            </div>
+                            <Show when={!selectionMode()}>
+                              <div style={{ color: "var(--text-secondary)", "font-size": "1.25rem" }}>›</div>
+                            </Show>
+                          </div>
+                        );
+                      }}
                     </For>
                   </div>
                 </Show>
@@ -3872,9 +4382,66 @@ export default function GamePage() {
                       flex: "1"
                     }}>
 
-                    <div class="item-grid">
+                    <div>
                       <For each={merchantInventory()}>
                         {(item) => (
+                          <div 
+                            style={{
+                              display: "flex",
+                              "justify-content": "space-between",
+                              "align-items": "center",
+                              padding: "0.75rem 1rem",
+                              background: "var(--bg-light)",
+                              "border-radius": "6px",
+                              "margin-bottom": "0.5rem",
+                              cursor: "pointer",
+                              transition: "all 0.2s ease",
+                              border: "1px solid transparent"
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = "var(--bg-dark)";
+                              e.currentTarget.style.borderColor = "var(--warning)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = "var(--bg-light)";
+                              e.currentTarget.style.borderColor = "transparent";
+                            }}
+                            onClick={() => handleViewItem(item, true)}
+                          >
+                            <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{item.name}</div>
+                                <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
+                                  {item.type}
+                                  <Show when={item.slot}> • {item.slot}</Show>
+                                  <Show when={item.damage_min}> • ⚔️ {item.damage_min}-{item.damage_max} Dmg</Show>
+                                  <Show when={item.armor}> • 🛡️ {item.armor} Armor</Show>
+                                  <Show when={item.health_restore}> • ❤️ +{item.health_restore} HP</Show>
+                                  <Show when={item.mana_restore}> • ✨ +{item.mana_restore} MP</Show>
+                                </div>
+                              </div>
+                              <div style={{ "text-align": "right" }}>
+                                <div style={{ "font-weight": "bold", color: "var(--warning)", "font-size": "1.1rem" }}>
+                                  {item.merchant_price}g
+                                </div>
+                                <Show when={item.stock !== undefined && item.stock !== -1}>
+                                  <div style={{ 
+                                    "font-size": "0.75rem",
+                                    color: item.stock > 5 ? "var(--success)" : item.stock > 0 ? "var(--warning)" : "var(--danger)"
+                                  }}>
+                                    {item.stock > 0 ? `Stock: ${item.stock}` : 'OUT OF STOCK'}
+                                  </div>
+                                </Show>
+                              </div>
+                            </div>
+                            <div style={{ color: "var(--text-secondary)", "font-size": "1.25rem", "margin-left": "0.5rem" }}>›</div>
+                          </div>
+                        )}
+                      </For>
+                    </div>
+                    <div class="hidden-old-merchant-code" style={{ display: "none" }}>
+                      <For each={[]}>
+                        {(item: any) => (
                           <div class={`item-card ${item.rarity}`}>
                             <div style={{ display: "flex", "justify-content": "space-between", "align-items": "start", "margin-bottom": "0.5rem" }}>
                               <div>
@@ -3935,6 +4502,51 @@ export default function GamePage() {
                                 <div style={{ color: "var(--accent)" }}>✨ Restores {item.mana_restore} Mana</div>
                               </Show>
                             </div>
+
+                            {/* Equipment Comparison */}
+                            <Show when={item.slot && getEquipmentComparison(item)}>
+                              {(comparison) => (
+                                <Show when={comparison().comparisons.length > 0}>
+                                  <div style={{ 
+                                    "font-size": "0.75rem", 
+                                    "margin-bottom": "0.5rem",
+                                    padding: "0.5rem",
+                                    background: "rgba(59, 130, 246, 0.1)",
+                                    "border-radius": "4px",
+                                    border: "1px solid var(--accent)"
+                                  }}>
+                                    <div style={{ 
+                                      color: "var(--accent)",
+                                      "font-weight": "bold",
+                                      "margin-bottom": "0.25rem"
+                                    }}>
+                                      ⚖️ Compared to {comparison().equippedItem.name}:
+                                    </div>
+                                    <div style={{ display: "flex", "flex-direction": "column", gap: "0.15rem" }}>
+                                      <For each={comparison().comparisons}>
+                                        {(comp: any) => {
+                                          // For attack speed, diff is already inverted (positive = better/faster)
+                                          const displayValue = comp.stat === 'Damage' ? comp.diff.toFixed(1) : comp.diff.toFixed(2);
+                                          return (
+                                            <div style={{ 
+                                              display: "flex", 
+                                              "justify-content": "space-between",
+                                              color: comp.diff > 0 ? "var(--success)" : comp.diff < 0 ? "var(--danger)" : "var(--text-secondary)"
+                                            }}>
+                                              <span>{comp.stat}:</span>
+                                              <span style={{ "font-weight": "bold" }}>
+                                                {comp.diff > 0 ? '+' : ''}{displayValue}
+                                                {comp.stat === 'Attack Speed' && 'x'}
+                                              </span>
+                                            </div>
+                                          );
+                                        }}
+                                      </For>
+                                    </div>
+                                  </div>
+                                </Show>
+                              )}
+                            </Show>
 
                             {/* Requirements */}
                             <Show when={formatRequirements(item).length > 0}>
@@ -4003,6 +4615,163 @@ export default function GamePage() {
                   </div>
                 </div>
               )}
+            </Show>
+
+            {/* Item Detail Modal */}
+            <Show when={showItemDetailModal()}>
+              <ItemDetailModal
+                item={selectedItem()}
+                isOpen={showItemDetailModal()}
+                onClose={() => {
+                  setShowItemDetailModal(false);
+                  setSelectedItem(null);
+                  setSelectedItemIsMerchant(false);
+                }}
+                meetsRequirements={meetsRequirements}
+                formatRequirements={formatRequirements}
+                getScrollAbilityStatus={getScrollAbilityStatus}
+                getEquipmentComparison={getEquipmentComparison}
+                onLearnAbility={handleLearnAbility}
+                onUseItem={handleUseItem}
+                onEquip={handleEquip}
+                onSell={handleSellClick}
+                onDrop={handleDropClick}
+                onBuy={handleBuyItem}
+                currentGold={currentGold()}
+                isMerchantItem={selectedItemIsMerchant()}
+              />
+            </Show>
+
+            {/* Bulk Sell Confirmation Modal */}
+            <Show when={showBulkSellModal()}>
+              <div 
+                style={{ 
+                  position: "fixed", 
+                  top: 0, 
+                  left: 0, 
+                  right: 0, 
+                  bottom: 0, 
+                  background: "rgba(0, 0, 0, 0.85)", 
+                  display: "flex", 
+                  "align-items": "center", 
+                  "justify-content": "center",
+                  "z-index": 1000,
+                  padding: "1rem"
+                }}
+                onClick={() => setShowBulkSellModal(false)}
+              >
+                <div 
+                  class="card"
+                  style={{ 
+                    "max-width": "500px",
+                    width: "100%",
+                    background: "var(--bg-dark)",
+                    border: "2px solid var(--warning)",
+                    "box-shadow": "0 0 20px rgba(251, 191, 36, 0.3)"
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h2 style={{ 
+                    color: "var(--warning)", 
+                    "text-align": "center",
+                    "font-size": "1.5rem",
+                    "margin-bottom": "1rem"
+                  }}>
+                    Bulk Sell Items?
+                  </h2>
+                  
+                  <div style={{ 
+                    "text-align": "center",
+                    "margin-bottom": "1.5rem"
+                  }}>
+                    <div style={{ 
+                      "font-size": "1.1rem",
+                      "font-weight": "bold",
+                      "margin-bottom": "0.5rem"
+                    }}>
+                      Sell {selectedItems().size} item{selectedItems().size !== 1 ? 's' : ''}?
+                    </div>
+                    <div style={{ 
+                      "font-size": "0.875rem", 
+                      color: "var(--text-secondary)",
+                      "margin-bottom": "1rem"
+                    }}>
+                      This action cannot be undone
+                    </div>
+                    
+                    <div style={{
+                      padding: "1rem",
+                      background: "var(--bg-light)",
+                      "border-radius": "6px",
+                      display: "inline-block",
+                      "margin-bottom": "1rem"
+                    }}>
+                      <div style={{ 
+                        "font-size": "0.875rem", 
+                        color: "var(--text-secondary)",
+                        "margin-bottom": "0.25rem"
+                      }}>
+                        You will receive (40% of value)
+                      </div>
+                      <div style={{ 
+                        "font-size": "2rem",
+                        "font-weight": "bold",
+                        color: "var(--warning)"
+                      }}>
+                        💰 {calculateBulkSellValue()}
+                      </div>
+                      <div style={{ 
+                        "font-size": "1rem",
+                        color: "var(--warning)"
+                      }}>
+                        Gold
+                      </div>
+                    </div>
+
+                    {/* List of items being sold */}
+                    <div style={{
+                      "max-height": "200px",
+                      "overflow-y": "auto",
+                      background: "var(--bg-light)",
+                      "border-radius": "6px",
+                      padding: "0.75rem",
+                      "text-align": "left"
+                    }}>
+                      <div style={{ "font-size": "0.875rem", "font-weight": "bold", "margin-bottom": "0.5rem" }}>
+                        Items to sell:
+                      </div>
+                      <For each={currentInventory().filter((i: any) => selectedItems().has(i.id))}>
+                        {(item: any) => (
+                          <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)", "margin-bottom": "0.25rem" }}>
+                            • {item.name} {item.quantity > 1 ? `x${item.quantity}` : ''} ({Math.floor(item.value * 0.4 * item.quantity)}g)
+                          </div>
+                        )}
+                      </For>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "1rem" }}>
+                    <button
+                      class="button secondary"
+                      onClick={() => setShowBulkSellModal(false)}
+                      style={{ flex: 1 }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      class="button"
+                      onClick={handleBulkSell}
+                      style={{ 
+                        flex: 1,
+                        background: "var(--warning)",
+                        color: "var(--bg-dark)"
+                      }}
+                    >
+                      Sell All
+                    </button>
+                  </div>
+                </div>
+              </div>
             </Show>
           </div>
       </Show>
