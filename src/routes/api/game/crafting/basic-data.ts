@@ -13,7 +13,6 @@ export async function GET(event: APIEvent) {
   }
 
   try {
-
     // Get character professions (or initialize them if they don't exist)
     const professionsResult = await db.execute({
       sql: `SELECT profession_type as type, level, experience 
@@ -48,56 +47,10 @@ export async function GET(event: APIEvent) {
       args: [characterId]
     });
 
-    // Get all recipes with their material requirements in a single query
-    const recipesResult = await db.execute(`
-      SELECT 
-        r.id,
-        r.name,
-        r.profession_type,
-        r.level_required,
-        r.craft_time_seconds,
-        r.base_experience
-      FROM recipes r
-      ORDER BY r.profession_type, r.level_required, r.name
-    `);
-
-    // Get ALL recipe materials in a single query
-    const allMaterialsResult = await db.execute(`
-      SELECT 
-        rm.recipe_id,
-        rm.material_id,
-        cm.name as material_name,
-        rm.quantity
-      FROM recipe_materials rm
-      JOIN crafting_materials cm ON rm.material_id = cm.id
-      ORDER BY rm.recipe_id
-    `);
-
-    // Group materials by recipe_id
-    const materialsByRecipe = new Map();
-    for (const material of allMaterialsResult.rows) {
-      const recipeId = material.recipe_id;
-      if (!materialsByRecipe.has(recipeId)) {
-        materialsByRecipe.set(recipeId, []);
-      }
-      materialsByRecipe.get(recipeId).push({
-        material_id: material.material_id,
-        material_name: material.material_name,
-        quantity: material.quantity
-      });
-    }
-
-    // Build recipes with their materials
-    const recipes = recipesResult.rows.map(recipe => ({
-      ...recipe,
-      materials: materialsByRecipe.get(recipe.id) || []
-    }));
-
     return new Response(
       JSON.stringify({
         professions,
-        materials: materialsResult.rows,
-        recipes
+        materials: materialsResult.rows
       }),
       {
         status: 200,
@@ -105,7 +58,7 @@ export async function GET(event: APIEvent) {
       }
     );
   } catch (error: any) {
-    console.error("[Crafting Data API] Error:", error);
+    console.error("[Crafting Basic Data API] Error:", error);
     return new Response(
       JSON.stringify({ error: error.message || "Failed to fetch crafting data" }),
       {

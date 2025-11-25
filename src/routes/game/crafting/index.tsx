@@ -1,4 +1,4 @@
-import { createSignal, Show, For, createEffect } from "solid-js";
+import { createSignal, Show, For, createEffect, createResource, createMemo, Suspense } from "solid-js";
 import { GameLayout } from "~/components/GameLayout";
 import { CraftingMinigame } from "~/components/CraftingMinigame";
 import { useCharacter } from "~/lib/CharacterContext";
@@ -80,57 +80,57 @@ export default function CraftingPage() {
   });
 
   const [selectedProfession, setSelectedProfession] = createSignal<Profession | null>(null);
-  const [professions, setProfessions] = createSignal<ProfessionData[]>([]);
-  const [materials, setMaterials] = createSignal<Material[]>([]);
-  const [recipes, setRecipes] = createSignal<Recipe[]>([]);
-  const [loading, setLoading] = createSignal(true);
   const [showMinigame, setShowMinigame] = createSignal(false);
   const [minigameData, setMinigameData] = createSignal<any>(null);
   const [crafting, setCrafting] = createSignal(false);
 
-  // Fetch crafting data
-  createEffect(async () => {
-    const character = store.character;
-    if (!character) return;
+  // Fetch basic crafting data (professions and materials only)
+  const fetchBasicCraftingData = async (characterId: number | undefined) => {
+    if (!characterId) return null;
+    
+    const response = await fetch(`/api/game/crafting/basic-data?characterId=${characterId}`);
+    const data = await response.json();
+    return data;
+  };
 
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/game/crafting/data?characterId=${character.id}`);
-      const data = await response.json();
-      
-      setProfessions(data.professions || []);
-      setMaterials(data.materials || []);
-      setRecipes(data.recipes || []);
-    } catch (error) {
-      console.error("[Crafting] Failed to fetch data:", error);
-    } finally {
-      setLoading(false);
-    }
-  });
+  // Fetch recipes for a specific profession
+  const fetchProfessionRecipes = async (params: { characterId: number; profession: Profession } | undefined) => {
+    if (!params) return [];
+    
+    const response = await fetch(`/api/game/crafting/recipes?characterId=${params.characterId}&profession=${params.profession}`);
+    const data = await response.json();
+    return data.recipes || [];
+  };
+
+  const [craftingData, { refetch: refetchBasicData }] = createResource(
+    () => store.character?.id,
+    fetchBasicCraftingData
+  );
+
+  const [recipes, { refetch: refetchRecipes }] = createResource(
+    () => {
+      const charId = store.character?.id;
+      const prof = selectedProfession();
+      return charId && prof ? { characterId: charId, profession: prof } : undefined;
+    },
+    fetchProfessionRecipes
+  );
+
+  const professions = createMemo(() => craftingData()?.professions || []);
+  const materials = createMemo(() => craftingData()?.materials || []);
 
   const currentCharacter = () => store.character;
   const maxCraftingLevel = () => Math.floor((currentCharacter()?.level || 1) / 2);
 
-  // Refetch crafting data
-  const refetchCraftingData = async () => {
-    const character = currentCharacter();
-    if (!character) return;
-
-    try {
-      const response = await fetch(`/api/game/crafting/data?characterId=${character.id}`);
-      const data = await response.json();
-      
-      setProfessions(data.professions || []);
-      setMaterials(data.materials || []);
-      setRecipes(data.recipes || []);
-    } catch (error) {
-      console.error("[Crafting] Failed to refetch data:", error);
-    }
+  // Refetch crafting data (uses the resource refetch)
+  const refetchCraftingData = () => {
+    refetchBasicData();
+    refetchRecipes();
   };
 
   // Get profession data
   const getProfession = (type: Profession) => {
-    return professions().find(p => p.type === type) || { type, level: 1, experience: 0 };
+    return professions().find((p: ProfessionData) => p.type === type) || { type, level: 1, experience: 0 };
   };
 
   // Filter recipes by selected profession
@@ -139,16 +139,16 @@ export default function CraftingPage() {
     if (!profession) return [];
     
     const profData = getProfession(profession);
-    return recipes().filter(r => 
+    return recipes()?.filter((r: Recipe) => 
       r.profession_type === profession && 
       r.level_required <= profData.level
-    );
+    ) || [];
   };
 
   // Check if player has enough materials for a recipe
   const canCraft = (recipe: Recipe) => {
     return recipe.materials.every(rm => {
-      const material = materials().find(m => m.id === rm.material_id);
+      const material = materials().find((m: Material) => m.id === rm.material_id);
       return material && material.quantity >= rm.quantity;
     });
   };
@@ -174,14 +174,8 @@ export default function CraftingPage() {
         setMinigameData(data.session);
         setShowMinigame(true);
         
-        // Deduct materials from local state
-        recipe.materials.forEach(rm => {
-          setMaterials(mats => mats.map(m => 
-            m.id === rm.material_id 
-              ? { ...m, quantity: m.quantity - rm.quantity }
-              : m
-          ));
-        });
+        // Refetch to get updated material quantities
+        refetchBasicData();
       } else {
         alert(data.error || "Failed to start crafting");
       }
@@ -229,7 +223,12 @@ export default function CraftingPage() {
       <div class="page-container">
         <h1>Crafting</h1>
         
-        <Show when={!loading()} fallback={<p>Loading crafting data...</p>}>
+        <Suspense fallback={
+          <div class="card" style={{ padding: "2rem", "text-align": "center" }}>
+            <div style={{ "font-size": "2rem", "margin-bottom": "1rem" }}>⚒️</div>
+            <p>Loading crafting data...</p>
+          </div>
+        }>
           <Show when={currentCharacter()}>
             <div style={{ "margin-bottom": "1rem", color: "var(--text-secondary)" }}>
               <p>Character Level: {currentCharacter()?.level} | Max Crafting Level: {maxCraftingLevel()}</p>
@@ -323,7 +322,7 @@ export default function CraftingPage() {
                         gap: "0.5rem",
                         "margin-top": "1rem"
                       }}>
-                        <For each={materials().filter(m => m.quantity > 0)}>
+                        <For each={materials().filter((m: Material) => m.quantity > 0)}>
                           {(material) => (
                             <div style={{ 
                               padding: "0.5rem",
@@ -345,7 +344,7 @@ export default function CraftingPage() {
                           )}
                         </For>
                       </div>
-                      <Show when={materials().filter(m => m.quantity > 0).length === 0}>
+                      <Show when={materials().filter((m: Material) => m.quantity > 0).length === 0}>
                         <p style={{ color: "var(--text-secondary)", "text-align": "center", "margin-top": "1rem" }}>
                           No materials yet. Defeat monsters to gather crafting supplies!
                         </p>
@@ -355,76 +354,83 @@ export default function CraftingPage() {
                     {/* Recipes */}
                     <div class="card">
                       <h3>Available Recipes</h3>
-                      <div style={{ 
-                        display: "grid", 
-                        "grid-template-columns": "repeat(auto-fill, minmax(300px, 1fr))",
-                        gap: "1rem",
-                        "margin-top": "1rem"
-                      }}>
-                        <For each={availableRecipes()}>
-                          {(recipe) => {
-                            const hasMateriels = canCraft(recipe);
-                            
-                            return (
-                              <div 
-                                class="card"
-                                style={{ 
-                                  background: "var(--bg-medium)",
-                                  opacity: hasMateriels ? 1 : 0.6
-                                }}
-                              >
-                                <h4 style={{ margin: "0 0 0.5rem 0" }}>{recipe.name}</h4>
-                                <div style={{ "font-size": "0.85rem", color: "var(--text-secondary)" }}>
-                                  <p>Level Required: {recipe.level_required}</p>
-                                  <p>Craft Time: {recipe.craft_time_seconds}s</p>
-                                  <p>Experience: {recipe.base_experience} XP</p>
-                                </div>
-                                <div style={{ "margin-top": "0.5rem" }}>
-                                  <strong>Materials:</strong>
-                                  <For each={recipe.materials}>
-                                    {(rm) => {
-                                      const material = materials().find(m => m.id === rm.material_id);
-                                      const hasEnough = material && material.quantity >= rm.quantity;
-                                      
-                                      return (
-                                        <div style={{ 
-                                          display: "flex",
-                                          "justify-content": "space-between",
-                                          "margin-top": "0.25rem",
-                                          color: hasEnough ? "inherit" : "var(--error)"
-                                        }}>
-                                          <span>{rm.material_name}</span>
-                                          <span>{material?.quantity || 0} / {rm.quantity}</span>
-                                        </div>
-                                      );
-                                    }}
-                                  </For>
-                                </div>
-                                <button 
-                                  class="button primary"
-                                  style={{ "margin-top": "1rem", width: "100%" }}
-                                  disabled={!hasMateriels || crafting()}
-                                  onClick={() => startCraft(recipe)}
+                      <Suspense fallback={
+                        <div style={{ padding: "2rem", "text-align": "center" }}>
+                          <div style={{ "font-size": "1.5rem", "margin-bottom": "0.5rem" }}>📜</div>
+                          <p style={{ color: "var(--text-secondary)" }}>Loading recipes...</p>
+                        </div>
+                      }>
+                        <div style={{ 
+                          display: "grid", 
+                          "grid-template-columns": "repeat(auto-fill, minmax(300px, 1fr))",
+                          gap: "1rem",
+                          "margin-top": "1rem"
+                        }}>
+                          <For each={availableRecipes()}>
+                            {(recipe) => {
+                              const hasMateriels = canCraft(recipe);
+                              
+                              return (
+                                <div 
+                                  class="card"
+                                  style={{ 
+                                    background: "var(--bg-medium)",
+                                    opacity: hasMateriels ? 1 : 0.6
+                                  }}
                                 >
-                                  {crafting() ? "Starting..." : "Craft"}
-                                </button>
-                              </div>
-                            );
-                          }}
-                        </For>
-                      </div>
-                      <Show when={availableRecipes().length === 0}>
-                        <p style={{ color: "var(--text-secondary)", "text-align": "center", "margin-top": "1rem" }}>
-                          No recipes available. Level up your {info.name} skill to unlock more recipes!
-                        </p>
-                      </Show>
+                                  <h4 style={{ margin: "0 0 0.5rem 0" }}>{recipe.name}</h4>
+                                  <div style={{ "font-size": "0.85rem", color: "var(--text-secondary)" }}>
+                                    <p>Level Required: {recipe.level_required}</p>
+                                    <p>Craft Time: {recipe.craft_time_seconds}s</p>
+                                    <p>Experience: {recipe.base_experience} XP</p>
+                                  </div>
+                                  <div style={{ "margin-top": "0.5rem" }}>
+                                    <strong>Materials:</strong>
+                                    <For each={recipe.materials}>
+                                      {(rm) => {
+                                        const material = materials().find((m: Material) => m.id === rm.material_id);
+                                        const hasEnough = material && material.quantity >= rm.quantity;
+                                        
+                                        return (
+                                          <div style={{ 
+                                            display: "flex",
+                                            "justify-content": "space-between",
+                                            "margin-top": "0.25rem",
+                                            color: hasEnough ? "inherit" : "var(--error)"
+                                          }}>
+                                            <span>{rm.material_name}</span>
+                                            <span>{material?.quantity || 0} / {rm.quantity}</span>
+                                          </div>
+                                        );
+                                      }}
+                                    </For>
+                                  </div>
+                                  <button 
+                                    class="button primary"
+                                    style={{ "margin-top": "1rem", width: "100%" }}
+                                    disabled={!hasMateriels || crafting()}
+                                    onClick={() => startCraft(recipe)}
+                                  >
+                                    {crafting() ? "Starting..." : "Craft"}
+                                  </button>
+                                </div>
+                              );
+                            }}
+                          </For>
+                        </div>
+                        <Show when={availableRecipes().length === 0}>
+                          <p style={{ color: "var(--text-secondary)", "text-align": "center", "margin-top": "1rem" }}>
+                            No recipes available. Level up your {info.name} skill to unlock more recipes!
+                          </p>
+                        </Show>
+                      </Suspense>
                     </div>
                   </div>
                 );
               }}
             </Show>
           </Show>
-        </Show>
+        </Suspense>
         
         {/* Crafting Minigame Modal */}
         <Show when={showMinigame() && minigameData() && currentCharacter()}>
@@ -437,11 +443,11 @@ export default function CraftingPage() {
             targetY={minigameData()!.targetY}
             targetRadius={minigameData()!.targetRadius}
             onComplete={completeCraft}
-            onCancel={async () => {
+            onCancel={() => {
               setShowMinigame(false);
               setMinigameData(null);
               // Refetch data after closing modal
-              await refetchCraftingData();
+              refetchCraftingData();
             }}
           />
         </Show>
