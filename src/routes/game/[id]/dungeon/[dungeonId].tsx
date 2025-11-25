@@ -72,7 +72,6 @@ async function getDungeonData(characterId: number, dungeonId: number) {
 }
 
 export default function DungeonRoute() {
-  console.log('🏰 === DUNGEON ROUTE LOADED - NEW VERSION WITH REACTIVE MEMOS ===');
   const params = useParams<{ id: string; dungeonId: string }>();
   const navigate = useNavigate();
   const characterId = () => parseInt(params.id!);
@@ -93,6 +92,9 @@ export default function DungeonRoute() {
   // Track combat HP/mana separately (updated by CombatEngine during combat)
   const [combatHealth, setCombatHealth] = createSignal<number | null>(null);
   const [combatMana, setCombatMana] = createSignal<number | null>(null);
+  
+  // Dungeon completion modal
+  const [showCompletionModal, setShowCompletionModal] = createSignal(false);
   
   // Initialize CharacterContext and dungeon session when data loads
   createEffect(() => {
@@ -175,8 +177,6 @@ export default function DungeonRoute() {
   
   const handleCombatEnd = async (result: 'victory' | 'defeat', finalState: any) => {
     try {
-      console.log('🏁 [COMBAT END] Final state:', finalState.characterHealth, finalState.characterMana);
-      
       const response = await fetch('/api/game/finish-combat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -221,12 +221,8 @@ export default function DungeonRoute() {
           setCombatHealth(null);
           setCombatMana(null);
           
-          alert('🎉 Dungeon Complete! You defeated the boss!');
-          
-          // Small delay to ensure state updates before navigation
-          setTimeout(() => {
-            navigate(`/game/${characterId()}`);
-          }, 100);
+          // Show completion modal instead of alert
+          setShowCompletionModal(true);
         } else if (advanceResult.progress) {
           // Update dungeon session with new encounter number and HP/mana
           actions.updateDungeonEncounter(
@@ -236,8 +232,6 @@ export default function DungeonRoute() {
           );
           
           // Clear combat state signals AFTER store is updated to avoid showing stale values
-          console.log('🧹 [COMBAT END] Clearing combat signals, store now has:', 
-            store.dungeonSession?.session_health, store.dungeonSession?.session_mana);
           setCombatHealth(null);
           setCombatMana(null);
         }
@@ -318,36 +312,19 @@ export default function DungeonRoute() {
     return (store.inventory || []).filter((i: any) => i.equipped && i.slot !== 'weapon');
   };
   
-  // Debug: Watch store changes
-  createEffect(() => {
-    console.log('🔍 [DUNGEON STORE] Session changed:', {
-      session_health: store.dungeonSession?.session_health,
-      session_mana: store.dungeonSession?.session_mana,
-      char_health: store.character?.current_health,
-      char_mana: store.character?.current_mana
-    });
-  });
-
   const currentHealth = createMemo(() => {
     // During combat, use combat state; otherwise use store
-    const health = combatHealth() ?? (store.dungeonSession?.session_health || store.character?.current_health || 0);
-    console.log('💚 [DUNGEON MEMO] currentHealth =', health, 'from', combatHealth() !== null ? 'COMBAT' : 'STORE');
-    return health;
+    return combatHealth() ?? (store.dungeonSession?.session_health || store.character?.current_health || 0);
   });
   
   const currentMana = createMemo(() => {
     // During combat, use combat state; otherwise use store
-    const mana = combatMana() ?? (store.dungeonSession?.session_mana || store.character?.current_mana || 0);
-    console.log('💙 [DUNGEON MEMO] currentMana =', mana, 'from', combatMana() !== null ? 'COMBAT' : 'STORE');
-    return mana;
+    return combatMana() ?? (store.dungeonSession?.session_mana || store.character?.current_mana || 0);
   });
   
   // Calculate actual max health including equipment and active effects
   const currentMaxHealth = createMemo(() => {
-    if (!store.character) {
-      console.log('❤️ [DUNGEON MEMO] currentMaxHealth = 100 (no character)');
-      return 100;
-    }
+    if (!store.character) return 100;
     
     // Get base constitution
     let totalConstitution = store.character.constitution;
@@ -372,18 +349,13 @@ export default function DungeonRoute() {
     const baseHealth = 100;
     const levelBonus = store.character.level * 20;
     const constitutionBonus = (totalConstitution - 10) * 8;
-    const maxHealth = baseHealth + levelBonus + constitutionBonus;
     
-    console.log('❤️ [DUNGEON MEMO] currentMaxHealth =', maxHealth);
-    return maxHealth;
+    return baseHealth + levelBonus + constitutionBonus;
   });
   
   // Calculate actual max mana including equipment and active effects
   const currentMaxMana = createMemo(() => {
-    if (!store.character) {
-      console.log('🔵 [DUNGEON MEMO] currentMaxMana = 100 (no character)');
-      return 100;
-    }
+    if (!store.character) return 100;
     
     // Get base intelligence
     let totalIntelligence = store.character.intelligence;
@@ -408,10 +380,8 @@ export default function DungeonRoute() {
     const baseMana = 100;
     const levelBonus = store.character.level * 20;
     const intelligenceBonus = (totalIntelligence - 10) * 5;
-    const maxMana = baseMana + levelBonus + intelligenceBonus;
     
-    console.log('🔵 [DUNGEON MEMO] currentMaxMana =', maxMana);
-    return maxMana;
+    return baseMana + levelBonus + intelligenceBonus;
   });
   
   const hotbarActions = createMemo(() => {
@@ -672,7 +642,6 @@ export default function DungeonRoute() {
                 onCombatEnd={handleCombatEnd}
                 onHealthChange={(health, mana) => {
                   // Update combat state signals so UI reflects combat changes
-                  console.log('⚔️ [COMBAT] HP/Mana changed:', health, mana);
                   setCombatHealth(health);
                   setCombatMana(mana);
                 }}
@@ -701,6 +670,60 @@ export default function DungeonRoute() {
               />
           </Show>
         </Show>
+      </Show>
+      
+      {/* Dungeon Completion Modal */}
+      <Show when={showCompletionModal()}>
+        <div 
+          style={{ 
+            position: "fixed", 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            background: "rgba(0, 0, 0, 0.9)", 
+            display: "flex", 
+            "align-items": "center", 
+            "justify-content": "center",
+            "z-index": 1000,
+            padding: "1rem"
+          }}
+          onClick={() => {
+            setShowCompletionModal(false);
+            navigate(`/game/${characterId()}`);
+          }}
+        >
+          <div 
+            class="card" 
+            style={{ 
+              "max-width": "500px",
+              width: "100%",
+              padding: "2rem",
+              "text-align": "center",
+              animation: "slideUp 0.3s ease-out"
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ "font-size": "4rem", "margin-bottom": "1rem" }}>🎉</div>
+            <h2 style={{ "margin-bottom": "1rem", color: "var(--accent)" }}>
+              Dungeon Complete!
+            </h2>
+            <p style={{ "font-size": "1.1rem", "margin-bottom": "2rem", color: "var(--text-secondary)" }}>
+              You have defeated {dungeon()?.name} and emerged victorious!
+            </p>
+            
+            <button 
+              class="button primary" 
+              style={{ width: "100%", "font-size": "1.1rem", padding: "1rem" }}
+              onClick={() => {
+                setShowCompletionModal(false);
+                navigate(`/game/${characterId()}`);
+              }}
+            >
+              Return to Town
+            </button>
+          </div>
+        </div>
       </Show>
     </div>
   );

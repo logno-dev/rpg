@@ -49,7 +49,6 @@ async function getGameData(characterId: number) {
 }
 
 export default function GamePage() {
-  console.log('=== GamePage component loaded - NEW VERSION WITH REACTIVE MEMOS ===');
   const params = useParams();
   const navigate = useNavigate();
   const characterId = () => parseInt(params.id);
@@ -246,29 +245,16 @@ export default function GamePage() {
   
   // Read health/mana from CharacterContext
   // When in dungeon, use dungeon session as source of truth
-  // Debug: Track when character changes
-  createEffect(() => {
-    console.log('[STORE WATCH] character changed:', {
-      health: store.character?.current_health,
-      mana: store.character?.current_mana,
-      charObject: store.character
-    });
-  });
-
   const currentHealth = createMemo(() => {
-    const health = store.dungeonSession 
+    return store.dungeonSession 
       ? store.dungeonSession.session_health 
       : (store.character?.current_health ?? 0);
-    console.log('[MEMO] currentHealth() returning:', health, 'from', store.dungeonSession ? 'dungeon session' : 'character');
-    return health;
   });
   
   const currentMana = createMemo(() => {
-    const mana = store.dungeonSession 
+    return store.dungeonSession 
       ? store.dungeonSession.session_mana 
       : (store.character?.current_mana ?? 0);
-    console.log('[MEMO] currentMana() returning:', mana, 'from', store.dungeonSession ? 'dungeon session' : 'character');
-    return mana;
   });
   
   // Legacy no-op functions (to be removed - all updates should use actions directly)

@@ -188,29 +188,16 @@ export const CharacterProvider: ParentComponent<{ initialData?: Partial<Characte
     },
 
     updateDungeonEncounter: (encounterNumber: number, health: number, mana: number) => {
-      console.log('🎯 [Context] updateDungeonEncounter called:', { encounterNumber, health, mana });
-      console.log('🎯 [Context] Before update:', { 
-        current: store.dungeonSession?.current_encounter,
-        health: store.dungeonSession?.session_health,
-        mana: store.dungeonSession?.session_mana 
-      });
       setStore("dungeonSession", "current_encounter", encounterNumber);
       setStore("dungeonSession", "session_health", health);
       setStore("dungeonSession", "session_mana", mana);
-      console.log('🎯 [Context] After update:', { 
-        current: store.dungeonSession?.current_encounter,
-        health: store.dungeonSession?.session_health,
-        mana: store.dungeonSession?.session_mana 
-      });
     },
 
     updateHealth: (health: number, mana?: number) => {
-      console.log('[CharacterContext] updateHealth called:', { health, mana, currentChar: store.character?.current_health });
       setStore("character", "current_health", health);
       if (mana !== undefined) {
         setStore("character", "current_mana", mana);
       }
-      console.log('[CharacterContext] After update:', { health: store.character?.current_health, mana: store.character?.current_mana });
     },
 
     updateGold: (gold: number) => {
