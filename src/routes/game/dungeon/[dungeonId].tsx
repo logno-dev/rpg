@@ -102,6 +102,34 @@ export default function DungeonRoute() {
   const characterId = () => data()?.characterId ?? null;
   const [store, actions] = useCharacter();
   
+  // Get loot item color based on type and rarity
+  const getLootColor = (item: any) => {
+    // Crafting materials - grey
+    if (item.type === 'material' || item.name?.includes('Ore') || item.name?.includes('Leather') || item.name?.includes('Cloth')) {
+      return '#9ca3af'; // Gray
+    }
+    
+    // Consumables (potions, food) - purple
+    if (item.type === 'consumable' || item.name?.includes('Potion') || item.name?.includes('Elixir')) {
+      return '#a855f7'; // Purple
+    }
+    
+    // Equipment - color by rarity
+    if (item.rarity) {
+      switch (item.rarity.toLowerCase()) {
+        case 'common': return '#10b981';    // Green
+        case 'uncommon': return '#3b82f6';  // Blue
+        case 'rare': return '#f97316';      // Orange
+        case 'epic': return '#a855f7';      // Purple
+        case 'legendary': return '#eab308'; // Gold/Yellow
+        default: return '#9ca3af';          // Gray
+      }
+    }
+    
+    // Default - white
+    return '#ffffff';
+  };
+  
   const [currentEncounter, setCurrentEncounter] = createSignal<any>(null);
   const [activeMob, setActiveMob] = createSignal<any>(null);
   const [activeNamedMobId, setActiveNamedMobId] = createSignal<number | null>(null);
@@ -117,6 +145,21 @@ export default function DungeonRoute() {
   
   // Dungeon completion modal
   const [showCompletionModal, setShowCompletionModal] = createSignal(false);
+  
+  // Victory modal for encounter loot
+  const [showVictoryModal, setShowVictoryModal] = createSignal(false);
+  const [victoryData, setVictoryData] = createSignal<{
+    expGained: number;
+    goldGained: number;
+    loot: Array<{name: string, quantity: number, type?: string, rarity?: string}>;
+  } | null>(null);
+  
+  // Track total dungeon rewards
+  const [dungeonRewards, setDungeonRewards] = createSignal<{
+    totalExp: number;
+    totalGold: number;
+    totalLoot: Array<{name: string, quantity: number, type?: string, rarity?: string}>;
+  }>({ totalExp: 0, totalGold: 0, totalLoot: [] });
   
   // Initialize CharacterContext and dungeon session when data loads
   createEffect(() => {
@@ -215,6 +258,27 @@ export default function DungeonRoute() {
       const responseData = await response.json();
       
       if (responseData.result === 'victory') {
+        // Update inventory if loot was received
+        if (responseData.inventory) {
+          actions.setInventory(responseData.inventory);
+        }
+        
+        // Track rewards
+        const rewards = dungeonRewards();
+        setDungeonRewards({
+          totalExp: rewards.totalExp + (responseData.expGained || 0),
+          totalGold: rewards.totalGold + (responseData.goldGained || 0),
+          totalLoot: [...rewards.totalLoot, ...(responseData.loot || [])]
+        });
+        
+        // Show victory modal with encounter rewards
+        setVictoryData({
+          expGained: responseData.expGained || 0,
+          goldGained: responseData.goldGained || 0,
+          loot: responseData.loot || []
+        });
+        setShowVictoryModal(true);
+        
         // Clear combat UI immediately
         setActiveMob(null);
         setActiveNamedMobId(null);
@@ -694,6 +758,156 @@ export default function DungeonRoute() {
         <ActiveEffectsDisplay combatHots={combatHots()} combatThorns={combatThorns()} />
       </Show>
       
+      {/* Victory Modal - Encounter Loot */}
+      <Show when={showVictoryModal() && victoryData()}>
+        {(data) => (
+          <div 
+            style={{ 
+              position: "fixed", 
+              top: 0, 
+              left: 0, 
+              right: 0, 
+              bottom: 0, 
+              background: "rgba(0, 0, 0, 0.85)", 
+              display: "flex", 
+              "align-items": "center", 
+              "justify-content": "center",
+              "z-index": 1000,
+              padding: "1rem"
+            }}
+            onClick={() => {
+              setShowVictoryModal(false);
+              setVictoryData(null);
+            }}
+          >
+            <div 
+              class="card"
+              style={{ 
+                "max-width": "500px",
+                width: "100%",
+                background: "var(--bg-dark)",
+                border: "2px solid var(--success)",
+                "box-shadow": "0 0 30px rgba(34, 197, 94, 0.3)"
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 style={{ 
+                color: "var(--success)", 
+                "text-align": "center",
+                "font-size": "2rem",
+                "margin-bottom": "1rem"
+              }}>
+                ⚔️ VICTORY! ⚔️
+              </h2>
+              
+              <div style={{ 
+                display: "flex", 
+                "flex-direction": "column", 
+                gap: "1rem",
+                "margin-bottom": "2rem"
+              }}>
+                <div style={{ 
+                  padding: "1rem",
+                  background: "var(--bg-light)",
+                  "border-radius": "6px",
+                  "border-left": "4px solid var(--accent)"
+                }}>
+                  <div style={{ 
+                    "font-size": "0.875rem", 
+                    color: "var(--text-secondary)",
+                    "margin-bottom": "0.25rem"
+                  }}>
+                    Experience Gained
+                  </div>
+                  <div style={{ 
+                    "font-size": "1.5rem",
+                    "font-weight": "bold",
+                    color: "var(--accent)"
+                  }}>
+                    +{data().expGained} XP
+                  </div>
+                </div>
+
+                <div style={{ 
+                  padding: "1rem",
+                  background: "var(--bg-light)",
+                  "border-radius": "6px",
+                  "border-left": "4px solid var(--warning)"
+                }}>
+                  <div style={{ 
+                    "font-size": "0.875rem", 
+                    color: "var(--text-secondary)",
+                    "margin-bottom": "0.25rem"
+                  }}>
+                    Gold Earned
+                  </div>
+                  <div style={{ 
+                    "font-size": "1.5rem",
+                    "font-weight": "bold",
+                    color: "var(--warning)"
+                  }}>
+                    💰 {data().goldGained}
+                  </div>
+                </div>
+
+                <Show when={data().loot.length > 0}>
+                  <div style={{ 
+                    padding: "1rem",
+                    background: "var(--bg-light)",
+                    "border-radius": "6px",
+                    "border-left": "4px solid var(--success)"
+                  }}>
+                    <div style={{ 
+                      "font-size": "0.875rem", 
+                      color: "var(--text-secondary)",
+                      "margin-bottom": "0.5rem"
+                    }}>
+                      Loot Acquired
+                    </div>
+                    <For each={data().loot}>
+                      {(item) => (
+                        <div style={{ 
+                          "font-size": "1rem",
+                          "font-weight": "bold",
+                          color: getLootColor(item),
+                          "margin-bottom": "0.25rem"
+                        }}>
+                          📦 {item.name} {item.quantity > 1 ? `x${item.quantity}` : ''}
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+
+                <Show when={data().loot.length === 0}>
+                  <div style={{ 
+                    padding: "1rem",
+                    background: "var(--bg-light)",
+                    "border-radius": "6px",
+                    "text-align": "center",
+                    color: "var(--text-secondary)",
+                    "font-style": "italic"
+                  }}>
+                    No items dropped
+                  </div>
+                </Show>
+              </div>
+
+              <button
+                class="button success"
+                style={{ width: "100%" }}
+                onClick={() => {
+                  setShowVictoryModal(false);
+                  setVictoryData(null);
+                }}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        )}
+      </Show>
+      
       {/* Abandon Dungeon Modal */}
       <Show when={showAbandonModal()}>
         <div 
@@ -789,9 +1003,79 @@ export default function DungeonRoute() {
             <h2 style={{ "margin-bottom": "1rem", color: "var(--accent)" }}>
               Dungeon Complete!
             </h2>
-            <p style={{ "font-size": "1.1rem", "margin-bottom": "2rem", color: "var(--text-secondary)" }}>
+            <p style={{ "font-size": "1.1rem", "margin-bottom": "1.5rem", color: "var(--text-secondary)" }}>
               You have defeated {dungeon()?.name} and emerged victorious!
             </p>
+            
+            {/* Total Dungeon Rewards */}
+            <div style={{ 
+              "text-align": "left",
+              "margin-bottom": "2rem",
+              display: "flex",
+              "flex-direction": "column",
+              gap: "0.75rem"
+            }}>
+              <div style={{ 
+                padding: "0.75rem",
+                background: "var(--bg-light)",
+                "border-radius": "4px",
+                display: "flex",
+                "justify-content": "space-between"
+              }}>
+                <span style={{ color: "var(--text-secondary)" }}>Total XP:</span>
+                <span style={{ "font-weight": "bold", color: "var(--accent)" }}>
+                  +{dungeonRewards().totalExp}
+                </span>
+              </div>
+              
+              <div style={{ 
+                padding: "0.75rem",
+                background: "var(--bg-light)",
+                "border-radius": "4px",
+                display: "flex",
+                "justify-content": "space-between"
+              }}>
+                <span style={{ color: "var(--text-secondary)" }}>Total Gold:</span>
+                <span style={{ "font-weight": "bold", color: "var(--warning)" }}>
+                  💰 {dungeonRewards().totalGold}
+                </span>
+              </div>
+              
+              <Show when={dungeonRewards().totalLoot.length > 0}>
+                <div style={{ 
+                  padding: "0.75rem",
+                  background: "var(--bg-light)",
+                  "border-radius": "4px"
+                }}>
+                  <div style={{ 
+                    color: "var(--text-secondary)", 
+                    "margin-bottom": "0.5rem",
+                    "font-size": "0.875rem"
+                  }}>
+                    Items Looted:
+                  </div>
+                  <div style={{ 
+                    "max-height": "150px",
+                    "overflow-y": "auto",
+                    display: "flex",
+                    "flex-direction": "column",
+                    gap: "0.25rem"
+                  }}>
+                    <For each={dungeonRewards().totalLoot}>
+                      {(item) => (
+                        <div style={{ 
+                          "font-size": "0.875rem",
+                          "font-weight": "500",
+                          color: getLootColor(item)
+                        }}>
+                          • {item.name} {item.quantity > 1 ? `x${item.quantity}` : ''}
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </div>
+              </Show>
+            </div>
             
             <button 
               class="button primary" 

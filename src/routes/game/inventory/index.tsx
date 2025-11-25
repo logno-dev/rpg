@@ -52,7 +52,7 @@ export default function InventoryPage() {
   });
 
   // State signals
-  const [inventoryFilter, setInventoryFilter] = createSignal<"all" | "weapons" | "armor" | "scrolls" | "consumables">("all");
+  const [inventoryFilter, setInventoryFilter] = createSignal<"all" | "weapons" | "armor" | "offhand" | "scrolls" | "consumables">("all");
   const [selectionMode, setSelectionMode] = createSignal(false);
   const [selectedItems, setSelectedItems] = createSignal<Set<number>>(new Set());
   const [showItemDetailModal, setShowItemDetailModal] = createSignal(false);
@@ -479,7 +479,7 @@ export default function InventoryPage() {
       <div class="card">
         <h3 style={{ "margin-bottom": "1rem" }}>Equipment</h3>
         <div style={{ display: "grid", "grid-template-columns": "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
-          <For each={["weapon", "head", "chest", "hands", "feet"]}>
+          <For each={["weapon", "offhand", "head", "chest", "hands", "feet"]}>
             {(slotName) => {
               const equippedItem = createMemo(() => 
                 currentInventory().find((i: any) => i.slot === slotName && i.equipped === 1)
@@ -637,6 +637,13 @@ export default function InventoryPage() {
             🛡️ Armor
           </button>
           <button 
+            class={inventoryFilter() === "offhand" ? "button" : "button secondary"}
+            onClick={() => setInventoryFilter("offhand")}
+            style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
+          >
+            🔮 Offhand
+          </button>
+          <button 
             class={inventoryFilter() === "scrolls" ? "button" : "button secondary"}
             onClick={() => setInventoryFilter("scrolls")}
             style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
@@ -735,12 +742,96 @@ export default function InventoryPage() {
             </div>
           </Show>
           
-          <Show when={currentInventory().filter((i: any) => !i.equipped && i.type === "armor").length > 0}>
+          <Show when={currentInventory().filter((i: any) => !i.equipped && i.slot === "offhand").length > 0}>
             <h4 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", display: "flex", "align-items": "center", gap: "0.5rem", "font-size": "1.1rem" }}>
-              🛡️ Armor ({currentInventory().filter((i: any) => !i.equipped && i.type === "armor").length})
+              🔮 Offhand ({currentInventory().filter((i: any) => !i.equipped && i.slot === "offhand").length})
             </h4>
             <div style={{ "margin-bottom": "2rem" }}>
-              <For each={currentInventory().filter((i: any) => !i.equipped && i.type === "armor")}>
+              <For each={currentInventory().filter((i: any) => !i.equipped && i.slot === "offhand")}>
+                {(invItem: any) => {
+                  const canSell = invItem.value && invItem.value > 0;
+                  const isSelected = selectedItems().has(invItem.id);
+                  
+                  return (
+                    <div 
+                      style={{
+                        display: "flex",
+                        "justify-content": "space-between",
+                        "align-items": "center",
+                        padding: "0.75rem 1rem",
+                        background: isSelected ? "rgba(251, 191, 36, 0.1)" : "var(--bg-light)",
+                        "border-radius": "6px",
+                        "margin-bottom": "0.5rem",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                        border: isSelected ? "1px solid var(--warning)" : "1px solid transparent"
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.background = "var(--bg-dark)";
+                          e.currentTarget.style.borderColor = "var(--accent)";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.background = "var(--bg-light)";
+                          e.currentTarget.style.borderColor = "transparent";
+                        }
+                      }}
+                      onClick={() => {
+                        if (selectionMode() && canSell) {
+                          toggleItemSelection(invItem.id);
+                        } else if (!selectionMode()) {
+                          handleViewItem(invItem, false);
+                        }
+                      }}
+                    >
+                      <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
+                        <Show when={selectionMode()}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            disabled={!canSell}
+                            style={{ width: "18px", height: "18px", cursor: canSell ? "pointer" : "not-allowed" }}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={() => canSell && toggleItemSelection(invItem.id)}
+                          />
+                        </Show>
+                        <div style={{ flex: 1, opacity: selectionMode() && !canSell ? 0.5 : 1 }}>
+                          <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
+                          <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
+                            {invItem.slot && `${invItem.slot} • `}
+                            <Show when={invItem.intelligence_bonus}>
+                              🧠 +{invItem.intelligence_bonus} INT
+                            </Show>
+                            <Show when={invItem.wisdom_bonus}>
+                              • 🦉 +{invItem.wisdom_bonus} WIS
+                            </Show>
+                            <Show when={selectionMode() && invItem.value}>
+                               • {Math.floor(invItem.value * 0.4 * invItem.quantity)}g
+                            </Show>
+                          </div>
+                        </div>
+                        <Show when={invItem.quantity > 1}>
+                          <div style={{ "font-weight": "bold", color: "var(--accent)" }}>x{invItem.quantity}</div>
+                        </Show>
+                      </div>
+                      <Show when={!selectionMode()}>
+                        <div style={{ color: "var(--text-secondary)", "font-size": "1.25rem" }}>›</div>
+                      </Show>
+                    </div>
+                  );
+                }}
+              </For>
+            </div>
+          </Show>
+          
+          <Show when={currentInventory().filter((i: any) => !i.equipped && i.type === "armor" && i.slot !== "offhand").length > 0}>
+            <h4 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", display: "flex", "align-items": "center", gap: "0.5rem", "font-size": "1.1rem" }}>
+              🛡️ Armor ({currentInventory().filter((i: any) => !i.equipped && i.type === "armor" && i.slot !== "offhand").length})
+            </h4>
+            <div style={{ "margin-bottom": "2rem" }}>
+              <For each={currentInventory().filter((i: any) => !i.equipped && i.type === "armor" && i.slot !== "offhand")}>
                 {(invItem: any) => {
                   const canSell = invItem.value && invItem.value > 0;
                   const isSelected = selectedItems().has(invItem.id);
@@ -980,7 +1071,8 @@ export default function InventoryPage() {
             <For each={currentInventory().filter((i: any) => {
               if (i.equipped) return false;
               if (inventoryFilter() === "weapons") return i.slot === "weapon";
-              if (inventoryFilter() === "armor") return i.type === "armor";
+              if (inventoryFilter() === "armor") return i.type === "armor" && i.slot !== "offhand";
+              if (inventoryFilter() === "offhand") return i.slot === "offhand";
               if (inventoryFilter() === "scrolls") return i.type === "scroll";
               if (inventoryFilter() === "consumables") return i.type === "consumable";
               return false;

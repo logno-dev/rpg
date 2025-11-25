@@ -102,6 +102,34 @@ export default function GamePage() {
     return { color: '#ef4444', label: 'Deadly' };                       // Red - 5+ levels above
   };
   
+  // Get loot item color based on type and rarity
+  const getLootColor = (item: any) => {
+    // Crafting materials - grey
+    if (item.type === 'material' || item.name?.includes('Ore') || item.name?.includes('Leather') || item.name?.includes('Cloth')) {
+      return '#9ca3af'; // Gray
+    }
+    
+    // Consumables (potions, food) - purple
+    if (item.type === 'consumable' || item.name?.includes('Potion') || item.name?.includes('Elixir')) {
+      return '#a855f7'; // Purple
+    }
+    
+    // Equipment - color by rarity
+    if (item.rarity) {
+      switch (item.rarity.toLowerCase()) {
+        case 'common': return '#10b981';    // Green
+        case 'uncommon': return '#3b82f6';  // Blue
+        case 'rare': return '#f97316';      // Orange
+        case 'epic': return '#a855f7';      // Purple
+        case 'legendary': return '#eab308'; // Gold/Yellow
+        default: return '#9ca3af';          // Gray
+      }
+    }
+    
+    // Default - white
+    return '#ffffff';
+  };
+  
   // Victory modal state
   const [showVictoryModal, setShowVictoryModal] = createSignal(false);
   const [victoryData, setVictoryData] = createSignal<{
@@ -2272,7 +2300,7 @@ export default function GamePage() {
                               <div style={{ 
                                 "font-size": "1rem",
                                 "font-weight": "bold",
-                                color: "var(--success)",
+                                color: getLootColor(item),
                                 "margin-bottom": "0.25rem"
                               }}>
                                 📦 {item.name} {item.quantity > 1 ? `x${item.quantity}` : ''}
