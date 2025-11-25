@@ -103,18 +103,14 @@ export async function POST(event: APIEvent) {
     }
 
     // Consume materials
-    console.log('[Crafting Start] Consuming materials for character', characterId);
     for (const material of materialsResult.rows as any[]) {
-      console.log('[Crafting Start] Consuming', material.quantity, 'x', material.name, '(material_id:', material.material_id, ')');
-      const result = await db.execute({
+      await db.execute({
         sql: `UPDATE character_crafting_materials 
               SET quantity = quantity - ? 
               WHERE character_id = ? AND material_id = ?`,
         args: [material.quantity, characterId, material.material_id]
       });
-      console.log('[Crafting Start] Update result:', result.rowsAffected, 'rows affected');
     }
-    console.log('[Crafting Start] Material consumption complete');
 
     // Calculate target position and radius based on difficulty
     // Difficulty = recipe level vs profession level

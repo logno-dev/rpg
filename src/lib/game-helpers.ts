@@ -23,34 +23,24 @@ export function getSelectedCharacterId(): number | null {
 async function fetchBasicCharacterDataFromSession() {
   "use server";
   
-  console.log('[fetchBasicCharacterDataFromSession] Server called');
-  
   const user = await getUser();
-  console.log('[fetchBasicCharacterDataFromSession] User:', user ? user.id : 'NULL');
   
   if (!user) {
-    console.log('[fetchBasicCharacterDataFromSession] No user, redirecting to /');
     throw redirect("/");
   }
 
   // Get character ID from session (works on SSR!)
   const characterId = await getSelectedCharacterFromSession();
-  console.log('[fetchBasicCharacterDataFromSession] Character ID from session:', characterId);
   
   if (!characterId) {
-    console.log('[fetchBasicCharacterDataFromSession] No character selected, redirecting');
     throw redirect("/character-select");
   }
 
   const character = await getCharacter(characterId);
-  console.log('[fetchBasicCharacterDataFromSession] Character:', character ? character.id : 'NULL');
   
   if (!character || character.user_id !== user.id) {
-    console.log('[fetchBasicCharacterDataFromSession] Character not found or not owned, redirecting');
     throw redirect("/character-select");
   }
-
-  console.log('[fetchBasicCharacterDataFromSession] Fetching parallel data...');
   
   // Check for active dungeon - return it so client can redirect
   const activeDungeonProgress = await getActiveDungeon(characterId);
@@ -62,13 +52,6 @@ async function fetchBasicCharacterDataFromSession() {
     getHotbar(characterId),
   ]);
 
-  console.log('[fetchBasicCharacterDataFromSession] Data fetched:', {
-    inventory: inventory.length,
-    abilities: abilities.length,
-    hotbar: hotbar.length,
-    activeDungeon: activeDungeonProgress ? activeDungeonProgress.dungeon_id : 'none'
-  });
-
   return { character, inventory, abilities, hotbar, activeDungeonProgress };
 }
 
@@ -78,7 +61,6 @@ async function fetchBasicCharacterDataFromSession() {
  */
 export function useBasicCharacterData() {
   return createAsync(async () => {
-    console.log('[useBasicCharacterData] Fetching from session');
     try {
       return await fetchBasicCharacterDataFromSession();
     } catch (error) {

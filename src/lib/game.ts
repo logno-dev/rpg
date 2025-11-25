@@ -1326,14 +1326,6 @@ export async function advanceDungeonEncounter(characterId: number, currentHealth
   const encounters = encountersResult.rows as any[];
   const nextEncounterOrder = progress.current_encounter + 1;
   
-  console.log('[advanceDungeonEncounter] Debug:', {
-    dungeonId: progress.dungeon_id,
-    currentEncounter: progress.current_encounter,
-    nextEncounterOrder,
-    encountersLength: encounters.length,
-    encounterOrders: encounters.map((e: any) => ({ order: e.encounter_order, isBoss: e.is_boss }))
-  });
-  
   // Check if dungeon is complete (no more encounters left)
   if (nextEncounterOrder > encounters.length) {
     // Close the final combat session

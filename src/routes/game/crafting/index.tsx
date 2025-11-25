@@ -126,9 +126,7 @@ export default function CraftingPage() {
   const materials = createMemo(() => {
     const data = craftingData();
     if (!data) return [];
-    const mats = data.materials || [];
-    console.log('[Materials memo]', mats.slice(0, 3).map((m: any) => ({ name: m.name, qty: m.quantity })));
-    return mats;
+    return data.materials || [];
   });
 
   const currentCharacter = () => store.character;
@@ -512,15 +510,8 @@ export default function CraftingPage() {
               setMinigameData(null);
               
               // Clear cache and force refetch
-              console.log('[Crafting] Clearing cache and refetching materials...');
               mutateBasicData(undefined);
-              const result = await refetchBasicData();
-              console.log('[Crafting] Refetch complete:', result?.materials?.length, 'materials');
-              
-              // Log first few materials to see actual quantities
-              if (result?.materials) {
-                console.log('[Crafting] Sample materials:', result.materials.slice(0, 5).map((m: any) => ({ name: m.name, qty: m.quantity })));
-              }
+              await refetchBasicData();
             }}
           />
         </Show>
