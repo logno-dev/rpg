@@ -7,6 +7,7 @@ import { CombatEngine } from "~/components/CombatEngine";
 import { HealthRegen } from "~/components/HealthRegen";
 import { ActiveEffectsDisplay } from "~/components/ActiveEffectsDisplay";
 import { HotbarManager } from "~/components/HotbarManager";
+import { InventoryItemCard } from "~/components/InventoryItemCard";
 import { useCharacter } from "~/lib/CharacterContext";
 import { useActiveEffects } from "~/lib/ActiveEffectsContext";
 
@@ -57,6 +58,7 @@ export default function GamePage() {
   const [effectsStore, effectsActions] = useActiveEffects();
 
   const [view, setView] = createSignal<"adventure" | "inventory" | "stats" | "hotbar">("adventure");
+  const [inventoryFilter, setInventoryFilter] = createSignal<"all" | "weapons" | "armor" | "scrolls" | "consumables">("all");
   const [availableMobs, setAvailableMobs] = createSignal<Mob[]>([]);
   const [activeMob, setActiveMob] = createSignal<Mob | null>(null);
   const [activeNamedMobId, setActiveNamedMobId] = createSignal<number | null>(null);
@@ -1248,6 +1250,52 @@ export default function GamePage() {
   };
 
   // Helper to check if requirements are met (uses BASE stats)
+  // Check if ability from scroll is already learned or has better version
+  const getScrollAbilityStatus = (scrollItem: any) => {
+    if (!scrollItem.teaches_ability_id) return { alreadyLearned: false, hasBetter: false, status: 'can_learn' };
+    
+    const abilities = currentAbilities();
+    
+    // Check if exact ability is learned
+    const hasExact = abilities.some((a: any) => a.ability_id === scrollItem.teaches_ability_id || a.id === scrollItem.teaches_ability_id);
+    
+    if (hasExact) {
+      return { alreadyLearned: true, hasBetter: false, status: 'already_learned' };
+    }
+    
+    // Check for better tier of same ability
+    // Extract base name and tier (e.g., "Fireball II" -> "Fireball", 2)
+    const scrollName = scrollItem.name.replace('Scroll: ', '');
+    const tierMatch = scrollName.match(/^(.+)\s+(I{1,3}|IV|V)$/);
+    
+    if (tierMatch) {
+      const baseName = tierMatch[1];
+      const scrollTier = tierMatch[2];
+      
+      // Convert Roman numerals to numbers
+      const tierToNum: Record<string, number> = { 'I': 1, 'II': 2, 'III': 3, 'IV': 4, 'V': 5 };
+      const scrollTierNum = tierToNum[scrollTier] || 0;
+      
+      // Check if we have any tier of this ability
+      const hasBetterTier = abilities.some((a: any) => {
+        const abilityTierMatch = a.name.match(/^(.+)\s+(I{1,3}|IV|V)$/);
+        if (!abilityTierMatch) return false;
+        
+        const abilityBaseName = abilityTierMatch[1];
+        const abilityTier = abilityTierMatch[2];
+        const abilityTierNum = tierToNum[abilityTier] || 0;
+        
+        return abilityBaseName === baseName && abilityTierNum >= scrollTierNum;
+      });
+      
+      if (hasBetterTier) {
+        return { alreadyLearned: false, hasBetter: true, status: 'has_better' };
+      }
+    }
+    
+    return { alreadyLearned: false, hasBetter: false, status: 'can_learn' };
+  };
+
   const meetsRequirements = (item: any) => {
     const char = currentCharacter();
     if (!char) return false;
@@ -2278,150 +2326,173 @@ export default function GamePage() {
               {/* General Inventory */}
               <div class="card">
                 <h3 style={{ "margin-bottom": "1rem" }}>Inventory</h3>
-                <div class="item-grid">
-                  <For each={currentInventory().filter((i: any) => !i.equipped)}>
-                    {(invItem: any) => (
-                      <div class={`item-card ${invItem.rarity}`}>
-                        <div style={{ display: "flex", "justify-content": "space-between", "align-items": "start", "margin-bottom": "0.5rem" }}>
-                          <div>
-                            <h4 style={{ "margin-bottom": "0.25rem" }}>{invItem.name}</h4>
-                            <p style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "text-transform": "uppercase" }}>
-                              {invItem.type} {invItem.slot && `• ${invItem.slot}`}
-                            </p>
-                          </div>
-                          <Show when={invItem.quantity > 1}>
-                            <div style={{ "font-weight": "bold", "font-size": "1.2rem" }}>x{invItem.quantity}</div>
-                          </Show>
-                        </div>
-
-                        <Show when={invItem.description}>
-                          <p style={{ "font-size": "0.875rem", "margin-bottom": "0.5rem", color: "var(--text-secondary)" }}>
-                            {invItem.description}
-                          </p>
-                        </Show>
-
-                        {/* Item Stats */}
-                        <div style={{ "font-size": "0.875rem", "margin-bottom": "0.5rem" }}>
-                          <Show when={invItem.damage_min && invItem.damage_max}>
-                            <div style={{ color: "var(--danger)" }}>⚔️ {invItem.damage_min}-{invItem.damage_max} Damage</div>
-                          </Show>
-                          <Show when={invItem.armor}>
-                            <div style={{ color: "var(--accent)" }}>🛡️ {invItem.armor} Armor</div>
-                          </Show>
-                          <Show when={invItem.attack_speed && invItem.attack_speed !== 1}>
-                            <div style={{ color: "var(--success)" }}>⚡ {invItem.attack_speed}x Attack Speed</div>
-                          </Show>
-                          <Show when={invItem.strength_bonus}>
-                            <div>💪 +{invItem.strength_bonus} Strength</div>
-                          </Show>
-                          <Show when={invItem.dexterity_bonus}>
-                            <div>🏃 +{invItem.dexterity_bonus} Dexterity</div>
-                          </Show>
-                          <Show when={invItem.constitution_bonus}>
-                            <div>❤️ +{invItem.constitution_bonus} Constitution</div>
-                          </Show>
-                          <Show when={invItem.intelligence_bonus}>
-                            <div>🧠 +{invItem.intelligence_bonus} Intelligence</div>
-                          </Show>
-                          <Show when={invItem.wisdom_bonus}>
-                            <div>✨ +{invItem.wisdom_bonus} Wisdom</div>
-                          </Show>
-                          <Show when={invItem.charisma_bonus}>
-                            <div>💫 +{invItem.charisma_bonus} Charisma</div>
-                          </Show>
-                          <Show when={invItem.value}>
-                            <div style={{ color: "var(--warning)" }}>💰 {invItem.value} Gold</div>
-                          </Show>
-                        </div>
-
-                        {/* Requirements */}
-                        <Show when={formatRequirements(invItem).length > 0}>
-                          <div style={{ 
-                            "font-size": "0.75rem", 
-                            "margin-bottom": "0.5rem",
-                            padding: "0.5rem",
-                            background: meetsRequirements(invItem) ? "rgba(34, 197, 94, 0.1)" : "rgba(239, 68, 68, 0.1)",
-                            "border-radius": "4px",
-                            border: `1px solid ${meetsRequirements(invItem) ? "var(--success)" : "var(--danger)"}`
-                          }}>
-                            <div style={{ 
-                              color: meetsRequirements(invItem) ? "var(--success)" : "var(--danger)",
-                              "font-weight": "bold",
-                              "margin-bottom": "0.25rem"
-                            }}>
-                              {meetsRequirements(invItem) ? "✓ Requirements Met" : "✗ Requirements Not Met"}
-                            </div>
-                            <div style={{ color: "var(--text-secondary)" }}>
-                              Requires: {formatRequirements(invItem).join(', ')}
-                            </div>
-                          </div>
-                        </Show>
-
-                        <div style={{ display: "flex", gap: "0.5rem", "margin-top": "0.5rem", "flex-wrap": "wrap" }}>
-                          <Show when={(invItem.type === 'consumable' || invItem.type === 'scroll') && invItem.teaches_ability_id}>
-                            <button
-                              class="button"
-                              style={{ 
-                                flex: 1, 
-                                "min-width": "100px", 
-                                background: meetsRequirements(invItem) ? "var(--accent)" : "var(--bg-light)", 
-                                color: meetsRequirements(invItem) ? "var(--bg-dark)" : "var(--text-secondary)",
-                                opacity: meetsRequirements(invItem) ? 1 : 0.5,
-                                cursor: meetsRequirements(invItem) ? "pointer" : "not-allowed"
-                              }}
-                              onClick={() => handleLearnAbility(invItem.id, invItem.name)}
-                              disabled={!meetsRequirements(invItem)}
-                            >
-                              {meetsRequirements(invItem) ? "Learn" : "Can't Learn"}
-                            </button>
-                          </Show>
-                          <Show when={invItem.type === 'consumable' && (invItem.health_restore || invItem.mana_restore)}>
-                            <button
-                              class="button success"
-                              style={{ flex: 1, "min-width": "100px" }}
-                              onClick={() => handleUseItem(invItem.id, invItem.name, invItem.health_restore || 0, invItem.mana_restore || 0)}
-                            >
-                              Use
-                            </button>
-                          </Show>
-                          <Show when={invItem.slot}>
-                            <button
-                              class="button"
-                              style={{ 
-                                flex: 1, 
-                                "min-width": "100px",
-                                opacity: meetsRequirements(invItem) ? 1 : 0.5,
-                                cursor: meetsRequirements(invItem) ? "pointer" : "not-allowed"
-                              }}
-                              onClick={() => handleEquip(invItem.id, false)}
-                              disabled={!meetsRequirements(invItem)}
-                            >
-                              {meetsRequirements(invItem) ? "Equip" : "Can't Equip"}
-                            </button>
-                          </Show>
-                          <Show when={invItem.value && invItem.value > 0}>
-                            <button
-                              class="button secondary"
-                              style={{ flex: 1, "min-width": "120px" }}
-                              onClick={() => handleSellClick(invItem.id, invItem.name, invItem.value, invItem.quantity)}
-                            >
-                              Sell ({Math.floor(invItem.value * 0.4) * invItem.quantity}g)
-                            </button>
-                          </Show>
-                          <Show when={!invItem.value || invItem.value === 0}>
-                            <button
-                              class="button danger"
-                              style={{ flex: 1, "min-width": "100px" }}
-                              onClick={() => handleDropClick(invItem.id, invItem.name, invItem.quantity)}
-                            >
-                              Drop
-                            </button>
-                          </Show>
-                        </div>
-                      </div>
-                    )}
-                  </For>
+                
+                {/* Filter Tabs */}
+                <div style={{ 
+                  display: "flex", 
+                  gap: "0.5rem", 
+                  "margin-bottom": "1.5rem",
+                  "flex-wrap": "wrap"
+                }}>
+                  <button 
+                    class={inventoryFilter() === "all" ? "button" : "button secondary"}
+                    onClick={() => setInventoryFilter("all")}
+                    style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
+                  >
+                    All
+                  </button>
+                  <button 
+                    class={inventoryFilter() === "weapons" ? "button" : "button secondary"}
+                    onClick={() => setInventoryFilter("weapons")}
+                    style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
+                  >
+                    ⚔️ Weapons
+                  </button>
+                  <button 
+                    class={inventoryFilter() === "armor" ? "button" : "button secondary"}
+                    onClick={() => setInventoryFilter("armor")}
+                    style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
+                  >
+                    🛡️ Armor
+                  </button>
+                  <button 
+                    class={inventoryFilter() === "scrolls" ? "button" : "button secondary"}
+                    onClick={() => setInventoryFilter("scrolls")}
+                    style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
+                  >
+                    📜 Scrolls
+                  </button>
+                  <button 
+                    class={inventoryFilter() === "consumables" ? "button" : "button secondary"}
+                    onClick={() => setInventoryFilter("consumables")}
+                    style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
+                  >
+                    🧪 Consumables
+                  </button>
                 </div>
+                
+                {/* Categorized "All" View */}
+                <Show when={inventoryFilter() === "all"}>
+                  <Show when={currentInventory().filter((i: any) => !i.equipped && i.slot === "weapon").length > 0}>
+                    <h4 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", display: "flex", "align-items": "center", gap: "0.5rem", "font-size": "1.1rem" }}>
+                      ⚔️ Weapons ({currentInventory().filter((i: any) => !i.equipped && i.slot === "weapon").length})
+                    </h4>
+                    <div class="item-grid" style={{ "margin-bottom": "2rem" }}>
+                      <For each={currentInventory().filter((i: any) => !i.equipped && i.slot === "weapon")}>
+                        {(invItem: any) => (
+                          <InventoryItemCard
+                            item={invItem}
+                            meetsRequirements={meetsRequirements}
+                            formatRequirements={formatRequirements}
+                            getScrollAbilityStatus={getScrollAbilityStatus}
+                            onLearnAbility={handleLearnAbility}
+                            onUseItem={handleUseItem}
+                            onEquip={handleEquip}
+                            onSell={handleSellClick}
+                            onDrop={handleDropClick}
+                          />
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+                  
+                  <Show when={currentInventory().filter((i: any) => !i.equipped && i.slot && i.slot !== "weapon" && i.type === "equipment").length > 0}>
+                    <h4 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", display: "flex", "align-items": "center", gap: "0.5rem", "font-size": "1.1rem" }}>
+                      🛡️ Armor ({currentInventory().filter((i: any) => !i.equipped && i.slot && i.slot !== "weapon" && i.type === "equipment").length})
+                    </h4>
+                    <div class="item-grid" style={{ "margin-bottom": "2rem" }}>
+                      <For each={currentInventory().filter((i: any) => !i.equipped && i.slot && i.slot !== "weapon" && i.type === "equipment")}>
+                        {(invItem: any) => (
+                          <InventoryItemCard
+                            item={invItem}
+                            meetsRequirements={meetsRequirements}
+                            formatRequirements={formatRequirements}
+                            getScrollAbilityStatus={getScrollAbilityStatus}
+                            onLearnAbility={handleLearnAbility}
+                            onUseItem={handleUseItem}
+                            onEquip={handleEquip}
+                            onSell={handleSellClick}
+                            onDrop={handleDropClick}
+                          />
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+                  
+                  <Show when={currentInventory().filter((i: any) => !i.equipped && i.type === "scroll").length > 0}>
+                    <h4 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", display: "flex", "align-items": "center", gap: "0.5rem", "font-size": "1.1rem" }}>
+                      📜 Scrolls ({currentInventory().filter((i: any) => !i.equipped && i.type === "scroll").length})
+                    </h4>
+                    <div class="item-grid" style={{ "margin-bottom": "2rem" }}>
+                      <For each={currentInventory().filter((i: any) => !i.equipped && i.type === "scroll")}>
+                        {(invItem: any) => (
+                          <InventoryItemCard
+                            item={invItem}
+                            meetsRequirements={meetsRequirements}
+                            formatRequirements={formatRequirements}
+                            getScrollAbilityStatus={getScrollAbilityStatus}
+                            onLearnAbility={handleLearnAbility}
+                            onUseItem={handleUseItem}
+                            onEquip={handleEquip}
+                            onSell={handleSellClick}
+                            onDrop={handleDropClick}
+                          />
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+                  
+                  <Show when={currentInventory().filter((i: any) => !i.equipped && i.type === "consumable").length > 0}>
+                    <h4 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", display: "flex", "align-items": "center", gap: "0.5rem", "font-size": "1.1rem" }}>
+                      🧪 Consumables ({currentInventory().filter((i: any) => !i.equipped && i.type === "consumable").length})
+                    </h4>
+                    <div class="item-grid" style={{ "margin-bottom": "2rem" }}>
+                      <For each={currentInventory().filter((i: any) => !i.equipped && i.type === "consumable")}>
+                        {(invItem: any) => (
+                          <InventoryItemCard
+                            item={invItem}
+                            meetsRequirements={meetsRequirements}
+                            formatRequirements={formatRequirements}
+                            getScrollAbilityStatus={getScrollAbilityStatus}
+                            onLearnAbility={handleLearnAbility}
+                            onUseItem={handleUseItem}
+                            onEquip={handleEquip}
+                            onSell={handleSellClick}
+                            onDrop={handleDropClick}
+                          />
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+                </Show>
+                
+                {/* Filtered View */}
+                <Show when={inventoryFilter() !== "all"}>
+                  <div class="item-grid">
+                    <For each={currentInventory().filter((i: any) => {
+                      if (i.equipped) return false;
+                      if (inventoryFilter() === "weapons") return i.slot === "weapon";
+                      if (inventoryFilter() === "armor") return i.slot && i.slot !== "weapon" && i.type === "equipment";
+                      if (inventoryFilter() === "scrolls") return i.type === "scroll";
+                      if (inventoryFilter() === "consumables") return i.type === "consumable";
+                      return false;
+                    })}>
+                      {(invItem: any) => (
+                        <InventoryItemCard
+                          item={invItem}
+                          meetsRequirements={meetsRequirements}
+                          formatRequirements={formatRequirements}
+                          getScrollAbilityStatus={getScrollAbilityStatus}
+                          onLearnAbility={handleLearnAbility}
+                          onUseItem={handleUseItem}
+                          onEquip={handleEquip}
+                          onSell={handleSellClick}
+                          onDrop={handleDropClick}
+                        />
+                      )}
+                    </For>
+                  </div>
+                </Show>
               </div>
             </Show>
 
