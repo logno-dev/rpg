@@ -55,6 +55,18 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
   const [lastActionResult, setLastActionResult] = createSignal<"success" | "fail" | null>(null);
   const [craftComplete, setCraftComplete] = createSignal(false);
   const [craftResult, setCraftResult] = createSignal<any>(null);
+  const [isAnimatingMove, setIsAnimatingMove] = createSignal(false);
+  const [animStartX, setAnimStartX] = createSignal(0);
+  const [animStartY, setAnimStartY] = createSignal(0);
+  const [animTargetX, setAnimTargetX] = createSignal(0);
+  const [animTargetY, setAnimTargetY] = createSignal(0);
+  const [animProgress, setAnimProgress] = createSignal(0);
+  const [animatingPin, setAnimatingPin] = createSignal(false);
+  const [pinAnimationProgress, setPinAnimationProgress] = createSignal(0);
+  const [pinStartX, setPinStartX] = createSignal(0);
+  const [pinStartY, setPinStartY] = createSignal(0);
+  const [pinTargetX, setPinTargetX] = createSignal(0);
+  const [pinTargetY, setPinTargetY] = createSignal(0);
 
   const GRID_SIZE = 21; // -10 to +10
   const GRID_MIN = -10;
@@ -115,40 +127,8 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
     ctx.fillStyle = "#1a1a2e";
     ctx.fillRect(0, 0, size, size);
 
-    // Draw grid
-    ctx.strokeStyle = "#2a2a3e";
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= GRID_SIZE; i++) {
-      // Vertical lines
-      ctx.beginPath();
-      ctx.moveTo(i * cellSize, 0);
-      ctx.lineTo(i * cellSize, size);
-      ctx.stroke();
-      
-      // Horizontal lines
-      ctx.beginPath();
-      ctx.moveTo(0, i * cellSize);
-      ctx.lineTo(size, i * cellSize);
-      ctx.stroke();
-    }
-
-    // Draw center lines (axes)
     const centerX = size / 2;
     const centerY = size / 2;
-    ctx.strokeStyle = "#4a4a5e";
-    ctx.lineWidth = 2;
-    
-    // X axis
-    ctx.beginPath();
-    ctx.moveTo(0, centerY);
-    ctx.lineTo(size, centerY);
-    ctx.stroke();
-    
-    // Y axis
-    ctx.beginPath();
-    ctx.moveTo(centerX, 0);
-    ctx.lineTo(centerX, size);
-    ctx.stroke();
 
     // Draw circular boundary
     ctx.strokeStyle = "#6a6a7e";
@@ -170,23 +150,39 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
     ctx.fill();
     ctx.stroke();
 
-    // Draw pin (current position)
-    const pinCanvasX = centerX + (pinX() * cellSize);
-    const pinCanvasY = centerY - (pinY() * cellSize); // Invert Y for canvas
+    // Draw pin (current position with animation)
+    let displayX = pinX();
+    let displayY = pinY();
     
-    ctx.fillStyle = "#8b5cf6";
-    ctx.strokeStyle = "#a78bfa";
+    // Apply animation interpolation if moving
+    if (isAnimatingMove()) {
+      const progress = animProgress();
+      displayX = animStartX() + (animTargetX() - animStartX()) * progress;
+      displayY = animStartY() + (animTargetY() - animStartY()) * progress;
+    }
+    
+    const pinCanvasX = centerX + (displayX * cellSize);
+    const pinCanvasY = centerY - (displayY * cellSize); // Invert Y for canvas
+    
+    // Color based on last action result
+    let pinFillColor = "#8b5cf6";
+    let pinStrokeColor = "#a78bfa";
+    
+    if (lastActionResult() === "success") {
+      pinFillColor = "#22c55e";
+      pinStrokeColor = "#4ade80";
+    } else if (lastActionResult() === "fail") {
+      pinFillColor = "#ef4444";
+      pinStrokeColor = "#f87171";
+    }
+    
+    ctx.fillStyle = pinFillColor;
+    ctx.strokeStyle = pinStrokeColor;
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.arc(pinCanvasX, pinCanvasY, 8, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
-
-    // Draw coordinate labels
-    ctx.fillStyle = "#9ca3af";
-    ctx.font = "12px monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(`(${pinX()}, ${pinY()})`, pinCanvasX, pinCanvasY - 15);
   });
 
   // Timer countdown
@@ -255,23 +251,53 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
       const data = await response.json();
       
       if (data.success) {
-        // Action succeeded, move pin
+        // Action succeeded, animate pin movement
         const newX = Math.max(GRID_MIN, Math.min(GRID_MAX, data.newX));
         const newY = Math.max(GRID_MIN, Math.min(GRID_MAX, data.newY));
-        setPinX(newX);
-        setPinY(newY);
+        
+        // Set up animation
+        setAnimStartX(pinX());
+        setAnimStartY(pinY());
+        setAnimTargetX(newX);
+        setAnimTargetY(newY);
+        setIsAnimatingMove(true);
+        setAnimProgress(0);
         setLastActionResult("success");
         
-        // Check if pin is now inside target circle
-        const distance = Math.sqrt(
-          Math.pow(newX - props.targetX, 2) + 
-          Math.pow(newY - props.targetY, 2)
-        );
+        // Animate the movement over 400ms
+        const animationDuration = 400;
+        const animationStart = Date.now();
         
-        if (distance <= props.targetRadius) {
-          // Success! Complete the craft immediately
-          setTimeout(() => finishCraft(), 300); // Small delay for visual feedback
-        }
+        const animateMove = () => {
+          const elapsed = Date.now() - animationStart;
+          const progress = Math.min(elapsed / animationDuration, 1);
+          
+          // Easing function for smooth animation (ease-out)
+          const easedProgress = 1 - Math.pow(1 - progress, 3);
+          setAnimProgress(easedProgress);
+          
+          if (progress < 1) {
+            requestAnimationFrame(animateMove);
+          } else {
+            // Animation complete, set final position
+            setPinX(newX);
+            setPinY(newY);
+            setIsAnimatingMove(false);
+            
+            // Check if pin is now inside target circle
+            const distance = Math.sqrt(
+              Math.pow(newX - props.targetX, 2) + 
+              Math.pow(newY - props.targetY, 2)
+            );
+            
+            if (distance <= props.targetRadius) {
+              // Success! Complete the craft immediately
+              setTimeout(() => finishCraft(), 300);
+            }
+          }
+        };
+        
+        requestAnimationFrame(animateMove);
       } else {
         // Action failed, pin doesn't move
         setLastActionResult("fail");
@@ -281,7 +307,7 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
       setTimeout(() => {
         setLastActionResult(null);
         setLastActionButton(null);
-      }, 500);
+      }, 600);
     } catch (error) {
       console.error("[CraftingMinigame] Action failed:", error);
     }
