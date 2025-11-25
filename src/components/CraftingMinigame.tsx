@@ -60,8 +60,15 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
   const GRID_MIN = -10;
   const GRID_MAX = 10;
   const ACTION_COOLDOWN = 1; // seconds
-  const CANVAS_SIZE = 400;
-  const CELL_SIZE = CANVAS_SIZE / GRID_SIZE;
+  
+  // Responsive canvas size
+  const getCanvasSize = () => {
+    if (typeof window === 'undefined') return 400;
+    return window.innerWidth < 768 ? Math.min(window.innerWidth - 60, 300) : 400;
+  };
+  
+  const [canvasSize, setCanvasSize] = createSignal(getCanvasSize());
+  const CELL_SIZE = () => canvasSize() / GRID_SIZE;
   const RIM_RADIUS = 9; // Place pin on rim (near edge of grid)
 
   let canvas: HTMLCanvasElement | undefined;
@@ -79,6 +86,18 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
     setPinY(y);
   });
 
+  // Handle window resize
+  createEffect(() => {
+    const handleResize = () => {
+      setCanvasSize(getCanvasSize());
+    };
+    
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', handleResize);
+      onCleanup(() => window.removeEventListener('resize', handleResize));
+    }
+  });
+
   // Draw the canvas
   createEffect(() => {
     if (!canvas) return;
@@ -86,12 +105,15 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    const size = canvasSize();
+    const cellSize = CELL_SIZE();
+
     // Clear canvas
-    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    ctx.clearRect(0, 0, size, size);
 
     // Draw background
     ctx.fillStyle = "#1a1a2e";
-    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    ctx.fillRect(0, 0, size, size);
 
     // Draw grid
     ctx.strokeStyle = "#2a2a3e";
@@ -99,46 +121,46 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
     for (let i = 0; i <= GRID_SIZE; i++) {
       // Vertical lines
       ctx.beginPath();
-      ctx.moveTo(i * CELL_SIZE, 0);
-      ctx.lineTo(i * CELL_SIZE, CANVAS_SIZE);
+      ctx.moveTo(i * cellSize, 0);
+      ctx.lineTo(i * cellSize, size);
       ctx.stroke();
       
       // Horizontal lines
       ctx.beginPath();
-      ctx.moveTo(0, i * CELL_SIZE);
-      ctx.lineTo(CANVAS_SIZE, i * CELL_SIZE);
+      ctx.moveTo(0, i * cellSize);
+      ctx.lineTo(size, i * cellSize);
       ctx.stroke();
     }
 
     // Draw center lines (axes)
-    const centerX = CANVAS_SIZE / 2;
-    const centerY = CANVAS_SIZE / 2;
+    const centerX = size / 2;
+    const centerY = size / 2;
     ctx.strokeStyle = "#4a4a5e";
     ctx.lineWidth = 2;
     
     // X axis
     ctx.beginPath();
     ctx.moveTo(0, centerY);
-    ctx.lineTo(CANVAS_SIZE, centerY);
+    ctx.lineTo(size, centerY);
     ctx.stroke();
     
     // Y axis
     ctx.beginPath();
     ctx.moveTo(centerX, 0);
-    ctx.lineTo(centerX, CANVAS_SIZE);
+    ctx.lineTo(centerX, size);
     ctx.stroke();
 
     // Draw circular boundary
     ctx.strokeStyle = "#6a6a7e";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(centerX, centerY, CANVAS_SIZE / 2 - 10, 0, Math.PI * 2);
+    ctx.arc(centerX, centerY, size / 2 - 10, 0, Math.PI * 2);
     ctx.stroke();
 
     // Draw target circle (green)
-    const targetCanvasX = centerX + (props.targetX * CELL_SIZE);
-    const targetCanvasY = centerY - (props.targetY * CELL_SIZE); // Invert Y for canvas
-    const targetCanvasRadius = props.targetRadius * CELL_SIZE;
+    const targetCanvasX = centerX + (props.targetX * cellSize);
+    const targetCanvasY = centerY - (props.targetY * cellSize); // Invert Y for canvas
+    const targetCanvasRadius = props.targetRadius * cellSize;
     
     ctx.fillStyle = "rgba(34, 197, 94, 0.2)";
     ctx.strokeStyle = "#22c55e";
@@ -149,8 +171,8 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
     ctx.stroke();
 
     // Draw pin (current position)
-    const pinCanvasX = centerX + (pinX() * CELL_SIZE);
-    const pinCanvasY = centerY - (pinY() * CELL_SIZE); // Invert Y for canvas
+    const pinCanvasX = centerX + (pinX() * cellSize);
+    const pinCanvasY = centerY - (pinY() * cellSize); // Invert Y for canvas
     
     ctx.fillStyle = "#8b5cf6";
     ctx.strokeStyle = "#a78bfa";
@@ -389,9 +411,9 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
         }}>
           <canvas 
             ref={canvas!}
-            width={CANVAS_SIZE} 
-            height={CANVAS_SIZE}
-            style={{ border: "2px solid var(--border)", "border-radius": "50%" }}
+            width={canvasSize()} 
+            height={canvasSize()}
+            style={{ border: "2px solid var(--border)", "border-radius": "50%", "max-width": "100%" }}
           />
         </div>
 
