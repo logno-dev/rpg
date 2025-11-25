@@ -52,6 +52,8 @@ export default function InventoryPage() {
   const [selectedItem, setSelectedItem] = createSignal<any | null>(null);
   const [selectedItemIsMerchant, setSelectedItemIsMerchant] = createSignal(false);
   const [showBulkSellModal, setShowBulkSellModal] = createSignal(false);
+  const [showDropModal, setShowDropModal] = createSignal(false);
+  const [dropItemData, setDropItemData] = createSignal<{inventoryItemId: number, itemName: string, quantity: number} | null>(null);
   const [isEquipping, setIsEquipping] = createSignal(false);
 
   // Computed values - use context as source of truth
@@ -136,6 +138,46 @@ export default function InventoryPage() {
     } catch (error) {
       console.error('Learn ability error:', error);
       alert('Failed to learn ability');
+    }
+  };
+
+  // Handle drop item click (show modal)
+  const handleDropClick = (inventoryItemId: number, itemName: string, quantity: number) => {
+    setDropItemData({ inventoryItemId, itemName, quantity });
+    setShowDropModal(true);
+  };
+
+  // Handle drop item confirm
+  const handleDropConfirm = async () => {
+    const dropData = dropItemData();
+    if (!dropData) return;
+
+    setShowDropModal(false);
+
+    try {
+      const response = await fetch('/api/game/drop-item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          characterId: characterId(), 
+          inventoryItemId: dropData.inventoryItemId,
+          quantity: dropData.quantity
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to drop item');
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        actions.setInventory(result.inventory);
+        setDropItemData(null);
+      }
+    } catch (error) {
+      console.error('Drop item error:', error);
+      alert('Failed to drop item');
     }
   };
 
@@ -986,6 +1028,7 @@ export default function InventoryPage() {
           onEquip={(id) => handleEquip(id, false)}
           onSell={handleSell}
           onLearnAbility={handleLearnAbility}
+          onDrop={handleDropClick}
           isMerchantItem={selectedItemIsMerchant()}
         />
       </Show>
@@ -1075,6 +1118,96 @@ export default function InventoryPage() {
                 style={{ flex: 1, background: "var(--warning)", color: "var(--bg-dark)" }}
               >
                 Sell Items
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      {/* Drop Confirmation Modal */}
+      <Show when={showDropModal() && dropItemData()}>
+        <div 
+          style={{ 
+            position: "fixed", 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            background: "rgba(0, 0, 0, 0.85)", 
+            display: "flex", 
+            "align-items": "center", 
+            "justify-content": "center",
+            "z-index": 1000,
+            padding: "1rem"
+          }}
+          onClick={() => setShowDropModal(false)}
+        >
+          <div 
+            class="card"
+            style={{ 
+              "max-width": "450px",
+              width: "100%",
+              background: "var(--bg-dark)",
+              border: "2px solid var(--danger)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ "margin-bottom": "1rem", color: "var(--danger)" }}>⚠️ Drop Item</h2>
+            
+            <div style={{ "margin-bottom": "1.5rem" }}>
+              <p style={{ color: "var(--text-secondary)", "margin-bottom": "1rem" }}>
+                Are you sure you want to drop this item? This action cannot be undone.
+              </p>
+              
+              <div style={{ 
+                padding: "1rem",
+                background: "var(--bg-light)",
+                "border-radius": "6px",
+                "margin-bottom": "1rem"
+              }}>
+                <div style={{ 
+                  "font-weight": "bold",
+                  "font-size": "1.1rem",
+                  "margin-bottom": "0.5rem"
+                }}>
+                  {dropItemData()?.itemName}
+                </div>
+                <Show when={dropItemData()?.quantity && dropItemData()!.quantity > 1}>
+                  <div style={{ color: "var(--text-secondary)", "font-size": "0.875rem" }}>
+                    Quantity: {dropItemData()?.quantity}
+                  </div>
+                </Show>
+              </div>
+              
+              <div style={{ 
+                padding: "0.75rem",
+                background: "rgba(239, 68, 68, 0.1)",
+                "border-radius": "6px",
+                "border-left": "4px solid var(--danger)",
+                "font-size": "0.875rem",
+                color: "var(--danger)"
+              }}>
+                <strong>Warning:</strong> Dropped items are permanently deleted and cannot be recovered.
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "1rem" }}>
+              <button
+                class="button secondary"
+                onClick={() => {
+                  setShowDropModal(false);
+                  setDropItemData(null);
+                }}
+                style={{ flex: 1 }}
+              >
+                Cancel
+              </button>
+              <button
+                class="button danger"
+                onClick={handleDropConfirm}
+                style={{ flex: 1 }}
+              >
+                Drop Item
               </button>
             </div>
           </div>
