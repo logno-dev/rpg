@@ -37,12 +37,21 @@ export async function POST(event: APIEvent) {
 
     const session = sessionResult.rows[0] as any;
 
+    // Get character level to check max crafting level
+    const charResult = await db.execute({
+      sql: `SELECT level FROM characters WHERE id = ?`,
+      args: [characterId]
+    });
+    const characterLevel = (charResult.rows[0] as any).level;
+    // Level 1 characters can craft at level 1, otherwise level / 2
+    const maxCraftingLevel = characterLevel === 1 ? 1 : Math.floor(characterLevel / 2);
+
     // Calculate XP gained (100% on success, 25% on failure)
     const xpMultiplier = success ? 1.0 : 0.25;
     const xpGained = Math.floor(session.base_experience * xpMultiplier);
 
     // Update profession XP
-    const newProfessionExp = session.profession_exp + xpGained;
+    let newProfessionExp = session.profession_exp + xpGained;
     
     // Check for level up (matches character XP formula: level * 125)
     const CRAFTING_XP_BASE = 125;
@@ -51,20 +60,19 @@ export async function POST(event: APIEvent) {
     let finalExp = newProfessionExp;
 
     if (newProfessionExp >= CRAFTING_XP_BASE * session.profession_level) {
-      // Get character level to check max crafting level
-      const charResult = await db.execute({
-        sql: `SELECT level FROM characters WHERE id = ?`,
-        args: [characterId]
-      });
-      const characterLevel = (charResult.rows[0] as any).level;
-      // Level 1 characters can craft at level 1, otherwise level / 2
-      const maxCraftingLevel = characterLevel === 1 ? 1 : Math.floor(characterLevel / 2);
-
       // Only level up if not at max
       if (session.profession_level < maxCraftingLevel) {
         newProfessionLevel = session.profession_level + 1;
         finalExp = newProfessionExp - (CRAFTING_XP_BASE * session.profession_level);
         levelUp = true;
+      }
+    }
+
+    // Cap experience at max level
+    if (newProfessionLevel >= maxCraftingLevel) {
+      const maxExp = CRAFTING_XP_BASE * maxCraftingLevel;
+      if (finalExp > maxExp) {
+        finalExp = maxExp;
       }
     }
 

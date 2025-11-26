@@ -49,12 +49,18 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
   const [pinX, setPinX] = createSignal(0);
   const [pinY, setPinY] = createSignal(0);
   const [timeRemaining, setTimeRemaining] = createSignal(props.craftTimeSeconds);
-  const [cooldownRemaining, setCooldownRemaining] = createSignal(0);
+  const [cooldowns, setCooldowns] = createSignal({
+    north: 0,
+    south: 0,
+    east: 0,
+    west: 0
+  });
   const [actionsPerformed, setActionsPerformed] = createSignal(0);
   const [lastActionButton, setLastActionButton] = createSignal<string | null>(null);
   const [lastActionResult, setLastActionResult] = createSignal<"success" | "fail" | null>(null);
   const [craftComplete, setCraftComplete] = createSignal(false);
   const [craftResult, setCraftResult] = createSignal<any>(null);
+  const [craftSucceeded, setCraftSucceeded] = createSignal(false);
   const [isAnimatingMove, setIsAnimatingMove] = createSignal(false);
   const [animStartX, setAnimStartX] = createSignal(0);
   const [animStartY, setAnimStartY] = createSignal(0);
@@ -85,7 +91,7 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
 
   let canvas: HTMLCanvasElement | undefined;
   let timerInterval: number | undefined;
-  let cooldownInterval: number | undefined;
+  let cooldownIntervals: Record<string, number> = {};
 
   const actions = () => PROFESSION_ACTIONS[props.profession];
 
@@ -200,38 +206,36 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
 
   // Cooldown countdown
   createEffect(() => {
-    if (cooldownInterval) {
-      clearInterval(cooldownInterval);
-      cooldownInterval = undefined;
-    }
+    const currentCooldowns = cooldowns();
     
-    if (cooldownRemaining() > 0) {
-      cooldownInterval = window.setInterval(() => {
-        setCooldownRemaining(cd => {
-          const newCd = cd - 0.1;
-          if (newCd <= 0) {
-            if (cooldownInterval) {
-              clearInterval(cooldownInterval);
-              cooldownInterval = undefined;
+    // Start/stop cooldown intervals for each action
+    (['north', 'south', 'east', 'west'] as const).forEach(direction => {
+      if (currentCooldowns[direction] > 0 && !cooldownIntervals[direction]) {
+        cooldownIntervals[direction] = window.setInterval(() => {
+          setCooldowns(cds => {
+            const newCd = cds[direction] - 0.1;
+            if (newCd <= 0) {
+              clearInterval(cooldownIntervals[direction]);
+              delete cooldownIntervals[direction];
+              return { ...cds, [direction]: 0 };
             }
-            return 0;
-          }
-          return newCd;
-        });
-      }, 100);
-    }
+            return { ...cds, [direction]: newCd };
+          });
+        }, 100);
+      }
+    });
   });
 
   onCleanup(() => {
     if (timerInterval) clearInterval(timerInterval);
-    if (cooldownInterval) clearInterval(cooldownInterval);
+    Object.values(cooldownIntervals).forEach(interval => clearInterval(interval));
   });
 
   const performAction = async (direction: "east" | "west" | "north" | "south") => {
-    if (cooldownRemaining() > 0) return;
+    if (cooldowns()[direction] > 0 || craftSucceeded()) return;
 
-    // Start cooldown
-    setCooldownRemaining(ACTION_COOLDOWN);
+    // Start cooldown for this specific action
+    setCooldowns(cds => ({ ...cds, [direction]: ACTION_COOLDOWN }));
     setActionsPerformed(a => a + 1);
     setLastActionButton(direction);
 
@@ -291,7 +295,8 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
             );
             
             if (distance <= props.targetRadius) {
-              // Success! Complete the craft immediately
+              // Success! Mark as succeeded and complete the craft
+              setCraftSucceeded(true);
               setTimeout(() => finishCraft(), 300);
             }
           }
@@ -324,7 +329,7 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
     
     // Stop timers
     if (timerInterval) clearInterval(timerInterval);
-    if (cooldownInterval) clearInterval(cooldownInterval);
+    Object.values(cooldownIntervals).forEach(interval => clearInterval(interval));
     
     // Call onComplete and get result data
     const result = await props.onComplete(success);
@@ -375,17 +380,17 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
               "margin-bottom": "2rem",
               color: "var(--text-secondary)"
             }}>
-              <Show when={craftResult()?.craftSuccess && craftResult()?.craftedItem}>
+              {craftResult()?.craftSuccess && craftResult()?.craftedItem && (
                 <p style={{ "font-weight": "bold", color: "var(--text-primary)" }}>
                   Crafted: {craftResult()?.craftedItem?.name}
                 </p>
-              </Show>
+              )}
               <p>+{craftResult()?.xpGained} XP</p>
-              <Show when={craftResult()?.levelUp}>
+              {craftResult()?.levelUp && (
                 <p style={{ color: "var(--accent)", "font-weight": "bold" }}>
                   Level Up! Now level {craftResult()?.newLevel}
                 </p>
-              </Show>
+              )}
             </div>
             <button 
               class="button primary" 
@@ -401,7 +406,7 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
         {/* Stats Bar */}
         <div style={{ 
           display: "grid", 
-          "grid-template-columns": "1fr 1fr 1fr",
+          "grid-template-columns": "1fr 1fr",
           gap: "1rem",
           "margin-bottom": "1rem",
           "text-align": "center"
@@ -416,12 +421,6 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
             <div style={{ "font-size": "0.85rem", color: "var(--text-secondary)" }}>Actions</div>
             <div style={{ "font-size": "1.5rem", "font-weight": "bold" }}>
               {actionsPerformed()}
-            </div>
-          </div>
-          <div>
-            <div style={{ "font-size": "0.85rem", color: "var(--text-secondary)" }}>Cooldown</div>
-            <div style={{ "font-size": "1.5rem", "font-weight": "bold" }}>
-              {cooldownRemaining() > 0 ? cooldownRemaining().toFixed(1) : "Ready"}
             </div>
           </div>
         </div>
@@ -443,65 +442,166 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
           />
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons - Circular Quadrant Layout */}
         <div style={{ 
-          display: "grid", 
-          "grid-template-columns": "1fr 1fr",
-          "grid-template-rows": "1fr 1fr",
-          gap: "0.5rem",
-          "max-width": "400px",
-          margin: "0 auto 1rem"
+          position: "relative",
+          width: "300px",
+          height: "300px",
+          margin: "0 auto 1rem",
+          "border-radius": "50%",
+          overflow: "hidden"
         }}>
-          {/* North */}
+          {/* SVG borders between quadrants */}
+          <svg style={{
+            position: "absolute",
+            top: "0",
+            left: "0",
+            width: "100%",
+            height: "100%",
+            "pointer-events": "none",
+            "z-index": "10"
+          }} viewBox="0 0 300 300">
+            {/* Diagonal line from top-left to center to bottom-right */}
+            <line x1="0" y1="0" x2="150" y2="150" stroke="var(--bg-dark)" stroke-width="3" />
+            <line x1="150" y1="150" x2="300" y2="300" stroke="var(--bg-dark)" stroke-width="3" />
+            {/* Diagonal line from top-right to center to bottom-left */}
+            <line x1="300" y1="0" x2="150" y2="150" stroke="var(--bg-dark)" stroke-width="3" />
+            <line x1="150" y1="150" x2="0" y2="300" stroke="var(--bg-dark)" stroke-width="3" />
+          </svg>
+          {/* North Quadrant - Top pie slice */}
           <button
-            class="button primary"
-            style={getButtonStyle("north", { "grid-column": "1 / -1" })}
+            class="button primary crafting-quadrant-button"
+            style={{
+              ...getButtonStyle("north"),
+              position: "absolute",
+              top: "0",
+              left: "0",
+              width: "300px",
+              height: "300px",
+              "clip-path": "polygon(50% 50%, 0% 0%, 100% 0%)",
+              display: "flex",
+              "flex-direction": "column",
+              "align-items": "center",
+              "justify-content": "flex-start",
+              "padding-top": "2rem",
+              "border-radius": "0"
+            }}
             onClick={() => performAction("north")}
-            disabled={cooldownRemaining() > 0}
+            disabled={cooldowns().north > 0}
           >
-            ↑ {actions().north.name}
-            <div style={{ "font-size": "0.75rem", opacity: 0.8 }}>
+            <div style={{ "font-weight": "bold", "margin-bottom": "0.25rem" }}>
+              ↑ {actions().north.name}
+            </div>
+            <div style={{ "font-size": "0.7rem", opacity: 0.8 }}>
               {actions().north.description}
             </div>
+            {cooldowns().north > 0 && (
+              <div style={{ "font-size": "0.8rem", "margin-top": "0.25rem", color: "var(--accent)" }}>
+                {cooldowns().north.toFixed(1)}s
+              </div>
+            )}
           </button>
           
-          {/* West */}
+          {/* East Quadrant - Right pie slice */}
           <button
-            class="button primary"
-            style={getButtonStyle("west")}
-            onClick={() => performAction("west")}
-            disabled={cooldownRemaining() > 0}
-          >
-            ← {actions().west.name}
-            <div style={{ "font-size": "0.75rem", opacity: 0.8 }}>
-              {actions().west.description}
-            </div>
-          </button>
-          
-          {/* East */}
-          <button
-            class="button primary"
-            style={getButtonStyle("east")}
+            class="button primary crafting-quadrant-button"
+            style={{
+              ...getButtonStyle("east"),
+              position: "absolute",
+              top: "0",
+              left: "0",
+              width: "300px",
+              height: "300px",
+              "clip-path": "polygon(50% 50%, 100% 0%, 100% 100%)",
+              display: "flex",
+              "flex-direction": "column",
+              "align-items": "flex-end",
+              "justify-content": "center",
+              "padding-right": "2rem",
+              "border-radius": "0"
+            }}
             onClick={() => performAction("east")}
-            disabled={cooldownRemaining() > 0}
+            disabled={cooldowns().east > 0}
           >
-            {actions().east.name} →
-            <div style={{ "font-size": "0.75rem", opacity: 0.8 }}>
+            <div style={{ "font-weight": "bold", "margin-bottom": "0.25rem" }}>
+              {actions().east.name} →
+            </div>
+            <div style={{ "font-size": "0.7rem", opacity: 0.8 }}>
               {actions().east.description}
             </div>
+            {cooldowns().east > 0 && (
+              <div style={{ "font-size": "0.8rem", "margin-top": "0.25rem", color: "var(--accent)" }}>
+                {cooldowns().east.toFixed(1)}s
+              </div>
+            )}
           </button>
           
-          {/* South */}
+          {/* South Quadrant - Bottom pie slice */}
           <button
-            class="button primary"
-            style={getButtonStyle("south", { "grid-column": "1 / -1" })}
+            class="button primary crafting-quadrant-button"
+            style={{
+              ...getButtonStyle("south"),
+              position: "absolute",
+              top: "0",
+              left: "0",
+              width: "300px",
+              height: "300px",
+              "clip-path": "polygon(50% 50%, 100% 100%, 0% 100%)",
+              display: "flex",
+              "flex-direction": "column",
+              "align-items": "center",
+              "justify-content": "flex-end",
+              "padding-bottom": "2rem",
+              "border-radius": "0"
+            }}
             onClick={() => performAction("south")}
-            disabled={cooldownRemaining() > 0}
+            disabled={cooldowns().south > 0}
           >
-            ↓ {actions().south.name}
-            <div style={{ "font-size": "0.75rem", opacity: 0.8 }}>
+            <div style={{ "font-weight": "bold", "margin-bottom": "0.25rem" }}>
+              ↓ {actions().south.name}
+            </div>
+            <div style={{ "font-size": "0.7rem", opacity: 0.8 }}>
               {actions().south.description}
             </div>
+            {cooldowns().south > 0 && (
+              <div style={{ "font-size": "0.8rem", "margin-top": "0.25rem", color: "var(--accent)" }}>
+                {cooldowns().south.toFixed(1)}s
+              </div>
+            )}
+          </button>
+          
+          {/* West Quadrant - Left pie slice */}
+          <button
+            class="button primary crafting-quadrant-button"
+            style={{
+              ...getButtonStyle("west"),
+              position: "absolute",
+              top: "0",
+              left: "0",
+              width: "300px",
+              height: "300px",
+              "clip-path": "polygon(50% 50%, 0% 100%, 0% 0%)",
+              display: "flex",
+              "flex-direction": "column",
+              "align-items": "flex-start",
+              "justify-content": "center",
+              "padding-left": "2rem",
+              "border-radius": "0"
+            }}
+            onClick={() => performAction("west")}
+            disabled={cooldowns().west > 0}
+          >
+            <div style={{ "font-weight": "bold", "margin-bottom": "0.25rem" }}>
+              ← {actions().west.name}
+            </div>
+            <div style={{ "font-size": "0.7rem", opacity: 0.8 }}>
+              {actions().west.description}
+            </div>
+            {cooldowns().west > 0 && (
+              <div style={{ "font-size": "0.8rem", "margin-top": "0.25rem", color: "var(--accent)" }}>
+                {cooldowns().west.toFixed(1)}s
+              </div>
+            )}
           </button>
         </div>
 
