@@ -62,6 +62,7 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
   const [craftResult, setCraftResult] = createSignal<any>(null);
   const [craftSucceeded, setCraftSucceeded] = createSignal(false);
   const [isAnimatingMove, setIsAnimatingMove] = createSignal(false);
+  const [isProcessingAction, setIsProcessingAction] = createSignal(false);
   const [animStartX, setAnimStartX] = createSignal(0);
   const [animStartY, setAnimStartY] = createSignal(0);
   const [animTargetX, setAnimTargetX] = createSignal(0);
@@ -232,7 +233,11 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
   });
 
   const performAction = async (direction: "east" | "west" | "north" | "south") => {
-    if (cooldowns()[direction] > 0 || craftSucceeded()) return;
+    // Prevent multiple actions from executing at the same time
+    if (cooldowns()[direction] > 0 || craftSucceeded() || isProcessingAction()) return;
+
+    // Mark that we're processing an action
+    setIsProcessingAction(true);
 
     // Start cooldown for this specific action
     setCooldowns(cds => ({ ...cds, [direction]: ACTION_COOLDOWN }));
@@ -299,6 +304,9 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
               setCraftSucceeded(true);
               setTimeout(() => finishCraft(), 300);
             }
+            
+            // Allow next action after animation completes
+            setIsProcessingAction(false);
           }
         };
         
@@ -306,6 +314,8 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
       } else {
         // Action failed, pin doesn't move
         setLastActionResult("fail");
+        // Allow next action immediately for failed actions
+        setIsProcessingAction(false);
       }
 
       // Clear result after animation
@@ -315,6 +325,8 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
       }, 600);
     } catch (error) {
       console.error("[CraftingMinigame] Action failed:", error);
+      // Allow next action even if error occurs
+      setIsProcessingAction(false);
     }
   };
 

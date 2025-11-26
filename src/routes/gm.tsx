@@ -2033,11 +2033,14 @@ export default function GMPage() {
                   <label>Type</label>
                   <select value={editingAbility()?.type || 'damage'} 
                           onChange={(e) => setEditingAbility({...editingAbility()!, type: e.currentTarget.value})} required>
-                    <option value="damage">Damage</option>
-                    <option value="spell">Spell</option>
-                    <option value="heal">Heal</option>
+                    <option value="ability">Ability</option>
+                    <option value="active">Active</option>
                     <option value="buff">Buff</option>
+                    <option value="damage">Damage</option>
                     <option value="debuff">Debuff</option>
+                    <option value="heal">Heal</option>
+                    <option value="magical">Magical</option>
+                    <option value="spell">Spell</option>
                     <option value="utility">Utility</option>
                   </select>
                 </div>
@@ -2045,10 +2048,13 @@ export default function GMPage() {
                   <label>Category</label>
                   <select value={editingAbility()?.category || 'combat'} 
                           onChange={(e) => setEditingAbility({...editingAbility()!, category: e.currentTarget.value})} required>
+                    <option value="buff">Buff</option>
                     <option value="combat">Combat</option>
-                    <option value="magic">Magic</option>
-                    <option value="healing">Healing</option>
+                    <option value="damage">Damage</option>
                     <option value="defense">Defense</option>
+                    <option value="heal">Heal</option>
+                    <option value="healing">Healing</option>
+                    <option value="magic">Magic</option>
                     <option value="utility">Utility</option>
                   </select>
                 </div>
