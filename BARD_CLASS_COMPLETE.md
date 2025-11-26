@@ -212,31 +212,60 @@ Bards are the only class that can:
 ## Loot & Crafting Integration
 
 ### Loot Tables
-**Status**: ⚠️ **To be added**
-- Need to add bard equipment to mob loot tables
-- Musical instruments should drop from:
-  - Cultural/artistic mobs (bards, performers)
-  - Boss encounters
-  - Special event mobs
-- Performance armor drops from humanoid enemies
+**Status**: ✅ **Complete - 2,318 loot entries**
+
+All bard equipment added to mob loot tables:
+- **Instruments** (offhand): Drop from mobs at appropriate levels
+- **Performance Armor** (head, chest, hands, feet): Distributed across all level ranges
+- **Drop rates by rarity**:
+  - Common: 12% drop rate
+  - Uncommon: 8% drop rate  
+  - Rare: 5% drop rate
+  - Epic: 3% drop rate
+  - Legendary: 1.5% drop rate
+
+Loot distribution ensures players can find bard gear throughout their leveling journey.
 
 ### Crafting Recipes
-**Status**: ⚠️ **To be added**
-- Instruments: Woodworking + Leatherworking + rare materials
-- Performance Armor: Tailoring + Leatherworking for flexibility
-- High-tier items require: Silk, Enchanted Thread, Rare Gems
+**Status**: ✅ **Complete - 34 recipes, 28 material requirements**
+
+**Instruments (Woodworking/Blacksmithing/Alchemy)**:
+- 24 instrument recipes spanning all levels
+- Profession types:
+  - **Woodworking**: Lutes, Harps, Flutes, Pipes (most instruments)
+  - **Blacksmithing**: Horns (Brass Horn, Titan's Horn, etc.)
+  - **Leatherworking**: Drums (War Drums, Drums of Thunder)
+  - **Alchemy**: Crystal Horn (special magical instrument)
+
+**Performance Armor (Tailoring/Blacksmithing)**:
+- 10 armor recipes for key pieces
+- **Tailoring**: Crowns, Caps, Diadems (head pieces)
+- **Blacksmithing**: Chainmail pieces (chest armor)
+
+**Material Requirements**:
+- **Early (1-20)**: Wooden Planks, Linen, Copper Ore, Rough Leather
+- **Mid (21-40)**: Ancient Wood, Silk Cloth, Steel Ingot, Minor Gemstones, Cured Leather
+- **Late (41-60)**: Ancient Wood, Ethereal Silk, Adamantite Ore, Dragon Scales, Major Gemstones
 
 ---
 
 ## Files Created
 1. `db/bard-equipment.sql` - 101 charisma-focused equipment pieces
 2. `db/bard-songs-simple.sql` - 40 charisma-scaling abilities
+3. `db/bard-loot-tables.sql` - 2,318 loot table entries
+4. `db/bard-crafting-recipes.sql` - 34 recipes + 28 material requirements
+5. `db/bard-ability-scrolls.sql` - ~30 scrolls that teach bard songs
+6. `db/bard-merchant-inventory.sql` - Bard equipment distributed to merchants
+7. `src/lib/game.ts` - Modified `giveStartingEquipment()` to auto-detect bards
 
 ---
 
 ## Database State
 - **Bard Equipment**: 101 items (27 instruments, 74 armor pieces)
 - **Bard Abilities**: 40 songs (17 DOTs, 10 immediate damage, 13 heals)
+- **Loot Entries**: 2,318 mob drops for bard equipment
+- **Crafting Recipes**: 34 recipes for instruments and armor
+- **Recipe Materials**: 28 material requirements
 - **Level Range**: 1-60 (full progression)
 - **Slots Covered**: weapon (existing), offhand (instruments), head, chest, hands, feet ✓
 
@@ -249,11 +278,13 @@ Bards are the only class that can:
 - ✅ Charisma scaling implemented
 - ✅ Low mana costs for low INT/WIS builds
 - ✅ Full level 1-60 progression
-- ⚠️ Loot tables (not yet added)
-- ⚠️ Crafting recipes (not yet added)
+- ✅ Loot tables (2,318 entries added)
+- ✅ Crafting recipes (34 recipes added)
+- ✅ Character creation redirect fixed (now uses `/game`)
+- ✅ Scroll drops for bard abilities (~30 scrolls added to loot tables)
+- ✅ Starting gear for new bard characters (auto-detects CHA >= 15)
+- ✅ Merchant inventory updates (distributed across regions 1-5)
 - ⚠️ Buff system implementation (requires ability_effects integration)
-- ⚠️ Scroll drops for bard abilities
-- ⚠️ Starting gear for new bard characters
 
 ---
 
@@ -317,6 +348,25 @@ The original design includes powerful buff songs that need `ability_effects` tab
 
 ## Summary
 
-The Bard class is now fully equipped with 101 pieces of charisma-focused gear and 40 powerful songs spanning damage, healing, and future support roles. With extremely low mana costs and high charisma scaling, bards can maintain sustained performance in long encounters where other casters would run dry. The class fills a unique niche as a mana-efficient hybrid that can adapt to any role the party needs.
+The Bard class is now **fully playable** with 101 pieces of charisma-focused gear and 40 powerful songs spanning damage, healing, and future support roles. With extremely low mana costs and high charisma scaling, bards can maintain sustained performance in long encounters where other casters would run dry. The class fills a unique niche as a mana-efficient hybrid that can adapt to any role the party needs.
 
-**Next Steps**: Add loot tables, crafting recipes, implement buff system via ability_effects, and create starting bard equipment sets.
+### What's Complete:
+- ✅ Full equipment progression (1-60)
+- ✅ 40 abilities with damage/healing
+- ✅ Loot tables (mobs drop bard gear)
+- ✅ Crafting recipes (34 recipes)
+- ✅ Ability scrolls (learn songs from drops/merchants)
+- ✅ Merchant inventory (buy gear in regions 1-5)
+- ✅ Auto-starting gear (new characters with CHA >= 15 get bard starter pack)
+
+### How to Play a Bard:
+1. Create a new character with **Charisma >= 15** (recommended 18+ CHA)
+2. You'll automatically receive:
+   - Wooden Lute (offhand instrument)
+   - Full performer's outfit (Cap, Tunic, Gloves, Shoes)
+   - Sonic Blast (damage song)
+   - Melody of Mending I (healing song)
+3. Buy additional scrolls from merchants or loot them from mobs
+4. Progress through regions to find better instruments and armor
+
+**Next Steps**: Implement buff system via ability_effects table for support role songs.

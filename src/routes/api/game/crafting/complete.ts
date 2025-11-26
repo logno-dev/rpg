@@ -57,7 +57,8 @@ export async function POST(event: APIEvent) {
         args: [characterId]
       });
       const characterLevel = (charResult.rows[0] as any).level;
-      const maxCraftingLevel = Math.floor(characterLevel / 2);
+      // Level 1 characters can craft at level 1, otherwise level / 2
+      const maxCraftingLevel = characterLevel === 1 ? 1 : Math.floor(characterLevel / 2);
 
       // Only level up if not at max
       if (session.profession_level < maxCraftingLevel) {

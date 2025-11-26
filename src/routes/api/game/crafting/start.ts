@@ -61,7 +61,8 @@ export async function POST(event: APIEvent) {
     }
 
     // Check if crafting level can exceed character level / 2
-    const maxCraftingLevel = Math.floor(character.level / 2);
+    // Level 1 characters can craft at level 1, otherwise level / 2
+    const maxCraftingLevel = character.level === 1 ? 1 : Math.floor(character.level / 2);
     if (profession.level > maxCraftingLevel) {
       return new Response(JSON.stringify({ 
         error: `Crafting level cannot exceed ${maxCraftingLevel} (Character level ${character.level} / 2)` 

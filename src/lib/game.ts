@@ -112,18 +112,64 @@ export async function createCharacter(
 }
 
 async function giveStartingEquipment(characterId: number) {
-  // Give a rusty sword (item_id: 1) and cloth armor (item_id: 6)
-  await db.execute({
-    sql: 'INSERT INTO character_inventory (character_id, item_id, quantity, equipped) VALUES (?, ?, 1, 1)',
-    args: [characterId, 1], // Rusty Sword
-  });
+  // Get character stats to determine build
+  const character = await getCharacter(characterId);
+  if (!character) throw new Error('Character not found');
 
-  await db.execute({
-    sql: 'INSERT INTO character_inventory (character_id, item_id, quantity, equipped) VALUES (?, ?, 1, 1)',
-    args: [characterId, 6], // Cloth Armor
-  });
+  // Check if character is a bard build (high charisma)
+  const isBard = character.charisma >= 15;
 
-  // Give some starting potions
+  if (isBard) {
+    // Give bard starting equipment
+    await db.execute({
+      sql: 'INSERT INTO character_inventory (character_id, item_id, quantity, equipped) VALUES (?, ?, 1, 1)',
+      args: [characterId, 1634], // Wooden Lute (offhand)
+    });
+
+    await db.execute({
+      sql: 'INSERT INTO character_inventory (character_id, item_id, quantity, equipped) VALUES (?, ?, 1, 1)',
+      args: [characterId, 1660], // Performer's Cap (head)
+    });
+
+    await db.execute({
+      sql: 'INSERT INTO character_inventory (character_id, item_id, quantity, equipped) VALUES (?, ?, 1, 1)',
+      args: [characterId, 1661], // Jester's Tunic (chest)
+    });
+
+    await db.execute({
+      sql: 'INSERT INTO character_inventory (character_id, item_id, quantity, equipped) VALUES (?, ?, 1, 1)',
+      args: [characterId, 1662], // Silk Gloves (hands)
+    });
+
+    await db.execute({
+      sql: 'INSERT INTO character_inventory (character_id, item_id, quantity, equipped) VALUES (?, ?, 1, 1)',
+      args: [characterId, 1663], // Dancing Shoes (feet)
+    });
+
+    // Give starting bard abilities
+    await db.execute({
+      sql: 'INSERT INTO character_abilities (character_id, ability_id) VALUES (?, ?)',
+      args: [characterId, 446], // Sonic Blast
+    });
+
+    await db.execute({
+      sql: 'INSERT INTO character_abilities (character_id, ability_id) VALUES (?, ?)',
+      args: [characterId, 434], // Melody of Mending I
+    });
+  } else {
+    // Give default starting equipment
+    await db.execute({
+      sql: 'INSERT INTO character_inventory (character_id, item_id, quantity, equipped) VALUES (?, ?, 1, 1)',
+      args: [characterId, 1], // Rusty Sword
+    });
+
+    await db.execute({
+      sql: 'INSERT INTO character_inventory (character_id, item_id, quantity, equipped) VALUES (?, ?, 1, 1)',
+      args: [characterId, 6], // Cloth Armor
+    });
+  }
+
+  // Give starting potions (for all builds)
   await db.execute({
     sql: 'INSERT INTO character_inventory (character_id, item_id, quantity) VALUES (?, ?, 3)',
     args: [characterId, 13], // Health Potions
