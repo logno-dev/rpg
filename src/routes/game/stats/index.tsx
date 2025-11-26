@@ -78,16 +78,14 @@ export default function StatsRoute() {
     };
 
     const inventory = store.inventory || [];
-    ['weapon', 'helmet', 'chest', 'legs', 'boots', 'gloves', 'ring', 'amulet'].forEach(slot => {
-      const item = inventory.find((i: any) => i.equipped_slot === slot);
-      if (item) {
-        if (item.strength_bonus) bonuses.strength += item.strength_bonus;
-        if (item.dexterity_bonus) bonuses.dexterity += item.dexterity_bonus;
-        if (item.constitution_bonus) bonuses.constitution += item.constitution_bonus;
-        if (item.intelligence_bonus) bonuses.intelligence += item.intelligence_bonus;
-        if (item.wisdom_bonus) bonuses.wisdom += item.wisdom_bonus;
-        if (item.charisma_bonus) bonuses.charisma += item.charisma_bonus;
-      }
+    const equippedItems = inventory.filter((i: any) => i.equipped === 1);
+    equippedItems.forEach((item: any) => {
+      if (item.strength_bonus) bonuses.strength += item.strength_bonus;
+      if (item.dexterity_bonus) bonuses.dexterity += item.dexterity_bonus;
+      if (item.constitution_bonus) bonuses.constitution += item.constitution_bonus;
+      if (item.intelligence_bonus) bonuses.intelligence += item.intelligence_bonus;
+      if (item.wisdom_bonus) bonuses.wisdom += item.wisdom_bonus;
+      if (item.charisma_bonus) bonuses.charisma += item.charisma_bonus;
     });
 
     return bonuses;
@@ -127,7 +125,8 @@ export default function StatsRoute() {
       // Optimistically update character stats in store
       const updatedStats: any = { ...character };
       Object.entries(stats).forEach(([stat, value]) => {
-        updatedStats[stat] = character[stat as keyof typeof character] + value;
+        const currentValue = character[stat as keyof typeof character];
+        updatedStats[stat] = (typeof currentValue === 'number' ? currentValue : 0) + value;
       });
       
       updatedStats.available_points = character.available_points - totalPendingPoints();
@@ -223,11 +222,11 @@ export default function StatsRoute() {
   return (
     <GameLayout>
       <Suspense fallback={<LoadingSkeleton />}>
-      <Show when={basicData()}>
+      <Show when={basicData() && currentCharacter()}>
       <div class="card">
         <h3 style={{ "margin-bottom": "1rem" }}>Character Stats</h3>
         
-        <Show when={currentCharacter()?.available_points > 0}>
+        <Show when={currentCharacter()!.available_points > 0}>
           <div style={{ 
             padding: "1rem", 
             background: "var(--warning)", 
@@ -310,7 +309,7 @@ export default function StatsRoute() {
                     <div style={{ "text-align": "center", "font-size": "1.5rem", "font-weight": "bold", color: "var(--accent)" }}>
                       {total()}
                     </div>
-                    <Show when={currentCharacter()?.available_points > 0}>
+                    <Show when={currentCharacter()!.available_points > 0}>
                       <div style={{ display: "flex", gap: "0.5rem" }}>
                         <button
                           class="button secondary"

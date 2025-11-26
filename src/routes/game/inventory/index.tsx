@@ -72,6 +72,10 @@ export default function InventoryPage() {
   const [showSellModal, setShowSellModal] = createSignal(false);
   const [sellItemData, setSellItemData] = createSignal<{inventoryItemId: number, itemName: string, value: number, quantity: number} | null>(null);
   const [sellQuantity, setSellQuantity] = createSignal(1);
+  
+  // Loading states for actions
+  const [isSelling, setIsSelling] = createSignal(false);
+  const [isSalvaging, setIsSalvaging] = createSignal(false);
 
   // Computed values - use context as source of truth
   const currentInventory = () => store.inventory || [];
@@ -119,6 +123,7 @@ export default function InventoryPage() {
     setShowSellModal(false);
     setShowItemDetailModal(false);
     setSelectedItem(null);
+    setIsSelling(true);
     
     try {
       const response = await fetch('/api/game/sell', {
@@ -147,6 +152,8 @@ export default function InventoryPage() {
     } catch (error) {
       console.error('Sell error:', error);
       alert('Failed to sell item');
+    } finally {
+      setIsSelling(false);
     }
   };
 
@@ -162,6 +169,9 @@ export default function InventoryPage() {
     if (!data) return;
 
     setShowSalvageConfirmModal(false);
+    setShowItemDetailModal(false);
+    setSelectedItem(null);
+    setIsSalvaging(true);
 
     try {
       const response = await fetch('/api/game/salvage', {
@@ -202,6 +212,8 @@ export default function InventoryPage() {
         materials: []
       });
       setShowSalvageResultModal(true);
+    } finally {
+      setIsSalvaging(false);
     }
   };
 
@@ -486,6 +498,7 @@ export default function InventoryPage() {
     if (salvageableItems.length === 0) return;
 
     setShowBulkSalvageModal(false);
+    setIsSalvaging(true);
 
     try {
       const response = await fetch('/api/game/bulk-salvage', {
@@ -529,6 +542,8 @@ export default function InventoryPage() {
         materials: []
       });
       setShowSalvageResultModal(true);
+    } finally {
+      setIsSalvaging(false);
     }
   };
 
@@ -536,6 +551,9 @@ export default function InventoryPage() {
   const handleBulkSell = async () => {
     const itemIds = Array.from(selectedItems());
     if (itemIds.length === 0) return;
+
+    setShowBulkSellModal(false);
+    setIsSelling(true);
 
     try {
       const response = await fetch('/api/game/bulk-sell', {
@@ -552,7 +570,6 @@ export default function InventoryPage() {
         actions.setInventory(newInventory);
         setSelectedItems(new Set<number>());
         setSelectionMode(false);
-        setShowBulkSellModal(false);
       } else {
         console.error('[BULK SELL] Error:', result.error);
         alert(result.error || 'Failed to sell items');
@@ -560,6 +577,8 @@ export default function InventoryPage() {
     } catch (error) {
       console.error('Bulk sell error:', error);
       alert('Failed to sell items');
+    } finally {
+      setIsSelling(false);
     }
   };
 
@@ -830,48 +849,67 @@ export default function InventoryPage() {
           </button>
         </div>
         
-        {/* Bulk Action Buttons */}
-        <Show when={selectionMode() && selectedItems().size > 0}>
+        {/* Bulk Action Buttons - Always visible when in selection mode */}
+        <Show when={selectionMode()}>
           <div style={{
             padding: "1rem",
             background: "var(--bg-light)",
             "border-radius": "6px",
-            "margin-bottom": "1rem",
-            display: "flex",
-            gap: "1rem",
-            "align-items": "center",
-            "justify-content": "space-between"
+            "margin-bottom": "1rem"
           }}>
-            <div>
-              <div style={{ "font-weight": "bold" }}>{selectedItems().size} item{selectedItems().size !== 1 ? 's' : ''} selected</div>
-              <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
-                Total value: {calculateBulkSellValue()}g (at 40%)
+            <div style={{ "margin-bottom": "0.75rem" }}>
+              <div style={{ "font-weight": "bold" }}>
+                {selectedItems().size > 0 
+                  ? `${selectedItems().size} item${selectedItems().size !== 1 ? 's' : ''} selected`
+                  : "No items selected"
+                }
               </div>
+              <Show when={selectedItems().size > 0}>
+                <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
+                  Total value: {calculateBulkSellValue()}g (at 40%)
+                </div>
+              </Show>
             </div>
-            <div style={{ display: "flex", gap: "0.5rem" }}>
+            <div style={{ display: "flex", gap: "0.5rem", "flex-wrap": "wrap" }}>
               <button
                 class="button secondary"
                 onClick={toggleSelectAll}
-                style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
+                style={{ "font-size": "0.875rem", padding: "0.5rem 0.75rem", flex: "1 1 auto" }}
               >
                 {selectedItems().size === currentInventory().filter(canSelectItem).length ? "Deselect All" : "Select All"}
               </button>
               <button
                 class="button"
                 onClick={() => setShowBulkSellModal(true)}
-                style={{ "font-size": "0.875rem", padding: "0.5rem 1rem", background: "var(--warning)", color: "var(--bg-dark)" }}
+                disabled={selectedItems().size === 0}
+                style={{ 
+                  "font-size": "0.875rem", 
+                  padding: "0.5rem 0.75rem", 
+                  background: selectedItems().size === 0 ? "var(--bg-dark)" : "var(--warning)", 
+                  color: selectedItems().size === 0 ? "var(--text-secondary)" : "var(--bg-dark)", 
+                  flex: "1 1 auto",
+                  opacity: selectedItems().size === 0 ? 0.5 : 1,
+                  cursor: selectedItems().size === 0 ? "not-allowed" : "pointer"
+                }}
               >
-                Sell Selected
+                Sell
               </button>
-              <Show when={countSalvageableItems() > 0}>
-                <button
-                  class="button"
-                  onClick={handleBulkSalvageClick}
-                  style={{ "font-size": "0.875rem", padding: "0.5rem 1rem", background: "var(--accent)", color: "var(--bg-dark)" }}
-                >
-                  ⚙️ Salvage Selected ({countSalvageableItems()})
-                </button>
-              </Show>
+              <button
+                class="button"
+                onClick={handleBulkSalvageClick}
+                disabled={countSalvageableItems() === 0}
+                style={{ 
+                  "font-size": "0.875rem", 
+                  padding: "0.5rem 0.75rem", 
+                  background: countSalvageableItems() === 0 ? "var(--bg-dark)" : "var(--accent)", 
+                  color: countSalvageableItems() === 0 ? "var(--text-secondary)" : "var(--bg-dark)", 
+                  flex: "1 1 auto",
+                  opacity: countSalvageableItems() === 0 ? 0.5 : 1,
+                  cursor: countSalvageableItems() === 0 ? "not-allowed" : "pointer"
+                }}
+              >
+                ⚙️ Salvage {countSalvageableItems() > 0 ? `(${countSalvageableItems()})` : ""}
+              </button>
             </div>
           </div>
         </Show>
@@ -1938,6 +1976,56 @@ export default function InventoryPage() {
       </Show>
       </Show>
       </Suspense>
+      
+      {/* Loading Overlay */}
+      <Show when={isSelling() || isSalvaging()}>
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0, 0, 0, 0.7)",
+          display: "flex",
+          "align-items": "center",
+          "justify-content": "center",
+          "z-index": 9999,
+          "backdrop-filter": "blur(4px)"
+        }}>
+          <div style={{
+            background: "var(--bg-dark)",
+            padding: "2rem 3rem",
+            "border-radius": "12px",
+            border: "2px solid var(--accent)",
+            display: "flex",
+            "flex-direction": "column",
+            "align-items": "center",
+            gap: "1rem",
+            "box-shadow": "0 8px 32px rgba(0, 0, 0, 0.5)"
+          }}>
+            <div style={{
+              width: "48px",
+              height: "48px",
+              border: "4px solid var(--bg-light)",
+              "border-top-color": "var(--accent)",
+              "border-radius": "50%",
+              animation: "spin 1s linear infinite"
+            }}></div>
+            <div style={{
+              "font-size": "1.25rem",
+              "font-weight": "bold",
+              color: "var(--accent)"
+            }}>
+              {isSelling() ? "Selling..." : "Salvaging..."}
+            </div>
+          </div>
+        </div>
+        <style>{`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+      </Show>
     </GameLayout>
   );
 }
