@@ -465,3 +465,77 @@ body:has(.modal-overlay) {
 .crafting-quadrant-button:disabled {
   filter: grayscale(0.5);
 }
+
+/* Inventory Item Selection Styles */
+.inventory-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: var(--bg-light);
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+  border-left-width: 4px;
+}
+
+.inventory-item:hover {
+  background: var(--bg-dark);
+  border-color: var(--accent);
+}
+
+.inventory-item.selectable {
+  cursor: pointer;
+}
+
+.inventory-item.selectable:hover {
+  background: rgba(139, 92, 246, 0.08);
+  border-color: rgba(139, 92, 246, 0.5);
+}
+
+.inventory-item.selected {
+  background: rgba(139, 92, 246, 0.2) !important;
+  border-color: #8b5cf6 !important;
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.3);
+}
+
+.inventory-item.not-selectable {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Inventory Item Rarity Colors */
+.inventory-item.rarity-material {
+  border-left-color: #9ca3af;
+}
+
+.inventory-item.rarity-consumable {
+  border-left-color: #a855f7;
+}
+
+.inventory-item.rarity-common {
+  border-left-color: #10b981;
+}
+
+.inventory-item.rarity-uncommon {
+  border-left-color: #3b82f6;
+}
+
+.inventory-item.rarity-rare {
+  border-left-color: #f97316;
+}
+
+.inventory-item.rarity-epic {
+  border-left-color: #a855f7;
+}
+
+.inventory-item.rarity-legendary {
+  border-left-color: #eab308;
+}
+
+.inventory-item.rarity-default {
+  border-left-color: #9ca3af;
+}
+

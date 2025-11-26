@@ -310,6 +310,13 @@ export default function InventoryPage() {
   };
 
   // Toggle item selection
+  // Helper to check if item can be selected (sellable or salvageable)
+  const canSelectItem = (item: any) => {
+    if (item.equipped) return false;
+    // Sellable (has value) or Salvageable (armor/weapon)
+    return (item.value && item.value > 0) || (item.type === 'armor' || item.type === 'weapon');
+  };
+
   const toggleItemSelection = (itemId: number) => {
     setSelectedItems(prev => {
       const newSet = new Set(prev);
@@ -324,15 +331,64 @@ export default function InventoryPage() {
 
   // Toggle select all
   const toggleSelectAll = () => {
-    const sellableItems = currentInventory().filter((i: any) => 
-      !i.equipped && i.value && i.value > 0
-    );
+    const selectableItems = currentInventory().filter(canSelectItem);
     
-    if (selectedItems().size === sellableItems.length) {
+    if (selectedItems().size === selectableItems.length) {
       setSelectedItems(new Set<number>());
     } else {
-      setSelectedItems(new Set<number>(sellableItems.map((i: any) => i.id)));
+      setSelectedItems(new Set<number>(selectableItems.map((i: any) => i.id)));
     }
+  };
+
+  // Get item rarity class for color coding
+  const getItemRarityClass = (item: any) => {
+    // Crafting materials - grey
+    if (item.type === 'material' || item.name?.includes('Ore') || item.name?.includes('Leather') || item.name?.includes('Cloth')) {
+      return 'rarity-material';
+    }
+    
+    // Consumables (potions, food) - purple
+    if (item.type === 'consumable' || item.name?.includes('Potion') || item.name?.includes('Elixir')) {
+      return 'rarity-consumable';
+    }
+    
+    // Equipment - color by rarity
+    if (item.rarity) {
+      switch (item.rarity.toLowerCase()) {
+        case 'common': return 'rarity-common';
+        case 'uncommon': return 'rarity-uncommon';
+        case 'rare': return 'rarity-rare';
+        case 'epic': return 'rarity-epic';
+        case 'legendary': return 'rarity-legendary';
+        default: return 'rarity-default';
+      }
+    }
+    
+    return 'rarity-default';
+  };
+
+  // Get item class names for selection styling
+  const getItemClassNames = (invItem: any) => {
+    const classes = ['inventory-item'];
+    const canSelect = canSelectItem(invItem);
+    const isSelected = selectedItems().has(invItem.id);
+    
+    // Add rarity class for color coding
+    classes.push(getItemRarityClass(invItem));
+    
+    if (selectionMode()) {
+      if (canSelect) {
+        classes.push('selectable');
+      } else {
+        classes.push('not-selectable');
+      }
+    }
+    
+    if (isSelected) {
+      classes.push('selected');
+    }
+    
+    return classes.join(' ');
   };
 
   // Calculate bulk sell value
@@ -729,7 +785,7 @@ export default function InventoryPage() {
                 onClick={toggleSelectAll}
                 style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
               >
-                {selectedItems().size === currentInventory().filter((i: any) => !i.equipped && i.value && i.value > 0).length ? "Deselect All" : "Select All"}
+                {selectedItems().size === currentInventory().filter(canSelectItem).length ? "Deselect All" : "Select All"}
               </button>
               <button
                 class="button"
@@ -811,37 +867,13 @@ export default function InventoryPage() {
             <div style={{ "margin-bottom": "2rem" }}>
               <For each={currentInventory().filter((i: any) => !i.equipped && i.slot === "weapon")}>
                 {(invItem: any) => {
-                  const canSell = invItem.value && invItem.value > 0;
-                  const isSelected = selectedItems().has(invItem.id);
+                  const canSelect = canSelectItem(invItem);
                   
                   return (
                     <div 
-                      style={{
-                        display: "flex",
-                        "justify-content": "space-between",
-                        "align-items": "center",
-                        padding: "0.75rem 1rem",
-                        background: isSelected ? "rgba(251, 191, 36, 0.1)" : "var(--bg-light)",
-                        "border-radius": "6px",
-                        "margin-bottom": "0.5rem",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        border: isSelected ? "1px solid var(--warning)" : "1px solid transparent"
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.background = "var(--bg-dark)";
-                          e.currentTarget.style.borderColor = "var(--accent)";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.background = "var(--bg-light)";
-                          e.currentTarget.style.borderColor = "transparent";
-                        }
-                      }}
+                      class={getItemClassNames(invItem)}
                       onClick={() => {
-                        if (selectionMode() && canSell) {
+                        if (selectionMode() && canSelect) {
                           toggleItemSelection(invItem.id);
                         } else if (!selectionMode()) {
                           handleViewItem(invItem, false);
@@ -849,17 +881,7 @@ export default function InventoryPage() {
                       }}
                     >
                       <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
-                        <Show when={selectionMode()}>
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            disabled={!canSell}
-                            style={{ width: "18px", height: "18px", cursor: canSell ? "pointer" : "not-allowed" }}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={() => canSell && toggleItemSelection(invItem.id)}
-                          />
-                        </Show>
-                        <div style={{ flex: 1, opacity: selectionMode() && !canSell ? 0.5 : 1 }}>
+                        <div style={{ flex: 1 }}>
                           <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
                           <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
                             {invItem.slot && `${invItem.slot} • `}
@@ -892,37 +914,13 @@ export default function InventoryPage() {
             <div style={{ "margin-bottom": "2rem" }}>
               <For each={currentInventory().filter((i: any) => !i.equipped && i.slot === "offhand")}>
                 {(invItem: any) => {
-                  const canSell = invItem.value && invItem.value > 0;
-                  const isSelected = selectedItems().has(invItem.id);
+                  const canSelect = canSelectItem(invItem);
                   
                   return (
                     <div 
-                      style={{
-                        display: "flex",
-                        "justify-content": "space-between",
-                        "align-items": "center",
-                        padding: "0.75rem 1rem",
-                        background: isSelected ? "rgba(251, 191, 36, 0.1)" : "var(--bg-light)",
-                        "border-radius": "6px",
-                        "margin-bottom": "0.5rem",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        border: isSelected ? "1px solid var(--warning)" : "1px solid transparent"
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.background = "var(--bg-dark)";
-                          e.currentTarget.style.borderColor = "var(--accent)";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.background = "var(--bg-light)";
-                          e.currentTarget.style.borderColor = "transparent";
-                        }
-                      }}
+                      class={getItemClassNames(invItem)}
                       onClick={() => {
-                        if (selectionMode() && canSell) {
+                        if (selectionMode() && canSelect) {
                           toggleItemSelection(invItem.id);
                         } else if (!selectionMode()) {
                           handleViewItem(invItem, false);
@@ -930,17 +928,7 @@ export default function InventoryPage() {
                       }}
                     >
                       <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
-                        <Show when={selectionMode()}>
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            disabled={!canSell}
-                            style={{ width: "18px", height: "18px", cursor: canSell ? "pointer" : "not-allowed" }}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={() => canSell && toggleItemSelection(invItem.id)}
-                          />
-                        </Show>
-                        <div style={{ flex: 1, opacity: selectionMode() && !canSell ? 0.5 : 1 }}>
+                        <div style={{ flex: 1 }}>
                           <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
                           <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
                             {invItem.slot && `${invItem.slot} • `}
@@ -976,37 +964,13 @@ export default function InventoryPage() {
             <div style={{ "margin-bottom": "2rem" }}>
               <For each={currentInventory().filter((i: any) => !i.equipped && i.type === "armor" && i.slot !== "offhand")}>
                 {(invItem: any) => {
-                  const canSell = invItem.value && invItem.value > 0;
-                  const isSelected = selectedItems().has(invItem.id);
+                  const canSelect = canSelectItem(invItem);
                   
                   return (
                     <div 
-                      style={{
-                        display: "flex",
-                        "justify-content": "space-between",
-                        "align-items": "center",
-                        padding: "0.75rem 1rem",
-                        background: isSelected ? "rgba(251, 191, 36, 0.1)" : "var(--bg-light)",
-                        "border-radius": "6px",
-                        "margin-bottom": "0.5rem",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        border: isSelected ? "1px solid var(--warning)" : "1px solid transparent"
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.background = "var(--bg-dark)";
-                          e.currentTarget.style.borderColor = "var(--accent)";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.background = "var(--bg-light)";
-                          e.currentTarget.style.borderColor = "transparent";
-                        }
-                      }}
+                      class={getItemClassNames(invItem)}
                       onClick={() => {
-                        if (selectionMode() && canSell) {
+                        if (selectionMode() && canSelect) {
                           toggleItemSelection(invItem.id);
                         } else if (!selectionMode()) {
                           handleViewItem(invItem, false);
@@ -1014,17 +978,7 @@ export default function InventoryPage() {
                       }}
                     >
                       <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
-                        <Show when={selectionMode()}>
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            disabled={!canSell}
-                            style={{ width: "18px", height: "18px", cursor: canSell ? "pointer" : "not-allowed" }}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={() => canSell && toggleItemSelection(invItem.id)}
-                          />
-                        </Show>
-                        <div style={{ flex: 1, opacity: selectionMode() && !canSell ? 0.5 : 1 }}>
+                        <div style={{ flex: 1 }}>
                           <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
                           <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
                             {invItem.slot && `${invItem.slot} • `}
@@ -1056,37 +1010,13 @@ export default function InventoryPage() {
               <For each={currentInventory().filter((i: any) => !i.equipped && i.type === "scroll")}>
                 {(invItem: any) => {
                   const scrollStatus = getScrollAbilityStatus(invItem);
-                  const canSell = invItem.value && invItem.value > 0;
-                  const isSelected = selectedItems().has(invItem.id);
+                  const canSelect = canSelectItem(invItem);
                   
                   return (
                     <div 
-                      style={{
-                        display: "flex",
-                        "justify-content": "space-between",
-                        "align-items": "center",
-                        padding: "0.75rem 1rem",
-                        background: isSelected ? "rgba(251, 191, 36, 0.1)" : "var(--bg-light)",
-                        "border-radius": "6px",
-                        "margin-bottom": "0.5rem",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        border: isSelected ? "1px solid var(--warning)" : "1px solid transparent"
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.background = "var(--bg-dark)";
-                          e.currentTarget.style.borderColor = "var(--accent)";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.background = "var(--bg-light)";
-                          e.currentTarget.style.borderColor = "transparent";
-                        }
-                      }}
+                      class={getItemClassNames(invItem)}
                       onClick={() => {
-                        if (selectionMode() && canSell) {
+                        if (selectionMode() && canSelect) {
                           toggleItemSelection(invItem.id);
                         } else if (!selectionMode()) {
                           handleViewItem(invItem, false);
@@ -1094,17 +1024,7 @@ export default function InventoryPage() {
                       }}
                     >
                       <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
-                        <Show when={selectionMode()}>
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            disabled={!canSell}
-                            style={{ width: "18px", height: "18px", cursor: canSell ? "pointer" : "not-allowed" }}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={() => canSell && toggleItemSelection(invItem.id)}
-                          />
-                        </Show>
-                        <div style={{ flex: 1, opacity: selectionMode() && !canSell ? 0.5 : 1 }}>
+                        <div style={{ flex: 1 }}>
                           <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
                           <div style={{ "font-size": "0.875rem", color: scrollStatus.alreadyLearned ? "var(--success)" : scrollStatus.hasBetter ? "var(--warning)" : "var(--text-secondary)" }}>
                             {scrollStatus.alreadyLearned ? "✓ Already Learned" : scrollStatus.hasBetter ? "⚠ You have better" : "Ability Scroll"}
@@ -1134,37 +1054,13 @@ export default function InventoryPage() {
             <div style={{ "margin-bottom": "2rem" }}>
               <For each={currentInventory().filter((i: any) => !i.equipped && i.type === "consumable")}>
                 {(invItem: any) => {
-                  const canSell = invItem.value && invItem.value > 0;
-                  const isSelected = selectedItems().has(invItem.id);
+                  const canSelect = canSelectItem(invItem);
                   
                   return (
                     <div 
-                      style={{
-                        display: "flex",
-                        "justify-content": "space-between",
-                        "align-items": "center",
-                        padding: "0.75rem 1rem",
-                        background: isSelected ? "rgba(251, 191, 36, 0.1)" : "var(--bg-light)",
-                        "border-radius": "6px",
-                        "margin-bottom": "0.5rem",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        border: isSelected ? "1px solid var(--warning)" : "1px solid transparent"
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.background = "var(--bg-dark)";
-                          e.currentTarget.style.borderColor = "var(--accent)";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isSelected) {
-                          e.currentTarget.style.background = "var(--bg-light)";
-                          e.currentTarget.style.borderColor = "transparent";
-                        }
-                      }}
+                      class={getItemClassNames(invItem)}
                       onClick={() => {
-                        if (selectionMode() && canSell) {
+                        if (selectionMode() && canSelect) {
                           toggleItemSelection(invItem.id);
                         } else if (!selectionMode()) {
                           handleViewItem(invItem, false);
@@ -1172,17 +1068,7 @@ export default function InventoryPage() {
                       }}
                     >
                       <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
-                        <Show when={selectionMode()}>
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            disabled={!canSell}
-                            style={{ width: "18px", height: "18px", cursor: canSell ? "pointer" : "not-allowed" }}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={() => canSell && toggleItemSelection(invItem.id)}
-                          />
-                        </Show>
-                        <div style={{ flex: 1, opacity: selectionMode() && !canSell ? 0.5 : 1 }}>
+                        <div style={{ flex: 1 }}>
                           <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
                           <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
                             <Show when={invItem.health_restore}>❤️ +{invItem.health_restore} HP</Show>
@@ -1222,55 +1108,21 @@ export default function InventoryPage() {
             })}>
               {(invItem: any) => {
                 const scrollStatus = invItem.type === "scroll" ? getScrollAbilityStatus(invItem) : { alreadyLearned: false, hasBetter: false };
-                const canSell = invItem.value && invItem.value > 0;
-                const isSelected = selectedItems().has(invItem.id);
+                const canSelect = canSelectItem(invItem);
                 
-                return (
-                  <div 
-                    style={{
-                      display: "flex",
-                      "justify-content": "space-between",
-                      "align-items": "center",
-                      padding: "0.75rem 1rem",
-                      background: isSelected ? "rgba(251, 191, 36, 0.1)" : "var(--bg-light)",
-                      "border-radius": "6px",
-                      "margin-bottom": "0.5rem",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                      border: isSelected ? "1px solid var(--warning)" : "1px solid transparent"
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.background = "var(--bg-dark)";
-                        e.currentTarget.style.borderColor = "var(--accent)";
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.background = "var(--bg-light)";
-                        e.currentTarget.style.borderColor = "transparent";
-                      }
-                    }}
-                    onClick={() => {
-                      if (selectionMode() && canSell) {
-                        toggleItemSelection(invItem.id);
-                      } else if (!selectionMode()) {
-                        handleViewItem(invItem, false);
-                      }
-                    }}
-                  >
-                    <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
-                      <Show when={selectionMode()}>
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          disabled={!canSell}
-                          style={{ width: "18px", height: "18px", cursor: canSell ? "pointer" : "not-allowed" }}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={() => canSell && toggleItemSelection(invItem.id)}
-                        />
-                      </Show>
-                      <div style={{ flex: 1, opacity: selectionMode() && !canSell ? 0.5 : 1 }}>
+                  return (
+                    <div 
+                      class={getItemClassNames(invItem)}
+                      onClick={() => {
+                        if (selectionMode() && canSelect) {
+                          toggleItemSelection(invItem.id);
+                        } else if (!selectionMode()) {
+                          handleViewItem(invItem, false);
+                        }
+                      }}
+                    >
+                      <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
+                        <div style={{ flex: 1 }}>
                         <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
                         <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
                           <Show when={invItem.slot}>
@@ -1857,3 +1709,4 @@ export default function InventoryPage() {
     </GameLayout>
   );
 }
+
