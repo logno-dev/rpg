@@ -64,6 +64,11 @@ export default function InventoryPage() {
   const [isEquipping, setIsEquipping] = createSignal(false);
   const [showLearnResultModal, setShowLearnResultModal] = createSignal(false);
   const [learnResultData, setLearnResultData] = createSignal<{success: boolean, message: string, abilityName?: string} | null>(null);
+  const [showSalvageConfirmModal, setShowSalvageConfirmModal] = createSignal(false);
+  const [salvageItemData, setSalvageItemData] = createSignal<{inventoryItemId: number, itemName: string} | null>(null);
+  const [showSalvageResultModal, setShowSalvageResultModal] = createSignal(false);
+  const [salvageResultData, setSalvageResultData] = createSignal<{itemName: string, materials: Array<{name: string, quantity: number}>} | null>(null);
+  const [showBulkSalvageModal, setShowBulkSalvageModal] = createSignal(false);
 
   // Computed values - use context as source of truth
   const currentInventory = () => store.inventory || [];
@@ -119,6 +124,61 @@ export default function InventoryPage() {
     } catch (error) {
       console.error('Sell error:', error);
       alert('Failed to sell item');
+    }
+  };
+
+  // Handle salvage item click (show confirmation)
+  const handleSalvageClick = (inventoryItemId: number, itemName: string) => {
+    setSalvageItemData({ inventoryItemId, itemName });
+    setShowSalvageConfirmModal(true);
+  };
+
+  // Handle salvage confirmation
+  const handleSalvageConfirm = async () => {
+    const data = salvageItemData();
+    if (!data) return;
+
+    setShowSalvageConfirmModal(false);
+
+    try {
+      const response = await fetch('/api/game/salvage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          characterId: characterId(), 
+          inventoryItemId: data.inventoryItemId 
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok || result.error) {
+        // Show error in result modal
+        setSalvageResultData({
+          itemName: data.itemName,
+          materials: []
+        });
+        setShowSalvageResultModal(true);
+        return;
+      }
+      
+      if (result.success) {
+        actions.setInventory(result.inventory);
+        
+        // Show success modal with materials gained
+        setSalvageResultData({
+          itemName: data.itemName,
+          materials: result.materialsGained
+        });
+        setShowSalvageResultModal(true);
+      }
+    } catch (error) {
+      console.error('Salvage error:', error);
+      setSalvageResultData({
+        itemName: data.itemName,
+        materials: []
+      });
+      setShowSalvageResultModal(true);
     }
   };
 
@@ -282,6 +342,80 @@ export default function InventoryPage() {
       .reduce((total: number, item: any) => {
         return total + (Math.floor(item.value * 0.4) * item.quantity);
       }, 0);
+  };
+
+  // Count salvageable items
+  const countSalvageableItems = () => {
+    return currentInventory()
+      .filter((i: any) => selectedItems().has(i.id))
+      .filter((i: any) => !i.equipped && (i.type === 'armor' || i.type === 'weapon'))
+      .length;
+  };
+
+  // Handle bulk salvage click
+  const handleBulkSalvageClick = () => {
+    const salvageableCount = countSalvageableItems();
+    if (salvageableCount === 0) {
+      alert('No salvageable items selected');
+      return;
+    }
+    setShowBulkSalvageModal(true);
+  };
+
+  // Handle bulk salvage confirm
+  const handleBulkSalvageConfirm = async () => {
+    const itemIds = Array.from(selectedItems());
+    const salvageableItems = currentInventory()
+      .filter((i: any) => itemIds.includes(i.id))
+      .filter((i: any) => !i.equipped && (i.type === 'armor' || i.type === 'weapon'));
+    
+    if (salvageableItems.length === 0) return;
+
+    setShowBulkSalvageModal(false);
+
+    try {
+      const response = await fetch('/api/game/bulk-salvage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          characterId: characterId(), 
+          itemIds: salvageableItems.map((i: any) => i.id)
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || result.error) {
+        setSalvageResultData({
+          itemName: `${salvageableItems.length} items`,
+          materials: []
+        });
+        setShowSalvageResultModal(true);
+        return;
+      }
+
+      if (result.success) {
+        actions.setInventory(result.inventory);
+        
+        // Clear selection
+        setSelectedItems(new Set<number>());
+        setSelectionMode(false);
+        
+        // Show result modal
+        setSalvageResultData({
+          itemName: `${result.totalSalvaged} items`,
+          materials: result.materialsGained
+        });
+        setShowSalvageResultModal(true);
+      }
+    } catch (error) {
+      console.error('Bulk salvage error:', error);
+      setSalvageResultData({
+        itemName: `${salvageableItems.length} items`,
+        materials: []
+      });
+      setShowSalvageResultModal(true);
+    }
   };
 
   // Handle bulk sell
@@ -604,6 +738,15 @@ export default function InventoryPage() {
               >
                 Sell Selected
               </button>
+              <Show when={countSalvageableItems() > 0}>
+                <button
+                  class="button"
+                  onClick={handleBulkSalvageClick}
+                  style={{ "font-size": "0.875rem", padding: "0.5rem 1rem", background: "var(--accent)", color: "var(--bg-dark)" }}
+                >
+                  ⚙️ Salvage Selected ({countSalvageableItems()})
+                </button>
+              </Show>
             </div>
           </div>
         </Show>
@@ -1180,6 +1323,7 @@ export default function InventoryPage() {
           getEquipmentComparison={getEquipmentComparison}
           onEquip={(id) => handleEquip(id, false)}
           onSell={handleSell}
+          onSalvage={handleSalvageClick}
           onLearnAbility={handleLearnAbility}
           onUseItem={handleUseItem}
           onDrop={handleDropClick}
@@ -1454,6 +1598,254 @@ export default function InventoryPage() {
                 setLearnResultData(null);
               }}
               style={{ width: "100%" }}
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      </Show>
+
+      {/* Bulk Salvage Modal */}
+      <Show when={showBulkSalvageModal()}>
+        <div 
+          style={{ 
+            position: "fixed", 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            background: "rgba(0, 0, 0, 0.85)", 
+            display: "flex", 
+            "align-items": "center", 
+            "justify-content": "center",
+            "z-index": 1000,
+            padding: "1rem"
+          }}
+          onClick={() => setShowBulkSalvageModal(false)}
+        >
+          <div 
+            class="card"
+            style={{ 
+              "max-width": "450px",
+              width: "100%",
+              background: "var(--bg-dark)",
+              border: "2px solid var(--warning)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ "margin-bottom": "1rem", color: "var(--warning)" }}>⚙️ Bulk Salvage</h2>
+            
+            <div style={{ "margin-bottom": "1.5rem" }}>
+              <p style={{ "margin-bottom": "1rem" }}>
+                Salvage <strong>{countSalvageableItems()} items</strong> for crafting materials?
+              </p>
+              
+              <div style={{ 
+                padding: "1rem",
+                background: "var(--bg-light)",
+                "border-radius": "6px",
+                "border-left": "4px solid var(--warning)",
+                "margin-bottom": "1rem"
+              }}>
+                <p style={{ color: "var(--warning)", "font-weight": "500" }}>
+                  ⚠️ This action cannot be undone
+                </p>
+                <p style={{ "font-size": "0.875rem", color: "var(--text-secondary)", "margin-top": "0.5rem" }}>
+                  Each item will be broken down into crafting materials based on its recipe or rarity. Equipped items and non-equipment will be skipped.
+                </p>
+              </div>
+            </div>
+            
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <button
+                class="button secondary"
+                style={{ flex: 1 }}
+                onClick={() => setShowBulkSalvageModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                class="button"
+                style={{ 
+                  flex: 1,
+                  background: "var(--warning)",
+                  color: "var(--bg-dark)"
+                }}
+                onClick={handleBulkSalvageConfirm}
+              >
+                Salvage All
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      {/* Salvage Confirmation Modal */}
+      <Show when={showSalvageConfirmModal() && salvageItemData()}>
+        <div 
+          style={{ 
+            position: "fixed", 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            background: "rgba(0, 0, 0, 0.85)", 
+            display: "flex", 
+            "align-items": "center", 
+            "justify-content": "center",
+            "z-index": 1000,
+            padding: "1rem"
+          }}
+          onClick={() => setShowSalvageConfirmModal(false)}
+        >
+          <div 
+            class="card"
+            style={{ 
+              "max-width": "450px",
+              width: "100%",
+              background: "var(--bg-dark)",
+              border: "2px solid var(--warning)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ "margin-bottom": "1rem", color: "var(--warning)" }}>⚙️ Salvage Item</h2>
+            
+            <div style={{ "margin-bottom": "1.5rem" }}>
+              <p style={{ "margin-bottom": "1rem" }}>
+                Break down <strong>{salvageItemData()?.itemName}</strong> into crafting materials?
+              </p>
+              <div style={{ 
+                padding: "1rem",
+                background: "var(--bg-light)",
+                "border-radius": "6px",
+                "border-left": "4px solid var(--warning)"
+              }}>
+                <p style={{ color: "var(--warning)", "font-weight": "500" }}>
+                  ⚠️ This action cannot be undone
+                </p>
+                <p style={{ "font-size": "0.875rem", color: "var(--text-secondary)", "margin-top": "0.5rem" }}>
+                  You will receive crafting materials based on the item's recipe or rarity.
+                </p>
+              </div>
+            </div>
+            
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <button
+                class="button secondary"
+                style={{ flex: 1 }}
+                onClick={() => setShowSalvageConfirmModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                class="button"
+                style={{ 
+                  flex: 1,
+                  background: "var(--warning)",
+                  color: "var(--bg-dark)"
+                }}
+                onClick={handleSalvageConfirm}
+              >
+                Salvage
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      {/* Salvage Result Modal */}
+      <Show when={showSalvageResultModal() && salvageResultData()}>
+        <div 
+          style={{ 
+            position: "fixed", 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            background: "rgba(0, 0, 0, 0.85)", 
+            display: "flex", 
+            "align-items": "center", 
+            "justify-content": "center",
+            "z-index": 1000,
+            padding: "1rem"
+          }}
+          onClick={() => {
+            setShowSalvageResultModal(false);
+            setSalvageResultData(null);
+          }}
+        >
+          <div 
+            class="card"
+            style={{ 
+              "max-width": "450px",
+              width: "100%",
+              background: "var(--bg-dark)",
+              border: `2px solid ${salvageResultData()?.materials.length ? "var(--success)" : "var(--danger)"}`,
+              "text-align": "center"
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ 
+              "font-size": "4rem", 
+              "margin-bottom": "1rem" 
+            }}>
+              {salvageResultData()?.materials.length ? "⚙️" : "✗"}
+            </div>
+            
+            <h2 style={{ 
+              color: salvageResultData()?.materials.length ? "var(--success)" : "var(--danger)",
+              "margin-bottom": "1rem"
+            }}>
+              {salvageResultData()?.materials.length ? "Item Salvaged!" : "Salvage Failed"}
+            </h2>
+            
+            <Show when={salvageResultData()?.materials.length}>
+              <div style={{ "margin-bottom": "1.5rem" }}>
+                <p style={{ "margin-bottom": "1rem", color: "var(--text-secondary)" }}>
+                  Salvaged <strong>{salvageResultData()?.itemName}</strong>
+                </p>
+                
+                <div style={{ 
+                  padding: "1rem",
+                  background: "var(--bg-light)",
+                  "border-radius": "6px",
+                  "text-align": "left"
+                }}>
+                  <h3 style={{ "margin-bottom": "0.75rem", "font-size": "1rem", color: "var(--accent)" }}>
+                    Materials Gained:
+                  </h3>
+                  <For each={salvageResultData()?.materials}>
+                    {(material) => (
+                      <div style={{ 
+                        display: "flex", 
+                        "justify-content": "space-between",
+                        padding: "0.5rem",
+                        "border-bottom": "1px solid var(--bg-dark)"
+                      }}>
+                        <span>{material.name}</span>
+                        <span style={{ color: "var(--success)", "font-weight": "500" }}>
+                          +{material.quantity}
+                        </span>
+                      </div>
+                    )}
+                  </For>
+                </div>
+              </div>
+            </Show>
+            
+            <Show when={!salvageResultData()?.materials.length}>
+              <p style={{ "margin-bottom": "1.5rem", color: "var(--text-secondary)" }}>
+                Failed to salvage <strong>{salvageResultData()?.itemName}</strong>
+              </p>
+            </Show>
+            
+            <button
+              class="button"
+              style={{ width: "100%" }}
+              onClick={() => {
+                setShowSalvageResultModal(false);
+                setSalvageResultData(null);
+              }}
             >
               Continue
             </button>

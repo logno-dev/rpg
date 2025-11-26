@@ -12,6 +12,7 @@ type ItemDetailModalProps = {
   onUseItem?: (id: number, name: string, healthRestore: number, manaRestore: number) => void;
   onEquip?: (id: number, showModal: boolean) => void;
   onSell?: (id: number, name: string, value: number, quantity: number) => void;
+  onSalvage?: (id: number, name: string) => void;
   onDrop?: (id: number, name: string, quantity: number) => void;
   onBuy?: (id: number, name: string, price: number) => void;
   currentGold?: number;
@@ -340,6 +341,24 @@ export function ItemDetailModal(props: ItemDetailModalProps) {
                 }}
               >
                 Sell ({Math.floor(item.value * 0.4) * item.quantity}g)
+              </button>
+            </Show>
+
+            {/* Salvage Button */}
+            <Show when={!item.equipped && (item.type === 'armor' || item.type === 'weapon') && props.onSalvage}>
+              <button
+                class="button"
+                style={{ 
+                  width: "100%",
+                  background: "var(--warning)",
+                  color: "var(--bg-dark)"
+                }}
+                onClick={() => {
+                  props.onSalvage?.(item.id, item.name);
+                  props.onClose();
+                }}
+              >
+                ⚙️ Salvage for Materials
               </button>
             </Show>
 
