@@ -955,8 +955,7 @@ export default function GMPage() {
                   setEditingAbility({
                     name: '', description: '', type: 'damage', category: 'combat',
                     required_level: 1, mana_cost: 0, cooldown: 0, primary_stat: null,
-                    stat_scaling: 0, damage_min: 0, damage_max: 0, healing: 0,
-                    buff_stat: null, buff_amount: 0, buff_duration: 0,
+                    stat_scaling: 0,
                     required_strength: 0, required_dexterity: 0, required_constitution: 0,
                     required_intelligence: 0, required_wisdom: 0, required_charisma: 0
                   });
@@ -2063,54 +2062,20 @@ export default function GMPage() {
                   <h3 style={{ "font-size": "1rem", "margin-bottom": "0.5rem", color: "var(--accent)" }}>Effect Values</h3>
                 </div>
                 
-                <div>
-                  <label>Damage Min</label>
-                  <input type="number" min="0" value={editingAbility()?.damage_min ?? 0} 
-                         onInput={(e) => setEditingAbility({...editingAbility()!, damage_min: parseInt(e.currentTarget.value)})} />
-                </div>
-                <div>
-                  <label>Damage Max</label>
-                  <input type="number" min="0" value={editingAbility()?.damage_max ?? 0} 
-                         onInput={(e) => setEditingAbility({...editingAbility()!, damage_max: parseInt(e.currentTarget.value)})} />
-                </div>
-                <div>
-                  <label>Healing Amount</label>
-                  <input type="number" min="0" value={editingAbility()?.healing ?? 0} 
-                         onInput={(e) => setEditingAbility({...editingAbility()!, healing: parseInt(e.currentTarget.value)})} />
-                </div>
-                <div>
-                  <label>Stat Scaling</label>
-                  <input type="number" step="0.01" min="0" value={editingAbility()?.stat_scaling ?? 0} 
-                         onChange={(e) => setEditingAbility({...editingAbility()!, stat_scaling: parseFloat(e.currentTarget.value) || 0})} />
-                  <small style={{ display: "block", "font-size": "0.75rem", color: "var(--text-secondary)" }}>Multiplier for primary stat (e.g. 0.5, 1.2)</small>
+                <div style={{ "grid-column": "1 / -1", padding: "0.5rem", background: "var(--bg-light)", "border-radius": "4px" }}>
+                  <p style={{ margin: 0, "font-size": "0.875rem", color: "var(--text-secondary)" }}>
+                    ℹ️ Damage, healing, and stat scaling are now configured in the <strong>Ability Effects</strong> system below. The old damage_min, damage_max, healing, and stat_scaling fields have been removed.
+                  </p>
                 </div>
                 
                 <div style={{ "grid-column": "1 / -1", "margin-top": "0.5rem" }}>
                   <h3 style={{ "font-size": "1rem", "margin-bottom": "0.5rem", color: "var(--accent)" }}>Buff/Debuff (if applicable)</h3>
                 </div>
                 
-                <div>
-                  <label>Buff Stat</label>
-                  <select value={editingAbility()?.buff_stat || ''} 
-                          onChange={(e) => setEditingAbility({...editingAbility()!, buff_stat: e.currentTarget.value || null})}>
-                    <option value="">None</option>
-                    <option value="strength">Strength</option>
-                    <option value="dexterity">Dexterity</option>
-                    <option value="constitution">Constitution</option>
-                    <option value="intelligence">Intelligence</option>
-                    <option value="wisdom">Wisdom</option>
-                    <option value="charisma">Charisma</option>
-                  </select>
-                </div>
-                <div>
-                  <label>Buff Amount</label>
-                  <input type="number" value={editingAbility()?.buff_amount ?? 0} 
-                         onInput={(e) => setEditingAbility({...editingAbility()!, buff_amount: parseInt(e.currentTarget.value)})} />
-                </div>
-                <div>
-                  <label>Buff Duration (seconds)</label>
-                  <input type="number" min="0" value={editingAbility()?.buff_duration ?? 0} 
-                         onInput={(e) => setEditingAbility({...editingAbility()!, buff_duration: parseInt(e.currentTarget.value)})} />
+                <div style={{ "grid-column": "1 / -1", padding: "0.5rem", background: "var(--bg-light)", "border-radius": "4px" }}>
+                  <p style={{ margin: 0, "font-size": "0.875rem", color: "var(--text-secondary)" }}>
+                    ℹ️ Buff abilities now use the <strong>Ability Effects</strong> system below. The old buff_stat, buff_amount, and buff_duration fields are deprecated.
+                  </p>
                 </div>
                 
                 <div style={{ "grid-column": "1 / -1", "margin-top": "0.5rem" }}>

@@ -364,8 +364,10 @@ export function CombatEngine(props: CombatEngineProps) {
       const newLog = [...currentState.log];
 
       // NEW EFFECT SYSTEM: Process if effects are loaded
+      console.log('[useAbility] Ability data:', { name: ability.name, hasEffects: !!ability.effects, effectCount: ability.effects?.length, effects: ability.effects });
+      
       if (ability.effects && ability.effects.length > 0) {
-        // console.log(`[useAbility] Processing ${ability.effects.length} effects for ${ability.name}`, ability.effects);
+        console.log(`[useAbility] Processing ${ability.effects.length} effects for ${ability.name}`, ability.effects);
         
         ability.effects.forEach((effect: AbilityEffect) => {
           const result = EffectProcessor.processInstantEffect(effect, props.character, props.mob.defense);

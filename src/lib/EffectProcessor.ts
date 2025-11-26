@@ -13,13 +13,24 @@ export class EffectProcessor {
                      Math.floor(Math.random() * (effect.value_max - effect.value_min + 1)) + effect.value_min;
     
     if (!effect.stat_scaling || effect.scaling_factor === 0) {
+      console.log('[calculateEffectValue] No scaling:', { baseValue, stat_scaling: effect.stat_scaling, scaling_factor: effect.scaling_factor });
       return baseValue;
     }
     
     const statValue = character[effect.stat_scaling as keyof Character] as number || 10;
     const statBonus = Math.floor((statValue - 10) * effect.scaling_factor);
+    const finalValue = Math.max(1, baseValue + statBonus);
     
-    return Math.max(1, baseValue + statBonus);
+    console.log('[calculateEffectValue] With scaling:', { 
+      baseValue, 
+      statScaling: effect.stat_scaling, 
+      statValue, 
+      scalingFactor: effect.scaling_factor,
+      statBonus, 
+      finalValue 
+    });
+    
+    return finalValue;
   }
 
   /**
@@ -47,7 +58,20 @@ export class EffectProcessor {
 
     // For DOT/HOT
     if (effect.is_periodic && effect.tick_count > 0) {
-      const tickValue = effect.tick_value || this.calculateEffectValue(effect, character, true);
+      // Always calculate with stat scaling if available
+      // If tick_value is set, use it as base, otherwise use value_min/value_max
+      let tickValue: number;
+      
+      if (effect.stat_scaling && effect.scaling_factor !== 0) {
+        // Apply stat scaling to base tick value
+        const baseValue = effect.tick_value || effect.value_min;
+        const statValue = character[effect.stat_scaling as keyof Character] as number || 10;
+        const statBonus = Math.floor((statValue - 10) * effect.scaling_factor);
+        tickValue = Math.max(1, baseValue + statBonus);
+      } else {
+        // No stat scaling - use tick_value or fallback to value calculation
+        tickValue = effect.tick_value || this.calculateEffectValue(effect, character, true);
+      }
       
       return {
         id,
@@ -70,6 +94,18 @@ export class EffectProcessor {
     // For buffs/debuffs
     if ((effect.effect_type === 'buff' || effect.effect_type === 'debuff') && effect.stat_affected) {
       const amount = this.calculateEffectValue(effect, character, true);
+      
+      console.log('[BUFF/DEBUFF CALCULATION]', {
+        abilityName,
+        effectType: effect.effect_type,
+        statAffected: effect.stat_affected,
+        valueMin: effect.value_min,
+        valueMax: effect.value_max,
+        statScaling: effect.stat_scaling,
+        scalingFactor: effect.scaling_factor,
+        characterStat: effect.stat_scaling ? character[effect.stat_scaling as keyof Character] : 'N/A',
+        calculatedAmount: amount
+      });
       
       return {
         id,
