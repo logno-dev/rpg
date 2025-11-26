@@ -139,6 +139,10 @@ export default function DungeonRoute() {
   const [combatThorns, setCombatThorns] = createSignal<any>(null);
   const [isScrolled, setIsScrolled] = createSignal(false);
   
+  // Track enemy health for sticky header
+  const [enemyCurrentHealth, setEnemyCurrentHealth] = createSignal(0);
+  const [enemyMaxHealth, setEnemyMaxHealth] = createSignal(1);
+  
   // Track combat HP/mana separately (updated by CombatEngine during combat)
   const [combatHealth, setCombatHealth] = createSignal<number | null>(null);
   const [combatMana, setCombatMana] = createSignal<number | null>(null);
@@ -508,7 +512,7 @@ export default function DungeonRoute() {
     <div style={{ 
       "min-height": "100vh",
       background: "linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%)",
-      padding: "2rem",
+      padding: "0.75rem",
       color: "white"
     }}>
       {/* Sticky Header on Scroll */}
@@ -528,41 +532,80 @@ export default function DungeonRoute() {
           <div style={{
             "max-width": "1200px",
             margin: "0 auto",
-            display: "grid",
-            "grid-template-columns": "auto 1fr 1fr auto",
-            gap: "1rem",
-            "align-items": "center"
+            display: "flex",
+            "flex-direction": "column",
+            gap: "0.75rem"
           }}>
-            <div style={{ "white-space": "nowrap", "font-weight": "bold" }}>
-              {store.character.name} <span style={{ color: "var(--text-secondary)" }}>Lv.{store.character.level}</span>
+            {/* Main Stats Row */}
+            <div style={{
+              display: "grid",
+              "grid-template-columns": "auto 1fr 1fr auto",
+              gap: "1rem",
+              "align-items": "center"
+            }}>
+              <div style={{ "white-space": "nowrap", "font-weight": "bold" }}>
+                {store.character.name} <span style={{ color: "var(--text-secondary)" }}>Lv.{store.character.level}</span>
+              </div>
+              
+              {/* Health Bar */}
+              <div>
+                <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "margin-bottom": "0.25rem", display: "flex", "justify-content": "space-between" }}>
+                  <span>HP</span>
+                  <span>{currentHealth()}/{currentMaxHealth()}</span>
+                </div>
+                <div class="progress-bar" style={{ height: "8px" }}>
+                  <div class="progress-fill health" style={{ width: `${(currentHealth() / currentMaxHealth()) * 100}%` }} />
+                </div>
+              </div>
+              
+              {/* Mana Bar */}
+              <div>
+                <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "margin-bottom": "0.25rem", display: "flex", "justify-content": "space-between" }}>
+                  <span>MP</span>
+                  <span>{currentMana()}/{currentMaxMana()}</span>
+                </div>
+                <div class="progress-bar" style={{ height: "8px" }}>
+                  <div class="progress-fill mana" style={{ width: `${(currentMana() / currentMaxMana()) * 100}%` }} />
+                </div>
+              </div>
+              
+              {/* Dungeon Progress */}
+              <div style={{ "white-space": "nowrap", "font-weight": "bold", color: "var(--accent)" }}>
+                🏰 {progress()?.current_encounter}/{dungeon()?.total_encounters}
+              </div>
             </div>
             
-            {/* Health Bar */}
-            <div>
-              <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "margin-bottom": "0.25rem", display: "flex", "justify-content": "space-between" }}>
-                <span>HP</span>
-                <span>{currentHealth()}/{currentMaxHealth()}</span>
-              </div>
-              <div class="progress-bar" style={{ height: "8px" }}>
-                <div class="progress-fill health" style={{ width: `${(currentHealth() / currentMaxHealth()) * 100}%` }} />
-              </div>
-            </div>
-            
-            {/* Mana Bar */}
-            <div>
-              <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "margin-bottom": "0.25rem", display: "flex", "justify-content": "space-between" }}>
-                <span>MP</span>
-                <span>{currentMana()}/{currentMaxMana()}</span>
-              </div>
-              <div class="progress-bar" style={{ height: "8px" }}>
-                <div class="progress-fill mana" style={{ width: `${(currentMana() / currentMaxMana()) * 100}%` }} />
-              </div>
-            </div>
-            
-            {/* Dungeon Progress */}
-            <div style={{ "white-space": "nowrap", "font-weight": "bold", color: "var(--accent)" }}>
-              🏰 {progress()?.current_encounter}/{dungeon()?.total_encounters}
-            </div>
+            {/* Enemy Health Bar (shown during combat) */}
+            <Show when={activeMob()}>
+              {(mob) => {
+                const healthPercent = () => (enemyCurrentHealth() / enemyMaxHealth()) * 100;
+                return (
+                  <div style={{
+                    "border-top": "1px solid var(--bg-light)",
+                    "padding-top": "0.75rem"
+                  }}>
+                    <div style={{ 
+                      "font-size": "0.75rem", 
+                      color: "var(--text-secondary)", 
+                      "margin-bottom": "0.25rem",
+                      display: "flex",
+                      "justify-content": "space-between"
+                    }}>
+                      <span style={{ color: "var(--danger)", "font-weight": "600" }}>
+                        ⚔️ {mob().name}
+                      </span>
+                      <span>{enemyCurrentHealth()}/{enemyMaxHealth()} ({Math.round(healthPercent())}%)</span>
+                    </div>
+                    <div class="progress-bar" style={{ height: "8px" }}>
+                      <div
+                        class="progress-fill danger"
+                        style={{ width: `${healthPercent()}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              }}
+            </Show>
           </div>
         </div>
       </Show>
@@ -581,19 +624,19 @@ export default function DungeonRoute() {
         </div>
       }>
         {/* Character Info Panel */}
-        <div class="card" style={{ "margin-bottom": "1rem" }}>
-          <div style={{ display: "flex", "justify-content": "space-between", "align-items": "start", "flex-wrap": "wrap", gap: "1rem" }}>
+        <div class="card" style={{ "margin-bottom": "0.5rem", padding: "0.75rem" }}>
+          <div style={{ display: "flex", "justify-content": "space-between", "align-items": "start", "flex-wrap": "wrap", gap: "0.5rem" }}>
             <div style={{ flex: 1 }}>
-              <h2>{store.character?.name}</h2>
-              <p style={{ color: "var(--text-secondary)", "margin-bottom": "0" }}>
+              <h2 style={{ "margin-bottom": "0.25rem", "font-size": "1.3rem" }}>{store.character?.name}</h2>
+              <p style={{ color: "var(--text-secondary)", "margin-bottom": "0", "font-size": "0.85rem" }}>
                 Level {store.character?.level}
               </p>
             </div>
           </div>
           
-          <div style={{ display: "grid", "grid-template-columns": "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", "margin-top": "1rem" }}>
+          <div style={{ display: "grid", "grid-template-columns": "repeat(auto-fit, minmax(200px, 1fr))", gap: "0.75rem", "margin-top": "0.5rem" }}>
             <div>
-              <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)", "margin-bottom": "0.25rem", display: "flex", "justify-content": "space-between" }}>
+              <div style={{ "font-size": "0.8rem", color: "var(--text-secondary)", "margin-bottom": "0.2rem", display: "flex", "justify-content": "space-between" }}>
                 <span>
                   Health
                   <Show when={activeMob()}> (Combat)</Show>
@@ -605,7 +648,7 @@ export default function DungeonRoute() {
               </div>
             </div>
             <div>
-              <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)", "margin-bottom": "0.25rem", display: "flex", "justify-content": "space-between" }}>
+              <div style={{ "font-size": "0.8rem", color: "var(--text-secondary)", "margin-bottom": "0.2rem", display: "flex", "justify-content": "space-between" }}>
                 <span>
                   Mana
                   <Show when={activeMob()}> (Combat)</Show>
@@ -620,29 +663,29 @@ export default function DungeonRoute() {
         </div>
         
         {/* Header */}
-        <div class="card" style={{ "margin-bottom": "2rem" }}>
-          <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center" }}>
-            <div>
-              <h1 style={{ margin: 0, "margin-bottom": "0.5rem" }}>
+        <div class="card" style={{ "margin-bottom": "0.5rem", padding: "0.75rem" }}>
+          <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center", "flex-wrap": "wrap", gap: "0.5rem" }}>
+            <div style={{ flex: 1 }}>
+              <h1 style={{ margin: 0, "margin-bottom": "0.25rem", "font-size": "1.5rem" }}>
                 {dungeon()?.name || 'Dungeon'}
               </h1>
-              <p style={{ margin: 0, color: "var(--text-secondary)" }}>
+              <p style={{ margin: 0, color: "var(--text-secondary)", "font-size": "0.85rem" }}>
                 {dungeon()?.description}
               </p>
             </div>
             <button 
               class="button" 
-              style={{ background: "var(--danger)" }}
+              style={{ background: "var(--danger)", padding: "0.5rem 1rem" }}
               onClick={() => setShowAbandonModal(true)}
             >
-              Abandon Dungeon
+              Abandon
             </button>
           </div>
         </div>
         
         {/* Progress Bar */}
-        <div class="card" style={{ "margin-bottom": "2rem" }}>
-          <h3 style={{ "margin-bottom": "1rem" }}>Progress</h3>
+        <div class="card" style={{ "margin-bottom": "0.5rem", padding: "0.75rem" }}>
+          <h3 style={{ "margin-bottom": "0.5rem", "font-size": "1.1rem" }}>Progress</h3>
           <div style={{ 
             display: "flex", 
             "flex-wrap": "wrap",
@@ -661,23 +704,23 @@ export default function DungeonRoute() {
                 return (
                   <div style={{
                     flex: "1 1 auto",
-                    "min-width": "80px",
-                    height: "60px",
+                    "min-width": "65px",
+                    height: "50px",
                     background: isComplete() ? "var(--success)" : isCurrent() ? "var(--accent)" : "var(--bg-light)",
-                    "border-radius": "8px",
+                    "border-radius": "6px",
                     display: "flex",
                     "align-items": "center",
                     "justify-content": "center",
                     "font-weight": "bold",
-                    border: isCurrent() ? "3px solid var(--accent)" : "none",
+                    border: isCurrent() ? "2px solid var(--accent)" : "none",
                     position: "relative"
                   }}>
                     <div style={{ "text-align": "center" }}>
-                      <div style={{ "font-size": "1.5rem" }}>
+                      <div style={{ "font-size": "1.3rem" }}>
                         {isBoss() ? '👑' : isComplete() ? '✓' : encounterNum}
                       </div>
-                      <div style={{ "font-size": "0.7rem", color: "var(--text-secondary)" }}>
-                        {isBoss() ? 'Boss' : `Encounter ${encounterNum}`}
+                      <div style={{ "font-size": "0.65rem", color: "var(--text-secondary)" }}>
+                        {isBoss() ? 'Boss' : `Enc ${encounterNum}`}
                       </div>
                     </div>
                   </div>
@@ -691,19 +734,19 @@ export default function DungeonRoute() {
         <Show 
           when={activeMob()} 
           fallback={
-            <div class="card" style={{ "text-align": "center", padding: "3rem" }}>
-              <div style={{ "font-size": "4rem", "margin-bottom": "1rem" }}>⚔️</div>
-              <h2 style={{ "margin-bottom": "1rem" }}>
+            <div class="card" style={{ "text-align": "center", padding: "2rem 1rem" }}>
+              <div style={{ "font-size": "3rem", "margin-bottom": "0.75rem" }}>⚔️</div>
+              <h2 style={{ "margin-bottom": "0.5rem", "font-size": "1.3rem" }}>
                 Ready for Encounter {progress()?.current_encounter}
               </h2>
-              <p style={{ color: "var(--text-secondary)", "margin-bottom": "2rem" }}>
+              <p style={{ color: "var(--text-secondary)", "margin-bottom": "1.25rem", "font-size": "0.9rem" }}>
                 {progress()?.current_encounter === dungeon()?.total_encounters 
                   ? "This is the final boss battle!" 
                   : "Click below to begin the encounter"}
               </p>
               <button 
                 class="button primary" 
-                style={{ "font-size": "1.2rem", padding: "1rem 2rem" }}
+                style={{ "font-size": "1.1rem", padding: "0.75rem 1.5rem" }}
                 onClick={handleStartEncounter}
               >
                 {progress()?.current_encounter === dungeon()?.total_encounters 
@@ -730,6 +773,10 @@ export default function DungeonRoute() {
                 }}
                 onActiveHotsChange={setCombatHots}
                 onThornsChange={setCombatThorns}
+                onMobHealthChange={(currentHealth, maxHealth) => {
+                  setEnemyCurrentHealth(currentHealth);
+                  setEnemyMaxHealth(maxHealth);
+                }}
                 onUseConsumable={async (itemId) => {
                   const item = store.inventory?.find((i: any) => i.id === itemId);
                   
@@ -783,19 +830,20 @@ export default function DungeonRoute() {
             <div 
               class="card"
               style={{ 
-                "max-width": "500px",
+                "max-width": "450px",
                 width: "100%",
                 background: "var(--bg-dark)",
                 border: "2px solid var(--success)",
-                "box-shadow": "0 0 30px rgba(34, 197, 94, 0.3)"
+                "box-shadow": "0 0 30px rgba(34, 197, 94, 0.3)",
+                padding: "1rem"
               }}
               onClick={(e) => e.stopPropagation()}
             >
               <h2 style={{ 
                 color: "var(--success)", 
                 "text-align": "center",
-                "font-size": "2rem",
-                "margin-bottom": "1rem"
+                "font-size": "1.5rem",
+                "margin-bottom": "0.75rem"
               }}>
                 ⚔️ VICTORY! ⚔️
               </h2>
@@ -803,24 +851,24 @@ export default function DungeonRoute() {
               <div style={{ 
                 display: "flex", 
                 "flex-direction": "column", 
-                gap: "1rem",
-                "margin-bottom": "2rem"
+                gap: "0.75rem",
+                "margin-bottom": "1rem"
               }}>
                 <div style={{ 
-                  padding: "1rem",
+                  padding: "0.75rem",
                   background: "var(--bg-light)",
-                  "border-radius": "6px",
-                  "border-left": "4px solid var(--accent)"
+                  "border-radius": "4px",
+                  "border-left": "3px solid var(--accent)"
                 }}>
                   <div style={{ 
-                    "font-size": "0.875rem", 
+                    "font-size": "0.8rem", 
                     color: "var(--text-secondary)",
-                    "margin-bottom": "0.25rem"
+                    "margin-bottom": "0.2rem"
                   }}>
                     Experience Gained
                   </div>
                   <div style={{ 
-                    "font-size": "1.5rem",
+                    "font-size": "1.3rem",
                     "font-weight": "bold",
                     color: "var(--accent)"
                   }}>
@@ -829,20 +877,20 @@ export default function DungeonRoute() {
                 </div>
 
                 <div style={{ 
-                  padding: "1rem",
+                  padding: "0.75rem",
                   background: "var(--bg-light)",
-                  "border-radius": "6px",
-                  "border-left": "4px solid var(--warning)"
+                  "border-radius": "4px",
+                  "border-left": "3px solid var(--warning)"
                 }}>
                   <div style={{ 
-                    "font-size": "0.875rem", 
+                    "font-size": "0.8rem", 
                     color: "var(--text-secondary)",
-                    "margin-bottom": "0.25rem"
+                    "margin-bottom": "0.2rem"
                   }}>
                     Gold Earned
                   </div>
                   <div style={{ 
-                    "font-size": "1.5rem",
+                    "font-size": "1.3rem",
                     "font-weight": "bold",
                     color: "var(--warning)"
                   }}>
@@ -852,10 +900,10 @@ export default function DungeonRoute() {
 
                 <Show when={data().loot.length > 0}>
                   <div style={{ 
-                    padding: "1rem",
+                    padding: "0.75rem",
                     background: "var(--bg-light)",
-                    "border-radius": "6px",
-                    "border-left": "4px solid var(--success)"
+                    "border-radius": "4px",
+                    "border-left": "3px solid var(--success)"
                   }}>
                     <div style={{ 
                       "font-size": "0.875rem", 
@@ -929,32 +977,32 @@ export default function DungeonRoute() {
           <div 
             class="card" 
             style={{ 
-              "max-width": "500px",
+              "max-width": "450px",
               width: "100%",
-              padding: "2rem",
+              padding: "1.25rem",
               "text-align": "center"
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ "font-size": "3rem", "margin-bottom": "1rem" }}>⚠️</div>
-            <h2 style={{ "margin-bottom": "1rem", color: "var(--danger)" }}>
+            <div style={{ "font-size": "2.5rem", "margin-bottom": "0.75rem" }}>⚠️</div>
+            <h2 style={{ "margin-bottom": "0.75rem", color: "var(--danger)", "font-size": "1.5rem" }}>
               Abandon Dungeon?
             </h2>
-            <p style={{ "font-size": "1rem", "margin-bottom": "2rem", color: "var(--text-secondary)" }}>
+            <p style={{ "font-size": "0.95rem", "margin-bottom": "1.25rem", color: "var(--text-secondary)" }}>
               Are you sure you want to abandon this dungeon? You will lose all progress and return to town.
             </p>
             
-            <div style={{ display: "flex", gap: "1rem" }}>
+            <div style={{ display: "flex", gap: "0.75rem" }}>
               <button 
                 class="button secondary" 
-                style={{ flex: 1 }}
+                style={{ flex: 1, padding: "0.75rem" }}
                 onClick={() => setShowAbandonModal(false)}
               >
                 Cancel
               </button>
               <button 
                 class="button danger" 
-                style={{ flex: 1 }}
+                style={{ flex: 1, padding: "0.75rem" }}
                 onClick={async () => {
                   setShowAbandonModal(false);
                   await handleAbandonDungeon();
@@ -991,19 +1039,19 @@ export default function DungeonRoute() {
           <div 
             class="card" 
             style={{ 
-              "max-width": "500px",
+              "max-width": "450px",
               width: "100%",
-              padding: "2rem",
+              padding: "1.25rem",
               "text-align": "center",
               animation: "slideUp 0.3s ease-out"
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ "font-size": "4rem", "margin-bottom": "1rem" }}>🎉</div>
-            <h2 style={{ "margin-bottom": "1rem", color: "var(--accent)" }}>
+            <div style={{ "font-size": "3rem", "margin-bottom": "0.75rem" }}>🎉</div>
+            <h2 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", "font-size": "1.5rem" }}>
               Dungeon Complete!
             </h2>
-            <p style={{ "font-size": "1.1rem", "margin-bottom": "1.5rem", color: "var(--text-secondary)" }}>
+            <p style={{ "font-size": "1rem", "margin-bottom": "1.25rem", color: "var(--text-secondary)" }}>
               You have defeated {dungeon()?.name} and emerged victorious!
             </p>
             
@@ -1079,7 +1127,7 @@ export default function DungeonRoute() {
             
             <button 
               class="button primary" 
-              style={{ width: "100%", "font-size": "1.1rem", padding: "1rem" }}
+              style={{ width: "100%", "font-size": "1rem", padding: "0.75rem" }}
               onClick={() => {
                 setShowCompletionModal(false);
                 navigate(`/game`);

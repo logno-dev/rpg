@@ -200,7 +200,7 @@ label {
 .combat-log {
   background-color: var(--bg-light);
   border-radius: 6px;
-  padding: 1rem;
+  padding: 0.5rem;
   max-height: 300px;
   overflow-y: auto;
   font-family: monospace;
@@ -208,10 +208,14 @@ label {
 }
 
 .combat-log p {
-  margin: 0.25rem 0;
-  padding: 0.25rem 0.5rem;
-  border-left: 3px solid var(--accent);
-  background-color: var(--bg-medium);
+  margin: 0;
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--bg-medium);
+  background-color: transparent;
+}
+
+.combat-log p:last-child {
+  border-bottom: none;
 }
 
 .error {

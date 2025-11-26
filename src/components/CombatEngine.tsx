@@ -47,6 +47,7 @@ type CombatEngineProps = {
   onUseConsumable?: (itemId: number) => Promise<{ healthRestore: number; manaRestore: number } | void>;
   onActiveHotsChange?: (hots: ActiveEffect[]) => void;
   onThornsChange?: (thorns: { name: string; reflectPercent: number; duration: number; expiresAt: number } | null) => void;
+  onMobHealthChange?: (currentHealth: number, maxHealth: number) => void;
 };
 
 const TICK_INTERVAL = 100; // 100ms per tick
@@ -160,10 +161,20 @@ export function CombatEngine(props: CombatEngineProps) {
     log: [`Combat started against ${props.mob.name}!`],
     isActive: true,
   });
+  
+  // Notify parent of mob health changes
+  createEffect(() => {
+    if (props.onMobHealthChange) {
+      props.onMobHealthChange(state().mobHealth, props.mob.max_health);
+    }
+  });
 
   // Track ability cooldowns in combat (in seconds)
   const [abilityCooldowns, setAbilityCooldowns] = createSignal<Map<number, number>>(new Map());
   const [currentMana, setCurrentMana] = createSignal(props.currentMana);
+  
+  // Toggle for attack timers visibility
+  const [showAttackTimers, setShowAttackTimers] = createSignal(false);
   
   // Track active combat effects (DOTs, HOTs, debuffs on enemy)
   const [activeDots, setActiveDots] = createSignal<ActiveEffect[]>([]);
@@ -277,12 +288,19 @@ export function CombatEngine(props: CombatEngineProps) {
     const log = state().log; // Track log changes
     
     if (logContainerRef && !userScrolledUp()) {
-      // Wait for DOM to update, then scroll to bottom
-      setTimeout(() => {
+      // Use requestAnimationFrame for more reliable scrolling
+      requestAnimationFrame(() => {
         if (logContainerRef) {
           logContainerRef.scrollTop = logContainerRef.scrollHeight;
         }
-      }, 0);
+      });
+      
+      // Double-check after a short delay to catch edge cases
+      setTimeout(() => {
+        if (logContainerRef && !userScrolledUp()) {
+          logContainerRef.scrollTop = logContainerRef.scrollHeight;
+        }
+      }, 50);
     }
   });
 
@@ -291,7 +309,8 @@ export function CombatEngine(props: CombatEngineProps) {
     if (!logContainerRef) return;
     
     const { scrollTop, scrollHeight, clientHeight } = logContainerRef;
-    const isAtBottom = scrollHeight - scrollTop - clientHeight < 10; // 10px threshold
+    // More generous threshold - consider "at bottom" if within 30px
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 30;
     
     // If user scrolls to bottom, resume auto-scroll
     // If user scrolls up, disable auto-scroll
@@ -775,18 +794,18 @@ export function CombatEngine(props: CombatEngineProps) {
   const mobHealthPercent = () => (state().mobHealth / props.mob.max_health) * 100;
 
   return (
-    <div class="card">
-      <h3 style={{ "margin-bottom": "1rem" }}>
+    <div class="card" style={{ padding: "0.75rem" }}>
+      <h3 style={{ "margin-bottom": "0.5rem", "font-size": "1.1rem" }}>
         Combat vs <span style={{ color: getDifficultyColor(props.mob.level, props.character.level) }}>{props.mob.name}</span>! {state().isActive ? "" : state().result === 'victory' ? "🎉" : "💀"}
       </h3>
 
       {/* Mob Health */}
-      <div style={{ "margin-bottom": "1rem" }}>
+      <div style={{ "margin-bottom": "0.5rem" }}>
         <div style={{ display: "flex", "justify-content": "space-between", "margin-bottom": "0.25rem" }}>
-          <strong style={{ color: getDifficultyColor(props.mob.level, props.character.level) }}>
+          <strong style={{ color: getDifficultyColor(props.mob.level, props.character.level), "font-size": "0.9rem" }}>
             {props.mob.name} (Level {props.mob.level})
           </strong>
-          <span>{state().mobHealth}/{props.mob.max_health} ({Math.round(mobHealthPercent())}%)</span>
+          <span style={{ "font-size": "0.85rem" }}>{state().mobHealth}/{props.mob.max_health} ({Math.round(mobHealthPercent())}%)</span>
         </div>
         <div class="progress-bar">
           <div class="progress-fill danger" style={{ width: `${mobHealthPercent()}%` }} />
@@ -795,22 +814,22 @@ export function CombatEngine(props: CombatEngineProps) {
         {/* Active DOTs on Enemy */}
         <Show when={activeDots().length > 0}>
           <div style={{ 
-            "margin-top": "0.5rem", 
+            "margin-top": "0.35rem", 
             display: "flex", 
-            gap: "0.5rem", 
+            gap: "0.35rem", 
             "flex-wrap": "wrap" 
           }}>
             <For each={activeDots()}>
               {(dot) => (
                 <span style={{ 
-                  "font-size": "0.75rem",
-                  padding: "0.25rem 0.5rem",
+                  "font-size": "0.7rem",
+                  padding: "0.2rem 0.4rem",
                   background: "rgba(220, 38, 38, 0.2)",
                   border: "1px solid var(--danger)",
-                  "border-radius": "4px",
+                  "border-radius": "3px",
                   color: "var(--danger)"
                 }}>
-                  🔥 {dot.name} ({dot.ticks_remaining} hit{dot.ticks_remaining !== 1 ? 's' : ''} remaining)
+                  🔥 {dot.name} ({dot.ticks_remaining})
                 </span>
               )}
             </For>
@@ -822,11 +841,11 @@ export function CombatEngine(props: CombatEngineProps) {
       <Show when={thornsEffect() && Date.now() < thornsEffect()!.expiresAt}>
         {(effect) => (
           <div style={{ 
-            "margin-bottom": "1rem",
-            padding: "0.75rem",
+            "margin-bottom": "0.5rem",
+            padding: "0.5rem",
             background: "rgba(96, 165, 250, 0.1)",
-            border: "2px solid var(--accent)",
-            "border-radius": "6px"
+            border: "1px solid var(--accent)",
+            "border-radius": "4px"
           }}>
             <div style={{ 
               display: "flex", 
@@ -835,50 +854,70 @@ export function CombatEngine(props: CombatEngineProps) {
             }}>
               <span style={{ 
                 "font-weight": "bold",
+                "font-size": "0.85rem",
                 color: "var(--accent)"
               }}>
                 ⚡ {effect().name}
               </span>
               <span style={{ 
-                "font-size": "0.875rem",
+                "font-size": "0.75rem",
                 color: "var(--text-secondary)"
               }}>
-                Reflecting {effect().reflectPercent}% damage
+                {effect().reflectPercent}% reflect • {Math.ceil((effect().expiresAt - Date.now()) / 1000)}s
               </span>
-            </div>
-            <div style={{ 
-              "margin-top": "0.25rem",
-              "font-size": "0.75rem",
-              color: "var(--text-secondary)"
-            }}>
-              {Math.ceil((effect().expiresAt - Date.now()) / 1000)}s remaining
             </div>
           </div>
         )}
       </Show>
 
-      {/* Attack Timers */}
+      {/* Attack Timers - Collapsible */}
       <Show when={state().isActive}>
-        <div style={{ display: "grid", "grid-template-columns": "1fr 1fr", gap: "1rem", "margin-bottom": "1rem" }}>
-          <div style={{ padding: "0.5rem", background: "var(--bg-light)", "border-radius": "4px" }}>
-            <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)" }}>Your next attack</div>
-            <div style={{ "font-size": "1.25rem", "font-weight": "bold", color: "var(--success)" }}>
-              {((state().characterAttackTicks - state().characterTicks) * TICK_INTERVAL / 1000).toFixed(1)}s
+        <div style={{ "margin-bottom": "0.5rem" }}>
+          <button
+            class="button secondary"
+            onClick={() => setShowAttackTimers(!showAttackTimers())}
+            style={{
+              width: "100%",
+              padding: "0.35rem",
+              "font-size": "0.8rem",
+              display: "flex",
+              "justify-content": "center",
+              "align-items": "center",
+              gap: "0.35rem"
+            }}
+          >
+            <span>{showAttackTimers() ? '▼' : '▶'}</span>
+            <span>Attack Timers</span>
+          </button>
+          
+          <Show when={showAttackTimers()}>
+            <div style={{ 
+              display: "grid", 
+              "grid-template-columns": "1fr 1fr", 
+              gap: "0.5rem", 
+              "margin-top": "0.35rem" 
+            }}>
+              <div style={{ padding: "0.4rem", background: "var(--bg-light)", "border-radius": "3px" }}>
+                <div style={{ "font-size": "0.7rem", color: "var(--text-secondary)" }}>Your next attack</div>
+                <div style={{ "font-size": "1.1rem", "font-weight": "bold", color: "var(--success)" }}>
+                  {((state().characterAttackTicks - state().characterTicks) * TICK_INTERVAL / 1000).toFixed(1)}s
+                </div>
+              </div>
+              <div style={{ padding: "0.4rem", background: "var(--bg-light)", "border-radius": "3px" }}>
+                <div style={{ "font-size": "0.7rem", color: "var(--text-secondary)" }}>Enemy attack</div>
+                <div style={{ "font-size": "1.1rem", "font-weight": "bold", color: "var(--danger)" }}>
+                  {((state().mobAttackTicks - state().mobTicks) * TICK_INTERVAL / 1000).toFixed(1)}s
+                </div>
+              </div>
             </div>
-          </div>
-          <div style={{ padding: "0.5rem", background: "var(--bg-light)", "border-radius": "4px" }}>
-            <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)" }}>Enemy attack</div>
-            <div style={{ "font-size": "1.25rem", "font-weight": "bold", color: "var(--danger)" }}>
-              {((state().mobAttackTicks - state().mobTicks) * TICK_INTERVAL / 1000).toFixed(1)}s
-            </div>
-          </div>
+          </Show>
         </div>
       </Show>
 
       {/* Hotbar Actions */}
       <Show when={props.hotbarActions.length > 0 && state().isActive}>
-        <div style={{ "margin-bottom": "1rem" }}>
-          <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)", "margin-bottom": "0.5rem" }}>
+        <div style={{ "margin-bottom": "0.5rem" }}>
+          <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "margin-bottom": "0.35rem" }}>
             Action Bar (Press 1-8)
           </div>
           <div style={{ 
@@ -1048,7 +1087,7 @@ export function CombatEngine(props: CombatEngineProps) {
         ref={logContainerRef}
         class="combat-log" 
         style={{ 
-          "max-height": "120px", // ~5 lines of text
+          "max-height": "150px", // More lines visible with denser spacing
           "overflow-y": "auto",
           "scroll-behavior": "smooth"
         }}

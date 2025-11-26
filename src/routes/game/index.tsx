@@ -78,6 +78,10 @@ export default function GamePage() {
   const [isRoaming, setIsRoaming] = createSignal(false);
   const [isTraveling, setIsTraveling] = createSignal(false);
   
+  // Track enemy health for sticky header
+  const [enemyCurrentHealth, setEnemyCurrentHealth] = createSignal(0);
+  const [enemyMaxHealth, setEnemyMaxHealth] = createSignal(1);
+  
   // Sticky header state
   const [isScrolled, setIsScrolled] = createSignal(false);
   
@@ -1703,67 +1707,107 @@ export default function GamePage() {
           <div style={{
             "max-width": "1200px",
             margin: "0 auto",
-            display: "grid",
-            "grid-template-columns": "auto 1fr 1fr auto",
-            gap: "1rem",
-            "align-items": "center"
+            display: "flex",
+            "flex-direction": "column",
+            gap: "0.75rem"
           }}>
-            {/* Character Name & Level */}
-            <div style={{ 
-              "white-space": "nowrap",
-              "font-weight": "bold"
+            {/* Main Stats Row */}
+            <div style={{
+              display: "grid",
+              "grid-template-columns": "auto 1fr 1fr auto",
+              gap: "1rem",
+              "align-items": "center"
             }}>
-              {currentCharacter()?.name} <span style={{ color: "var(--text-secondary)" }}>Lv.{currentCharacter()?.level}</span>
-            </div>
-
-            {/* Health Bar */}
-            <div>
+              {/* Character Name & Level */}
               <div style={{ 
-                "font-size": "0.75rem", 
-                color: "var(--text-secondary)", 
-                "margin-bottom": "0.25rem",
-                display: "flex",
-                "justify-content": "space-between"
+                "white-space": "nowrap",
+                "font-weight": "bold"
               }}>
-                <span>HP</span>
-                <span>{currentHealth()}/{currentMaxHealth()}</span>
+                {currentCharacter()?.name} <span style={{ color: "var(--text-secondary)" }}>Lv.{currentCharacter()?.level}</span>
               </div>
-              <div class="progress-bar" style={{ height: "8px" }}>
-                <div
-                  class="progress-fill health"
-                  style={{ width: `${(currentHealth() / currentMaxHealth()) * 100}%` }}
-                />
-              </div>
-            </div>
 
-            {/* Mana Bar */}
-            <div>
+              {/* Health Bar */}
+              <div>
+                <div style={{ 
+                  "font-size": "0.75rem", 
+                  color: "var(--text-secondary)", 
+                  "margin-bottom": "0.25rem",
+                  display: "flex",
+                  "justify-content": "space-between"
+                }}>
+                  <span>HP</span>
+                  <span>{currentHealth()}/{currentMaxHealth()}</span>
+                </div>
+                <div class="progress-bar" style={{ height: "8px" }}>
+                  <div
+                    class="progress-fill health"
+                    style={{ width: `${(currentHealth() / currentMaxHealth()) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Mana Bar */}
+              <div>
+                <div style={{ 
+                  "font-size": "0.75rem", 
+                  color: "var(--text-secondary)", 
+                  "margin-bottom": "0.25rem",
+                  display: "flex",
+                  "justify-content": "space-between"
+                }}>
+                  <span>MP</span>
+                  <span>{currentMana()}/{currentMaxMana()}</span>
+                </div>
+                <div class="progress-bar" style={{ height: "8px" }}>
+                  <div
+                    class="progress-fill mana"
+                    style={{ width: `${(currentMana() / currentMaxMana()) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Gold */}
               <div style={{ 
-                "font-size": "0.75rem", 
-                color: "var(--text-secondary)", 
-                "margin-bottom": "0.25rem",
-                display: "flex",
-                "justify-content": "space-between"
+                "white-space": "nowrap",
+                "font-weight": "bold",
+                color: "var(--warning)"
               }}>
-                <span>MP</span>
-                <span>{currentMana()}/{currentMaxMana()}</span>
-              </div>
-              <div class="progress-bar" style={{ height: "8px" }}>
-                <div
-                  class="progress-fill mana"
-                  style={{ width: `${(currentMana() / currentMaxMana()) * 100}%` }}
-                />
+                💰 {currentGold()}
               </div>
             </div>
-
-            {/* Gold */}
-            <div style={{ 
-              "white-space": "nowrap",
-              "font-weight": "bold",
-              color: "var(--warning)"
-            }}>
-              💰 {currentGold()}
-            </div>
+            
+            {/* Enemy Health Bar (shown during combat) */}
+            <Show when={activeMob()}>
+              {(mob) => {
+                const difficulty = getDifficultyColor(mob().level, currentCharacter()?.level || 1);
+                const healthPercent = () => (enemyCurrentHealth() / enemyMaxHealth()) * 100;
+                return (
+                  <div style={{
+                    "border-top": "1px solid var(--bg-light)",
+                    "padding-top": "0.75rem"
+                  }}>
+                    <div style={{ 
+                      "font-size": "0.75rem", 
+                      color: "var(--text-secondary)", 
+                      "margin-bottom": "0.25rem",
+                      display: "flex",
+                      "justify-content": "space-between"
+                    }}>
+                      <span style={{ color: difficulty.color, "font-weight": "600" }}>
+                        ⚔️ {mob().name}
+                      </span>
+                      <span>{enemyCurrentHealth()}/{enemyMaxHealth()} ({Math.round(healthPercent())}%)</span>
+                    </div>
+                    <div class="progress-bar" style={{ height: "8px" }}>
+                      <div
+                        class="progress-fill danger"
+                        style={{ width: `${healthPercent()}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              }}
+            </Show>
           </div>
         </div>
       </Show>
@@ -1867,6 +1911,10 @@ export default function GamePage() {
                   onHealthChange={handleHealthChange}
                   onActiveHotsChange={setCombatHots}
                   onThornsChange={setCombatThorns}
+                  onMobHealthChange={(currentHealth, maxHealth) => {
+                    setEnemyCurrentHealth(currentHealth);
+                    setEnemyMaxHealth(maxHealth);
+                  }}
                   onUseConsumable={async (itemId) => {
                     const item = currentInventory().find((i: any) => i.id === itemId);
                     if (item) {
