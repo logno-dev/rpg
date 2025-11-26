@@ -376,6 +376,11 @@ export default function InventoryPage() {
     // Add rarity class for color coding
     classes.push(getItemRarityClass(invItem));
     
+    // Add requirements check - subtle red tint if requirements not met
+    if (hasRequirements(invItem) && !meetsRequirements(invItem)) {
+      classes.push('requirements-not-met');
+    }
+    
     if (selectionMode()) {
       if (canSelect) {
         classes.push('selectable');
@@ -542,6 +547,17 @@ export default function InventoryPage() {
     }
     
     return { alreadyLearned: false, hasBetter: false, status: 'can_learn' };
+  };
+
+  // Check if item has requirements
+  const hasRequirements = (item: any) => {
+    return (item.required_level && item.required_level > 1) || 
+           item.required_strength || 
+           item.required_dexterity || 
+           item.required_constitution || 
+           item.required_intelligence || 
+           item.required_wisdom || 
+           item.required_charisma;
   };
 
   // Check requirements
@@ -1145,9 +1161,9 @@ export default function InventoryPage() {
                           </Show>
                         </div>
                       </div>
-                      <Show when={invItem.quantity > 1}>
-                        <div style={{ "font-weight": "bold", color: "var(--accent)" }}>x{invItem.quantity}</div>
-                      </Show>
+                        <Show when={invItem.quantity > 1}>
+                          <div style={{ "font-weight": "bold", color: "var(--accent)" }}>x{invItem.quantity}</div>
+                        </Show>
                     </div>
                     <Show when={!selectionMode()}>
                       <div style={{ color: "var(--text-secondary)", "font-size": "1.25rem" }}>›</div>

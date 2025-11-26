@@ -82,8 +82,8 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
   
   // Responsive canvas size
   const getCanvasSize = () => {
-    if (typeof window === 'undefined') return 400;
-    return window.innerWidth < 768 ? Math.min(window.innerWidth - 60, 300) : 400;
+    if (typeof window === 'undefined') return 320;
+    return window.innerWidth < 768 ? Math.min(window.innerWidth - 60, 280) : 320;
   };
   
   const [canvasSize, setCanvasSize] = createSignal(getCanvasSize());
@@ -419,19 +419,19 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
         <div style={{ 
           display: "grid", 
           "grid-template-columns": "1fr 1fr",
-          gap: "1rem",
-          "margin-bottom": "1rem",
+          gap: "0.75rem",
+          "margin-bottom": "0.75rem",
           "text-align": "center"
         }}>
           <div>
-            <div style={{ "font-size": "0.85rem", color: "var(--text-secondary)" }}>Time Remaining</div>
-            <div style={{ "font-size": "1.5rem", "font-weight": "bold" }}>
+            <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)" }}>Time Remaining</div>
+            <div style={{ "font-size": "1.25rem", "font-weight": "bold" }}>
               {formatTime(timeRemaining())}
             </div>
           </div>
           <div>
-            <div style={{ "font-size": "0.85rem", color: "var(--text-secondary)" }}>Actions</div>
-            <div style={{ "font-size": "1.5rem", "font-weight": "bold" }}>
+            <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)" }}>Actions</div>
+            <div style={{ "font-size": "1.25rem", "font-weight": "bold" }}>
               {actionsPerformed()}
             </div>
           </div>
@@ -441,9 +441,9 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
         <div style={{ 
           display: "flex", 
           "justify-content": "center", 
-          "margin-bottom": "1rem",
+          "margin-bottom": "0.75rem",
           background: "var(--bg-dark)",
-          padding: "1rem",
+          padding: "0.75rem",
           "border-radius": "8px"
         }}>
           <canvas 
@@ -457,8 +457,8 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
         {/* Action Buttons - Circular Quadrant Layout */}
         <div style={{ 
           position: "relative",
-          width: "300px",
-          height: "300px",
+          width: "240px",
+          height: "240px",
           margin: "0 auto 1rem",
           "border-radius": "50%",
           overflow: "hidden"
@@ -472,13 +472,13 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
             height: "100%",
             "pointer-events": "none",
             "z-index": "10"
-          }} viewBox="0 0 300 300">
+          }} viewBox="0 0 240 240">
             {/* Diagonal line from top-left to center to bottom-right */}
-            <line x1="0" y1="0" x2="150" y2="150" stroke="var(--bg-dark)" stroke-width="3" />
-            <line x1="150" y1="150" x2="300" y2="300" stroke="var(--bg-dark)" stroke-width="3" />
+            <line x1="0" y1="0" x2="120" y2="120" stroke="var(--bg-dark)" stroke-width="3" />
+            <line x1="120" y1="120" x2="240" y2="240" stroke="var(--bg-dark)" stroke-width="3" />
             {/* Diagonal line from top-right to center to bottom-left */}
-            <line x1="300" y1="0" x2="150" y2="150" stroke="var(--bg-dark)" stroke-width="3" />
-            <line x1="150" y1="150" x2="0" y2="300" stroke="var(--bg-dark)" stroke-width="3" />
+            <line x1="240" y1="0" x2="120" y2="120" stroke="var(--bg-dark)" stroke-width="3" />
+            <line x1="120" y1="120" x2="0" y2="240" stroke="var(--bg-dark)" stroke-width="3" />
           </svg>
           {/* North Quadrant - Top pie slice */}
           <button
@@ -488,27 +488,27 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
               position: "absolute",
               top: "0",
               left: "0",
-              width: "300px",
-              height: "300px",
+              width: "240px",
+              height: "240px",
               "clip-path": "polygon(50% 50%, 0% 0%, 100% 0%)",
               display: "flex",
               "flex-direction": "column",
               "align-items": "center",
               "justify-content": "flex-start",
-              "padding-top": "2rem",
+              "padding-top": "1.5rem",
               "border-radius": "0"
             }}
             onClick={() => performAction("north")}
             disabled={cooldowns().north > 0}
           >
-            <div style={{ "font-weight": "bold", "margin-bottom": "0.25rem" }}>
+            <div style={{ "font-weight": "bold", "margin-bottom": "0.2rem", "font-size": "0.9rem" }}>
               ↑ {actions().north.name}
             </div>
-            <div style={{ "font-size": "0.7rem", opacity: 0.8 }}>
+            <div style={{ "font-size": "0.65rem", opacity: 0.8 }}>
               {actions().north.description}
             </div>
             {cooldowns().north > 0 && (
-              <div style={{ "font-size": "0.8rem", "margin-top": "0.25rem", color: "var(--accent)" }}>
+              <div style={{ "font-size": "0.75rem", "margin-top": "0.2rem", color: "var(--accent)" }}>
                 {cooldowns().north.toFixed(1)}s
               </div>
             )}
@@ -522,27 +522,27 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
               position: "absolute",
               top: "0",
               left: "0",
-              width: "300px",
-              height: "300px",
+              width: "240px",
+              height: "240px",
               "clip-path": "polygon(50% 50%, 100% 0%, 100% 100%)",
               display: "flex",
               "flex-direction": "column",
               "align-items": "flex-end",
               "justify-content": "center",
-              "padding-right": "2rem",
+              "padding-right": "1.5rem",
               "border-radius": "0"
             }}
             onClick={() => performAction("east")}
             disabled={cooldowns().east > 0}
           >
-            <div style={{ "font-weight": "bold", "margin-bottom": "0.25rem" }}>
+            <div style={{ "font-weight": "bold", "margin-bottom": "0.2rem", "font-size": "0.9rem" }}>
               {actions().east.name} →
             </div>
-            <div style={{ "font-size": "0.7rem", opacity: 0.8 }}>
+            <div style={{ "font-size": "0.65rem", opacity: 0.8 }}>
               {actions().east.description}
             </div>
             {cooldowns().east > 0 && (
-              <div style={{ "font-size": "0.8rem", "margin-top": "0.25rem", color: "var(--accent)" }}>
+              <div style={{ "font-size": "0.75rem", "margin-top": "0.2rem", color: "var(--accent)" }}>
                 {cooldowns().east.toFixed(1)}s
               </div>
             )}
@@ -556,27 +556,27 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
               position: "absolute",
               top: "0",
               left: "0",
-              width: "300px",
-              height: "300px",
+              width: "240px",
+              height: "240px",
               "clip-path": "polygon(50% 50%, 100% 100%, 0% 100%)",
               display: "flex",
               "flex-direction": "column",
               "align-items": "center",
               "justify-content": "flex-end",
-              "padding-bottom": "2rem",
+              "padding-bottom": "1.5rem",
               "border-radius": "0"
             }}
             onClick={() => performAction("south")}
             disabled={cooldowns().south > 0}
           >
-            <div style={{ "font-weight": "bold", "margin-bottom": "0.25rem" }}>
+            <div style={{ "font-weight": "bold", "margin-bottom": "0.2rem", "font-size": "0.9rem" }}>
               ↓ {actions().south.name}
             </div>
-            <div style={{ "font-size": "0.7rem", opacity: 0.8 }}>
+            <div style={{ "font-size": "0.65rem", opacity: 0.8 }}>
               {actions().south.description}
             </div>
             {cooldowns().south > 0 && (
-              <div style={{ "font-size": "0.8rem", "margin-top": "0.25rem", color: "var(--accent)" }}>
+              <div style={{ "font-size": "0.75rem", "margin-top": "0.2rem", color: "var(--accent)" }}>
                 {cooldowns().south.toFixed(1)}s
               </div>
             )}
@@ -590,27 +590,27 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
               position: "absolute",
               top: "0",
               left: "0",
-              width: "300px",
-              height: "300px",
+              width: "240px",
+              height: "240px",
               "clip-path": "polygon(50% 50%, 0% 100%, 0% 0%)",
               display: "flex",
               "flex-direction": "column",
               "align-items": "flex-start",
               "justify-content": "center",
-              "padding-left": "2rem",
+              "padding-left": "1.5rem",
               "border-radius": "0"
             }}
             onClick={() => performAction("west")}
             disabled={cooldowns().west > 0}
           >
-            <div style={{ "font-weight": "bold", "margin-bottom": "0.25rem" }}>
+            <div style={{ "font-weight": "bold", "margin-bottom": "0.2rem", "font-size": "0.9rem" }}>
               ← {actions().west.name}
             </div>
-            <div style={{ "font-size": "0.7rem", opacity: 0.8 }}>
+            <div style={{ "font-size": "0.65rem", opacity: 0.8 }}>
               {actions().west.description}
             </div>
             {cooldowns().west > 0 && (
-              <div style={{ "font-size": "0.8rem", "margin-top": "0.25rem", color: "var(--accent)" }}>
+              <div style={{ "font-size": "0.75rem", "margin-top": "0.2rem", color: "var(--accent)" }}>
                 {cooldowns().west.toFixed(1)}s
               </div>
             )}

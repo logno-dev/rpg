@@ -506,6 +506,14 @@ body:has(.modal-overlay) {
   opacity: 0.5;
 }
 
+.inventory-item.requirements-not-met {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.inventory-item.requirements-not-met:hover {
+  background: rgba(239, 68, 68, 0.12);
+}
+
 /* Inventory Item Rarity Colors */
 .inventory-item.rarity-material {
   border-left-color: #9ca3af;
