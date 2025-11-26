@@ -84,6 +84,10 @@ async function migrate() {
       '033_add_gm_role.sql',
       '034_add_dungeon_session_state.sql',
       '035_create_crafting_system.sql',
+      '036_add_quality_to_inventory.sql',
+      '037_recipe_groups_system.sql',
+      '038_seed_recipe_groups.sql',
+      '039_fix_crafting_sessions_fk.sql',
     ];
 
     for (const migrationFile of migrations) {

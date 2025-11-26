@@ -62,7 +62,19 @@ export function ItemDetailModal(props: ItemDetailModalProps) {
         {/* Header */}
         <div style={{ display: "flex", "justify-content": "space-between", "align-items": "start", "margin-bottom": "1rem" }}>
           <div style={{ flex: 1 }}>
-            <h3 style={{ "margin-bottom": "0.25rem", "font-size": "1.5rem" }}>{item.name}</h3>
+            <h3 style={{ "margin-bottom": "0.25rem", "font-size": "1.5rem" }}>
+              <Show when={item.quality && item.quality !== 'common'}>
+                <span style={{
+                  color: item.quality === 'masterwork' ? 'var(--legendary)' :
+                         item.quality === 'superior' ? 'var(--epic)' :
+                         item.quality === 'fine' ? 'var(--rare)' : 'inherit',
+                  "margin-right": "0.5rem"
+                }}>
+                  {item.quality.charAt(0).toUpperCase() + item.quality.slice(1)}
+                </span>
+              </Show>
+              {item.name}
+            </h3>
             <p style={{ "font-size": "0.875rem", color: "var(--text-secondary)", "text-transform": "uppercase", margin: 0 }}>
               {item.type} {item.slot && `• ${item.slot}`}
             </p>

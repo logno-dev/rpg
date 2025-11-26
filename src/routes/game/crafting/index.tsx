@@ -1,8 +1,9 @@
 import { createSignal, Show, For, createEffect, createResource, createMemo, Suspense } from "solid-js";
 import { GameLayout } from "~/components/GameLayout";
-import { CraftingMinigame } from "~/components/CraftingMinigame";
+import { CraftingMinigameNew } from "~/components/CraftingMinigameNew";
 import { useCharacter } from "~/lib/CharacterContext";
 import { useBasicCharacterData } from "~/lib/game-helpers";
+import { Hammer } from "lucide-solid";
 
 type Profession = "blacksmithing" | "leatherworking" | "tailoring" | "fletching" | "alchemy";
 
@@ -83,6 +84,7 @@ export default function CraftingPage() {
   const [showMinigame, setShowMinigame] = createSignal(false);
   const [minigameData, setMinigameData] = createSignal<any>(null);
   const [crafting, setCrafting] = createSignal(false);
+  const [expandedBrackets, setExpandedBrackets] = createSignal<Set<string>>(new Set());
 
   // Fetch basic crafting data (professions and materials only)
   const fetchBasicCraftingData = async (characterId: number | undefined) => {
@@ -178,6 +180,71 @@ export default function CraftingPage() {
     ) || [];
   };
 
+  // Group recipes by category (Weapons, Armor, Offhand, Consumables)
+  const groupRecipesByCategory = () => {
+    const recipeList = availableRecipes();
+    const categories: Record<string, Recipe[]> = {};
+    
+    recipeList.forEach((recipe: any) => {
+      const category = recipe.category || 'other';
+      const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1) + 's';
+      
+      if (!categories[categoryLabel]) {
+        categories[categoryLabel] = [];
+      }
+      categories[categoryLabel].push(recipe);
+    });
+    
+    // Sort categories and recipes within each category
+    return Object.entries(categories)
+      .sort((a, b) => {
+        // Custom sort order
+        const order = ['Weapons', 'Armors', 'Offhands', 'Consumables', 'Materials'];
+        const aIndex = order.indexOf(a[0]);
+        const bIndex = order.indexOf(b[0]);
+        if (aIndex === -1) return 1;
+        if (bIndex === -1) return -1;
+        return aIndex - bIndex;
+      })
+      .map(([category, recipes]) => [
+        category,
+        recipes.sort((a: any, b: any) => (a.min_level || a.level_required) - (b.min_level || b.level_required))
+      ]);
+  };
+
+  // Toggle bracket expansion
+  const toggleBracket = (key: string) => {
+    const current = expandedBrackets();
+    const newSet = new Set(current);
+    if (newSet.has(key)) {
+      newSet.delete(key);
+    } else {
+      newSet.add(key);
+    }
+    setExpandedBrackets(newSet);
+  };
+
+  // Auto-expand first category on profession selection
+  const [initialExpansionDone, setInitialExpansionDone] = createSignal(false);
+  
+  createEffect(() => {
+    const profession = selectedProfession();
+    if (!profession) {
+      setInitialExpansionDone(false);
+      return;
+    }
+    
+    // Only auto-expand once when profession is first selected
+    if (!initialExpansionDone()) {
+      const groups = groupRecipesByCategory();
+      if (groups.length > 0) {
+        const firstCategory = groups[0][0] as string;
+        setExpandedBrackets(new Set([firstCategory]));
+        setInitialExpansionDone(true);
+      }
+    }
+  });
+
   // Check if player has enough materials for a recipe
   const canCraft = (recipe: Recipe) => {
     return recipe.materials.every(rm => {
@@ -189,6 +256,11 @@ export default function CraftingPage() {
   // Start crafting
   const startCraft = async (recipe: Recipe) => {
     if (crafting() || !currentCharacter()) return;
+
+    const profession = selectedProfession();
+    if (!profession) return;
+    
+    const profData = getProfession(profession);
 
     setCrafting(true);
     try {
@@ -204,7 +276,11 @@ export default function CraftingPage() {
       const data = await response.json();
 
       if (data.success) {
-        setMinigameData(data.session);
+        setMinigameData({
+          ...data.session,
+          professionLevel: profData.level,
+          recipeLevel: recipe.level_required
+        });
         setShowMinigame(true);
         // Don't refetch here - materials will update when modal closes
       } else {
@@ -219,7 +295,7 @@ export default function CraftingPage() {
   };
 
   // Complete crafting
-  const completeCraft = async (success: boolean) => {
+  const completeCraft = async (success: boolean, quality?: string) => {
     if (!currentCharacter()) return null;
 
     try {
@@ -228,7 +304,8 @@ export default function CraftingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           characterId: currentCharacter()!.id,
-          success
+          success,
+          quality
         })
       });
 
@@ -371,85 +448,174 @@ export default function CraftingPage() {
                       </div>
                     </div>
 
-                    {/* Recipes */}
+                    {/* Recipes - Accordion by Level */}
                     <div class="card">
-                      <h3>Available Recipes</h3>
+                      <h3>Recipes</h3>
                       <Suspense fallback={
                         <div style={{ padding: "2rem", "text-align": "center" }}>
                           <div style={{ "font-size": "1.5rem", "margin-bottom": "0.5rem" }}>📜</div>
                           <p style={{ color: "var(--text-secondary)" }}>Loading recipes...</p>
                         </div>
                       }>
-                        <div style={{ 
-                          display: "grid", 
-                          "grid-template-columns": "repeat(auto-fill, minmax(300px, 1fr))",
-                          gap: "1rem",
-                          "margin-top": "1rem"
-                        }}>
-                          <For each={availableRecipes()}>
-                            {(recipe) => {
-                              // Use createMemo to make hasMateriels reactive
-                              const hasMateriels = createMemo(() => canCraft(recipe));
-                              
-                              return (
-                                <div 
-                                  class="card"
-                                  style={{ 
-                                    background: "var(--bg-medium)",
-                                    opacity: hasMateriels() ? 1 : 0.6
-                                  }}
-                                >
-                                  <h4 style={{ margin: "0 0 0.5rem 0" }}>{recipe.name}</h4>
-                                  <div style={{ "font-size": "0.85rem", color: "var(--text-secondary)" }}>
-                                    <p>Level Required: {recipe.level_required}</p>
-                                    <p>Craft Time: {recipe.craft_time_seconds}s</p>
-                                    <p>Experience: {recipe.base_experience} XP</p>
-                                  </div>
-                                  <div style={{ "margin-top": "0.5rem" }}>
-                                    <strong>Materials:</strong>
-                                    <For each={recipe.materials}>
-                                      {(rm) => {
-                                        // Use createMemo to ensure proper reactivity tracking
-                                        const material = createMemo(() => 
-                                          materials().find((m: Material) => m.id === rm.material_id)
-                                        );
-                                        const hasEnough = createMemo(() => {
-                                          const mat = material();
-                                          return mat && mat.quantity >= rm.quantity;
-                                        });
-                                        
-                                        return (
-                                          <div style={{ 
-                                            display: "flex",
-                                            "justify-content": "space-between",
-                                            "margin-top": "0.25rem",
-                                            color: hasEnough() ? "inherit" : "var(--error)"
-                                          }}>
-                                            <span>{rm.material_name}</span>
-                                            <span>{material()?.quantity || 0} / {rm.quantity}</span>
-                                          </div>
-                                        );
-                                      }}
-                                    </For>
-                                  </div>
-                                  <button 
-                                    class="button primary"
-                                    style={{ "margin-top": "1rem", width: "100%" }}
-                                    disabled={!hasMateriels() || crafting()}
-                                    onClick={() => startCraft(recipe)}
-                                  >
-                                    {crafting() ? "Starting..." : "Craft"}
-                                  </button>
-                                </div>
-                              );
-                            }}
-                          </For>
-                        </div>
                         <Show when={availableRecipes().length === 0}>
                           <p style={{ color: "var(--text-secondary)", "text-align": "center", "margin-top": "1rem" }}>
                             No recipes available. Level up your {info.name} skill to unlock more recipes!
                           </p>
                         </Show>
+                        
+                        <div style={{ "margin-top": "1rem" }}>
+                          <For each={groupRecipesByCategory()}>
+                            {(entry) => {
+                              const category = entry[0] as string;
+                              const categoryRecipes = entry[1] as Recipe[];
+                              const isExpanded = () => expandedBrackets().has(category as string);
+                              
+                              return (
+                                <div style={{ "margin-bottom": "0.5rem" }}>
+                                  {/* Category Header */}
+                                  <button
+                                    class="button secondary"
+                                    onClick={() => toggleBracket(category as string)}
+                                    style={{
+                                      width: "100%",
+                                      display: "flex",
+                                      "justify-content": "space-between",
+                                      "align-items": "center",
+                                      "text-align": "left",
+                                      padding: "0.75rem 1rem"
+                                    }}
+                                  >
+                                    <div>
+                                      <span style={{ "font-weight": "600" }}>{category}</span>
+                                      <span style={{ 
+                                        "margin-left": "0.5rem",
+                                        color: "var(--text-secondary)",
+                                        "font-size": "0.875rem"
+                                      }}>
+                                        {(categoryRecipes as any[]).length} {(categoryRecipes as any[]).length === 1 ? 'recipe' : 'recipes'}
+                                      </span>
+                                    </div>
+                                    <span>{isExpanded() ? '▼' : '▶'}</span>
+                                  </button>
+
+                                  {/* Category Content */}
+                                  <Show when={isExpanded()}>
+                                    <div style={{ 
+                                      "margin-top": "0.5rem"
+                                    }}>
+                                      <For each={categoryRecipes as any[]}>
+                                        {(recipe: Recipe) => {
+                                          const hasMateriels = createMemo(() => canCraft(recipe));
+                                          
+                                          return (
+                                            <details 
+                                              style={{ 
+                                                background: "var(--bg-medium)",
+                                                "border-radius": "4px",
+                                                "margin-bottom": "0.5rem",
+                                                opacity: hasMateriels() ? 1 : 0.6,
+                                                border: "1px solid var(--border)"
+                                              }}
+                                            >
+                                              <summary style={{ 
+                                                padding: "0.75rem 1rem",
+                                                cursor: "pointer",
+                                                "font-weight": "600",
+                                                display: "flex",
+                                                "justify-content": "space-between",
+                                                "align-items": "center",
+                                                "user-select": "none"
+                                              }}>
+                                                <span>{recipe.name}</span>
+                                                <button 
+                                                  class="button primary"
+                                                  style={{ 
+                                                    padding: "0.5rem",
+                                                    "min-width": "auto",
+                                                    width: "auto",
+                                                    display: "flex",
+                                                    "align-items": "center",
+                                                    "justify-content": "center"
+                                                  }}
+                                                  disabled={!hasMateriels() || crafting()}
+                                                  onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    startCraft(recipe);
+                                                  }}
+                                                  title="Craft"
+                                                >
+                                                  <Hammer size={18} />
+                                                </button>
+                                              </summary>
+
+                                              <div style={{ 
+                                                padding: "0 1rem 1rem 1rem",
+                                                "border-top": "1px solid var(--border)"
+                                              }}>
+                                                {/* Level & XP */}
+                                                <div style={{ 
+                                                  "margin-top": "0.75rem",
+                                                  "margin-bottom": "0.75rem",
+                                                  "font-size": "0.9rem",
+                                                  color: "var(--text-secondary)"
+                                                }}>
+                                                  Level {recipe.level_required} • {recipe.base_experience} XP
+                                                </div>
+
+                                                {/* Materials */}
+                                                <div>
+                                                  <div style={{ 
+                                                    "font-weight": "600",
+                                                    "margin-bottom": "0.5rem",
+                                                    "font-size": "0.9rem"
+                                                  }}>
+                                                    Materials:
+                                                  </div>
+                                                  <div style={{ display: "flex", gap: "0.5rem", "flex-wrap": "wrap" }}>
+                                                    <For each={recipe.materials}>
+                                                      {(rm) => {
+                                                        const material = createMemo(() => 
+                                                          materials().find((m: Material) => m.id === rm.material_id)
+                                                        );
+                                                        const hasEnough = createMemo(() => {
+                                                          const mat = material();
+                                                          return mat && mat.quantity >= rm.quantity;
+                                                        });
+                                                        
+                                                        return (
+                                                          <div style={{ 
+                                                            display: "flex",
+                                                            "align-items": "center",
+                                                            gap: "0.5rem",
+                                                            padding: "0.375rem 0.75rem",
+                                                            background: "var(--bg-dark)",
+                                                            "border-radius": "4px",
+                                                            "font-size": "0.875rem",
+                                                            color: hasEnough() ? "inherit" : "var(--danger)"
+                                                          }}>
+                                                            <span>{rm.material_name}</span>
+                                                            <span style={{ "font-weight": "600" }}>
+                                                              {material()?.quantity || 0}/{rm.quantity}
+                                                            </span>
+                                                          </div>
+                                                        );
+                                                      }}
+                                                    </For>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </details>
+                                          );
+                                        }}
+                                      </For>
+                                    </div>
+                                  </Show>
+                                </div>
+                              );
+                            }}
+                          </For>
+                        </div>
                       </Suspense>
                     </div>
 
@@ -499,14 +665,13 @@ export default function CraftingPage() {
         
         {/* Crafting Minigame Modal */}
         <Show when={showMinigame() && minigameData() && currentCharacter()}>
-          <CraftingMinigame
+          <CraftingMinigameNew
             characterId={currentCharacter()!.id}
             profession={minigameData()!.profession}
             recipeName={minigameData()!.recipeName}
-            craftTimeSeconds={minigameData()!.craftTimeSeconds}
-            targetX={minigameData()!.targetX}
-            targetY={minigameData()!.targetY}
-            targetRadius={minigameData()!.targetRadius}
+            recipeId={minigameData()!.recipeId}
+            professionLevel={minigameData()!.professionLevel}
+            recipeLevel={minigameData()!.recipeLevel}
             onComplete={completeCraft}
             onCancel={async () => {
               // Close modal first

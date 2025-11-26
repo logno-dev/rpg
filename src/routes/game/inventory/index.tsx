@@ -432,6 +432,16 @@ export default function InventoryPage() {
     return 'rarity-default';
   };
 
+  // Get quality-prefixed item name
+  const getItemDisplayName = (item: any) => {
+    if (!item.quality || item.quality === 'common') {
+      return item.name;
+    }
+    
+    const qualityLabel = item.quality.charAt(0).toUpperCase() + item.quality.slice(1);
+    return `${qualityLabel} ${item.name}`;
+  };
+
   // Get item class names for selection styling
   const getItemClassNames = (invItem: any) => {
     const classes = ['inventory-item'];
@@ -991,7 +1001,7 @@ export default function InventoryPage() {
                     >
                       <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
                         <div style={{ flex: 1 }}>
-                          <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
+                          <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{getItemDisplayName(invItem)}</div>
                           <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
                             {invItem.slot && `${invItem.slot} • `}
                             <Show when={invItem.damage_min && invItem.damage_max}>
@@ -1040,7 +1050,7 @@ export default function InventoryPage() {
                     >
                       <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
                         <div style={{ flex: 1 }}>
-                          <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
+                          <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{getItemDisplayName(invItem)}</div>
                           <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
                             {invItem.slot && `${invItem.slot} • `}
                             <Show when={invItem.intelligence_bonus}>
@@ -1092,7 +1102,7 @@ export default function InventoryPage() {
                     >
                       <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
                         <div style={{ flex: 1 }}>
-                          <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
+                          <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{getItemDisplayName(invItem)}</div>
                           <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
                             {invItem.slot && `${invItem.slot} • `}
                             <Show when={invItem.armor}>🛡️ {invItem.armor} Armor</Show>
@@ -1140,7 +1150,7 @@ export default function InventoryPage() {
                     >
                       <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
                         <div style={{ flex: 1 }}>
-                          <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
+                          <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{getItemDisplayName(invItem)}</div>
                           <div style={{ "font-size": "0.875rem", color: scrollStatus.alreadyLearned ? "var(--success)" : scrollStatus.hasBetter ? "var(--warning)" : "var(--text-secondary)" }}>
                             {scrollStatus.alreadyLearned ? "✓ Already Learned" : scrollStatus.hasBetter ? "⚠ You have better" : "Ability Scroll"}
                             <Show when={selectionMode() && invItem.value}>
@@ -1186,7 +1196,7 @@ export default function InventoryPage() {
                     >
                       <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
                         <div style={{ flex: 1 }}>
-                          <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
+                          <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{getItemDisplayName(invItem)}</div>
                           <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
                             <Show when={invItem.health_restore}>❤️ +{invItem.health_restore} HP</Show>
                             <Show when={invItem.health_restore && invItem.mana_restore}> • </Show>

@@ -13,9 +13,9 @@ export async function POST(event: APIEvent) {
       });
     }
 
-    // Get recipe details
+    // Get recipe group details
     const recipeResult = await db.execute({
-      sql: `SELECT * FROM recipes WHERE id = ?`,
+      sql: `SELECT * FROM recipe_groups WHERE id = ?`,
       args: [recipeId]
     });
 
@@ -51,9 +51,9 @@ export async function POST(event: APIEvent) {
     const profession = profResult.rows[0] as any;
 
     // Check level requirement
-    if (profession.level < recipe.level_required) {
+    if (profession.level < recipe.min_level) {
       return new Response(JSON.stringify({ 
-        error: `Requires ${recipe.profession_type} level ${recipe.level_required}` 
+        error: `Requires ${recipe.profession_type} level ${recipe.min_level}` 
       }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
@@ -72,12 +72,12 @@ export async function POST(event: APIEvent) {
       });
     }
 
-    // Get recipe materials
+    // Get recipe group materials
     const materialsResult = await db.execute({
-      sql: `SELECT rm.*, cm.name 
-            FROM recipe_materials rm 
-            JOIN crafting_materials cm ON rm.material_id = cm.id
-            WHERE rm.recipe_id = ?`,
+      sql: `SELECT rgm.*, cm.name 
+            FROM recipe_group_materials rgm 
+            JOIN crafting_materials cm ON rgm.material_id = cm.id
+            WHERE rgm.recipe_group_id = ?`,
       args: [recipeId]
     });
 
@@ -115,7 +115,7 @@ export async function POST(event: APIEvent) {
 
     // Calculate target position and radius based on difficulty
     // Difficulty = recipe level vs profession level
-    const levelDiff = recipe.level_required - profession.level;
+    const levelDiff = recipe.min_level - profession.level;
     
     // Target radius: larger if player is over-leveled, smaller if under-leveled
     // Range: 2 (hard) to 5 (easy)
@@ -135,14 +135,14 @@ export async function POST(event: APIEvent) {
     const startX = Math.round(Math.cos(startAngle) * rimRadius);
     const startY = Math.round(Math.sin(startAngle) * rimRadius);
 
-    // Create crafting session
+    // Create crafting session (still using recipe_id column for now - it now holds recipe_group_id)
     await db.execute({
       sql: `INSERT INTO crafting_sessions 
             (character_id, recipe_id, profession_type, pin_x, pin_y, target_x, target_y, target_radius, start_time)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
       args: [
         characterId,
-        recipeId,
+        recipeId, // This is actually recipe_group_id now
         recipe.profession_type,
         startX,
         startY,
@@ -156,6 +156,7 @@ export async function POST(event: APIEvent) {
       JSON.stringify({
         success: true,
         session: {
+          recipeId: recipe.id,
           pinX: startX,
           pinY: startY,
           targetX,

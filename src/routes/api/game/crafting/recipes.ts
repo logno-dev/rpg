@@ -14,25 +14,28 @@ export async function GET(event: APIEvent) {
   }
 
   try {
-    // Get recipes for the specific profession
+    // Get recipe groups for the specific profession
     const recipesResult = await db.execute({
       sql: `SELECT 
-              r.id,
-              r.name,
-              r.profession_type,
-              r.level_required,
-              r.craft_time_seconds,
-              r.base_experience
-            FROM recipes r
-            WHERE r.profession_type = ?
-            ORDER BY r.level_required, r.name`,
+              rg.id,
+              rg.name,
+              rg.description,
+              rg.profession_type,
+              rg.category,
+              rg.min_level,
+              rg.max_level,
+              rg.craft_time_seconds,
+              rg.base_experience
+            FROM recipe_groups rg
+            WHERE rg.profession_type = ?
+            ORDER BY rg.category, rg.min_level, rg.name`,
       args: [profession]
     });
 
-    // Get ALL recipe materials for this profession's recipes in a single query
-    const recipeIds = recipesResult.rows.map(r => r.id);
+    // Get ALL recipe materials for this profession's recipe groups in a single query
+    const recipeGroupIds = recipesResult.rows.map(r => r.id);
     
-    if (recipeIds.length === 0) {
+    if (recipeGroupIds.length === 0) {
       return new Response(
         JSON.stringify({ recipes: [] }),
         {
@@ -42,37 +45,38 @@ export async function GET(event: APIEvent) {
       );
     }
 
-    const placeholders = recipeIds.map(() => '?').join(',');
+    const placeholders = recipeGroupIds.map(() => '?').join(',');
     const allMaterialsResult = await db.execute({
       sql: `SELECT 
-              rm.recipe_id,
-              rm.material_id,
+              rgm.recipe_group_id,
+              rgm.material_id,
               cm.name as material_name,
-              rm.quantity
-            FROM recipe_materials rm
-            JOIN crafting_materials cm ON rm.material_id = cm.id
-            WHERE rm.recipe_id IN (${placeholders})
-            ORDER BY rm.recipe_id`,
-      args: recipeIds
+              rgm.quantity
+            FROM recipe_group_materials rgm
+            JOIN crafting_materials cm ON rgm.material_id = cm.id
+            WHERE rgm.recipe_group_id IN (${placeholders})
+            ORDER BY rgm.recipe_group_id`,
+      args: recipeGroupIds
     });
 
-    // Group materials by recipe_id
+    // Group materials by recipe_group_id
     const materialsByRecipe = new Map();
     for (const material of allMaterialsResult.rows) {
-      const recipeId = material.recipe_id;
-      if (!materialsByRecipe.has(recipeId)) {
-        materialsByRecipe.set(recipeId, []);
+      const recipeGroupId = material.recipe_group_id;
+      if (!materialsByRecipe.has(recipeGroupId)) {
+        materialsByRecipe.set(recipeGroupId, []);
       }
-      materialsByRecipe.get(recipeId).push({
+      materialsByRecipe.get(recipeGroupId).push({
         material_id: material.material_id,
         material_name: material.material_name,
         quantity: material.quantity
       });
     }
 
-    // Build recipes with their materials
+    // Build recipe groups with their materials
     const recipes = recipesResult.rows.map(recipe => ({
       ...recipe,
+      level_required: recipe.min_level, // For backwards compatibility
       materials: materialsByRecipe.get(recipe.id) || []
     }));
 

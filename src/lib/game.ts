@@ -776,17 +776,43 @@ export async function getInventory(characterId: number): Promise<Array<Inventory
   });
 
   // Map the ability_ prefixed columns back to required_ for consistency
-  const rows = result.rows.map((row: any) => ({
-    ...row,
-    required_level: row.ability_required_level || row.required_level,
-    required_strength: row.ability_required_strength || row.required_strength,
-    required_dexterity: row.ability_required_dexterity || row.required_dexterity,
-    required_intelligence: row.ability_required_intelligence || row.required_intelligence,
-    required_wisdom: row.ability_required_wisdom || row.required_wisdom,
-    required_charisma: row.ability_required_charisma || row.required_charisma,
-  }));
+  // AND apply quality multipliers to stats
+  const rows = result.rows.map((row: any) => {
+    const quality = row.quality || 'common';
+    const multiplier = getQualityMultiplier(quality);
+    
+    return {
+      ...row,
+      required_level: row.ability_required_level || row.required_level,
+      required_strength: row.ability_required_strength || row.required_strength,
+      required_dexterity: row.ability_required_dexterity || row.required_dexterity,
+      required_intelligence: row.ability_required_intelligence || row.required_intelligence,
+      required_wisdom: row.ability_required_wisdom || row.required_wisdom,
+      required_charisma: row.ability_required_charisma || row.required_charisma,
+      // Apply quality multipliers to stats (using round instead of floor for better scaling)
+      strength_bonus: Math.round(row.strength_bonus * multiplier),
+      dexterity_bonus: Math.round(row.dexterity_bonus * multiplier),
+      constitution_bonus: Math.round(row.constitution_bonus * multiplier),
+      intelligence_bonus: Math.round(row.intelligence_bonus * multiplier),
+      wisdom_bonus: Math.round(row.wisdom_bonus * multiplier),
+      charisma_bonus: Math.round(row.charisma_bonus * multiplier),
+      damage_min: Math.round(row.damage_min * multiplier),
+      damage_max: Math.round(row.damage_max * multiplier),
+      armor: Math.round(row.armor * multiplier),
+    };
+  });
 
   return rows as any[];
+}
+
+function getQualityMultiplier(quality: string): number {
+  const multipliers: Record<string, number> = {
+    common: 1.0,
+    fine: 1.05,
+    superior: 1.10,
+    masterwork: 1.15,
+  };
+  return multipliers[quality] || 1.0;
 }
 
 export async function addItemToInventory(characterId: number, itemId: number, quantity: number = 1): Promise<void> {
