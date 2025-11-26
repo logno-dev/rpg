@@ -4,6 +4,7 @@ type ItemDetailModalProps = {
   item: any;
   isOpen: boolean;
   onClose: () => void;
+  preventBackgroundClose?: boolean;
   meetsRequirements: (item: any) => boolean;
   formatRequirements: (item: any) => string[];
   getScrollAbilityStatus?: (item: any) => { alreadyLearned: boolean; hasBetter: boolean; status: string };
@@ -20,15 +21,10 @@ type ItemDetailModalProps = {
 };
 
 export function ItemDetailModal(props: ItemDetailModalProps) {
-  console.log('[ItemDetailModal] Render - isOpen:', props.isOpen, 'hasItem:', !!props.item, 'itemName:', props.item?.name);
-  
-  if (!props.isOpen || !props.item) {
-    console.log('[ItemDetailModal] Not showing - isOpen:', props.isOpen, 'hasItem:', !!props.item);
+  const item = props.item;
+  if (!props.isOpen || !item) {
     return null;
   }
-
-  const item = props.item;
-  console.log('[ItemDetailModal] Showing modal for:', item.name);
   
   return (
     <div 
@@ -45,7 +41,11 @@ export function ItemDetailModal(props: ItemDetailModalProps) {
         "z-index": 1000,
         padding: "1rem"
       }}
-      onClick={props.onClose}
+      onClick={() => {
+        if (!props.preventBackgroundClose) {
+          props.onClose();
+        }
+      }}
     >
       <div 
         class={`card ${item.rarity}`}
@@ -335,9 +335,20 @@ export function ItemDetailModal(props: ItemDetailModalProps) {
               <button
                 class="button secondary"
                 style={{ width: "100%" }}
-                onClick={() => {
-                  props.onSell?.(item.id, item.name, item.value, item.quantity);
-                  props.onClose();
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevent event from bubbling to modal background
+                  console.log('[ITEM DETAIL] Sell button clicked', { id: item.id, name: item.name, quantity: item.quantity });
+                  console.log('[ITEM DETAIL] props.onSell exists?', !!props.onSell);
+                  console.log('[ITEM DETAIL] Calling props.onSell with:', item.id, item.name, item.value, item.quantity);
+                  try {
+                    // Call sell handler to open quantity modal
+                    props.onSell?.(item.id, item.name, item.value, item.quantity);
+                    console.log('[ITEM DETAIL] Sell handler called successfully');
+                  } catch (err) {
+                    console.error('[ITEM DETAIL] Error calling onSell:', err);
+                  }
+                  // Don't close this modal yet - let the sell modal appear first
+                  // The sell modal will be on top (higher z-index)
                 }}
               >
                 Sell ({Math.floor(item.value * 0.4) * item.quantity}g)

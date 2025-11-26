@@ -813,62 +813,68 @@ export function CombatEngine(props: CombatEngineProps) {
           <div class="progress-fill danger" style={{ width: `${mobHealthPercent()}%` }} />
         </div>
         
-        {/* Active DOTs on Enemy */}
-        <Show when={activeDots().length > 0}>
-          <div style={{ 
-            "margin-top": "0.35rem", 
-            display: "flex", 
-            gap: "0.35rem", 
-            "flex-wrap": "wrap" 
-          }}>
-            <For each={activeDots()}>
-              {(dot) => (
-                <span style={{ 
-                  "font-size": "0.7rem",
-                  padding: "0.2rem 0.4rem",
-                  background: "rgba(220, 38, 38, 0.2)",
-                  border: "1px solid var(--danger)",
-                  "border-radius": "3px",
-                  color: "var(--danger)"
-                }}>
-                  🔥 {dot.name} ({dot.ticks_remaining})
-                </span>
-              )}
-            </For>
-          </div>
-        </Show>
+        {/* Active DOTs on Enemy - Fixed height container with horizontal scroll */}
+        <div style={{ 
+          "margin-top": "0.35rem", 
+          height: "28px",
+          "min-height": "28px",
+          "overflow-x": "auto",
+          "overflow-y": "hidden",
+          display: "flex", 
+          gap: "0.35rem",
+          "white-space": "nowrap"
+        }}>
+          <For each={activeDots()}>
+            {(dot) => (
+              <span style={{ 
+                "font-size": "0.7rem",
+                padding: "0.2rem 0.4rem",
+                background: "rgba(220, 38, 38, 0.2)",
+                border: "1px solid var(--danger)",
+                "border-radius": "3px",
+                color: "var(--danger)",
+                display: "inline-block",
+                "flex-shrink": 0
+              }}>
+                🔥 {dot.name} ({dot.ticks_remaining})
+              </span>
+            )}
+          </For>
+        </div>
       </div>
       
       {/* Active Thorns Effect on Character */}
-      <Show when={thornsEffect() && Date.now() < thornsEffect()!.expiresAt}>
+      <Show when={thornsEffect()}>
         {(effect) => (
-          <div style={{ 
-            "margin-bottom": "0.5rem",
-            padding: "0.5rem",
-            background: "rgba(96, 165, 250, 0.1)",
-            border: "1px solid var(--accent)",
-            "border-radius": "4px"
-          }}>
+          <Show when={Date.now() < effect().expiresAt}>
             <div style={{ 
-              display: "flex", 
-              "justify-content": "space-between", 
-              "align-items": "center" 
+              "margin-bottom": "0.5rem",
+              padding: "0.5rem",
+              background: "rgba(96, 165, 250, 0.1)",
+              border: "1px solid var(--accent)",
+              "border-radius": "4px"
             }}>
-              <span style={{ 
-                "font-weight": "bold",
-                "font-size": "0.85rem",
-                color: "var(--accent)"
+              <div style={{ 
+                display: "flex", 
+                "justify-content": "space-between", 
+                "align-items": "center" 
               }}>
-                ⚡ {effect().name}
-              </span>
-              <span style={{ 
-                "font-size": "0.75rem",
-                color: "var(--text-secondary)"
-              }}>
-                {effect().reflectPercent}% reflect • {Math.ceil((effect().expiresAt - Date.now()) / 1000)}s
-              </span>
+                <span style={{ 
+                  "font-weight": "bold",
+                  "font-size": "0.85rem",
+                  color: "var(--accent)"
+                }}>
+                  ⚡ {effect().name}
+                </span>
+                <span style={{ 
+                  "font-size": "0.75rem",
+                  color: "var(--text-secondary)"
+                }}>
+                  {effect().reflectPercent}% reflect • {Math.ceil((effect().expiresAt - Date.now()) / 1000)}s
+                </span>
+              </div>
             </div>
-          </div>
+          </Show>
         )}
       </Show>
 

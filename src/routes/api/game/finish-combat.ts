@@ -145,17 +145,25 @@ export async function POST(event: APIEvent) {
           });
 
           if (invResult.rows.length > 0 && item.stackable) {
-            // Update quantity
+            // Update quantity for stackable items
             await db.execute({
               sql: 'UPDATE character_inventory SET quantity = quantity + ? WHERE character_id = ? AND item_id = ?',
               args: [quantity, characterId, item.id],
             });
-          } else {
-            // Add new item
+          } else if (item.stackable) {
+            // Add new stackable item
             await db.execute({
               sql: 'INSERT INTO character_inventory (character_id, item_id, quantity) VALUES (?, ?, ?)',
               args: [characterId, item.id, quantity],
             });
+          } else {
+            // For non-stackable items (equipment), add each as a separate entry with quantity=1
+            for (let i = 0; i < quantity; i++) {
+              await db.execute({
+                sql: 'INSERT INTO character_inventory (character_id, item_id, quantity) VALUES (?, ?, 1)',
+                args: [characterId, item.id],
+              });
+            }
           }
 
           loot.push({ name: item.name, quantity, rarity: item.rarity });

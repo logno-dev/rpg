@@ -69,6 +69,9 @@ export default function InventoryPage() {
   const [showSalvageResultModal, setShowSalvageResultModal] = createSignal(false);
   const [salvageResultData, setSalvageResultData] = createSignal<{itemName: string, materials: Array<{name: string, quantity: number}>} | null>(null);
   const [showBulkSalvageModal, setShowBulkSalvageModal] = createSignal(false);
+  const [showSellModal, setShowSellModal] = createSignal(false);
+  const [sellItemData, setSellItemData] = createSignal<{inventoryItemId: number, itemName: string, value: number, quantity: number} | null>(null);
+  const [sellQuantity, setSellQuantity] = createSignal(1);
 
   // Computed values - use context as source of truth
   const currentInventory = () => store.inventory || [];
@@ -99,15 +102,32 @@ export default function InventoryPage() {
   };
 
   // Handle sell item
-  const handleSell = async (inventoryItemId: number, itemName: string, value: number, quantity: number) => {
+  // Open sell confirmation modal (don't sell immediately)
+  const handleSell = (inventoryItemId: number, itemName: string, value: number, quantity: number) => {
+    console.log('[INVENTORY] handleSell called - opening modal', { inventoryItemId, itemName, value, quantity });
+    setSellItemData({ inventoryItemId, itemName, value, quantity });
+    setSellQuantity(quantity); // Default to all
+    setShowSellModal(true);
+  };
+  
+  // Actually perform the sell after confirmation
+  const handleSellConfirm = async () => {
+    const data = sellItemData();
+    if (!data) return;
+    
+    const quantityToSell = sellQuantity();
+    setShowSellModal(false);
+    setShowItemDetailModal(false);
+    setSelectedItem(null);
+    
     try {
       const response = await fetch('/api/game/sell', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           characterId: characterId(), 
-          inventoryItemId, 
-          quantity 
+          inventoryItemId: data.inventoryItemId, 
+          quantity: quantityToSell 
         }),
       });
       
@@ -121,6 +141,9 @@ export default function InventoryPage() {
         actions.setCharacter({ ...store.character!, gold: result.character.gold });
         actions.setInventory(result.inventory);
       }
+      
+      setSellItemData(null);
+      setSellQuantity(1);
     } catch (error) {
       console.error('Sell error:', error);
       alert('Failed to sell item');
@@ -315,6 +338,36 @@ export default function InventoryPage() {
     if (item.equipped) return false;
     // Sellable (has value) or Salvageable (armor/weapon)
     return (item.value && item.value > 0) || (item.type === 'armor' || item.type === 'weapon');
+  };
+  
+  // Helper to create long press handlers for bulk select
+  const createLongPressHandlers = (itemId: number, canSelect: boolean) => {
+    let pressTimer: number | null = null;
+    
+    return {
+      onTouchStart: (e: TouchEvent) => {
+        if (!canSelect) return;
+        pressTimer = window.setTimeout(() => {
+          // Long press detected - enable selection mode and select this item
+          if (!selectionMode()) {
+            setSelectionMode(true);
+            setSelectedItems(new Set([itemId]));
+          }
+        }, 500); // 500ms long press
+      },
+      onTouchEnd: () => {
+        if (pressTimer) {
+          clearTimeout(pressTimer);
+          pressTimer = null;
+        }
+      },
+      onTouchMove: () => {
+        if (pressTimer) {
+          clearTimeout(pressTimer);
+          pressTimer = null;
+        }
+      }
+    };
   };
 
   const toggleItemSelection = (itemId: number) => {
@@ -884,6 +937,7 @@ export default function InventoryPage() {
               <For each={currentInventory().filter((i: any) => !i.equipped && i.slot === "weapon")}>
                 {(invItem: any) => {
                   const canSelect = canSelectItem(invItem);
+                  const longPressHandlers = createLongPressHandlers(invItem.id, canSelect);
                   
                   return (
                     <div 
@@ -895,6 +949,7 @@ export default function InventoryPage() {
                           handleViewItem(invItem, false);
                         }
                       }}
+                      {...longPressHandlers}
                     >
                       <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
                         <div style={{ flex: 1 }}>
@@ -928,9 +983,10 @@ export default function InventoryPage() {
               🔮 Offhand ({currentInventory().filter((i: any) => !i.equipped && i.slot === "offhand").length})
             </h4>
             <div style={{ "margin-bottom": "2rem" }}>
-              <For each={currentInventory().filter((i: any) => !i.equipped && i.slot === "offhand")}>
+               <For each={currentInventory().filter((i: any) => !i.equipped && i.slot === "offhand")}>
                 {(invItem: any) => {
                   const canSelect = canSelectItem(invItem);
+                  const longPressHandlers = createLongPressHandlers(invItem.id, canSelect);
                   
                   return (
                     <div 
@@ -942,6 +998,7 @@ export default function InventoryPage() {
                           handleViewItem(invItem, false);
                         }
                       }}
+                      {...longPressHandlers}
                     >
                       <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
                         <div style={{ flex: 1 }}>
@@ -981,6 +1038,7 @@ export default function InventoryPage() {
               <For each={currentInventory().filter((i: any) => !i.equipped && i.type === "armor" && i.slot !== "offhand")}>
                 {(invItem: any) => {
                   const canSelect = canSelectItem(invItem);
+                  const longPressHandlers = createLongPressHandlers(invItem.id, canSelect);
                   
                   return (
                     <div 
@@ -992,6 +1050,7 @@ export default function InventoryPage() {
                           handleViewItem(invItem, false);
                         }
                       }}
+                      {...longPressHandlers}
                     >
                       <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
                         <div style={{ flex: 1 }}>
@@ -1027,6 +1086,7 @@ export default function InventoryPage() {
                 {(invItem: any) => {
                   const scrollStatus = getScrollAbilityStatus(invItem);
                   const canSelect = canSelectItem(invItem);
+                  const longPressHandlers = createLongPressHandlers(invItem.id, canSelect);
                   
                   return (
                     <div 
@@ -1038,6 +1098,7 @@ export default function InventoryPage() {
                           handleViewItem(invItem, false);
                         }
                       }}
+                      {...longPressHandlers}
                     >
                       <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
                         <div style={{ flex: 1 }}>
@@ -1071,6 +1132,7 @@ export default function InventoryPage() {
               <For each={currentInventory().filter((i: any) => !i.equipped && i.type === "consumable")}>
                 {(invItem: any) => {
                   const canSelect = canSelectItem(invItem);
+                  const longPressHandlers = createLongPressHandlers(invItem.id, canSelect);
                   
                   return (
                     <div 
@@ -1082,6 +1144,7 @@ export default function InventoryPage() {
                           handleViewItem(invItem, false);
                         }
                       }}
+                      {...longPressHandlers}
                     >
                       <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
                         <div style={{ flex: 1 }}>
@@ -1125,18 +1188,20 @@ export default function InventoryPage() {
               {(invItem: any) => {
                 const scrollStatus = invItem.type === "scroll" ? getScrollAbilityStatus(invItem) : { alreadyLearned: false, hasBetter: false };
                 const canSelect = canSelectItem(invItem);
-                
-                  return (
-                    <div 
-                      class={getItemClassNames(invItem)}
-                      onClick={() => {
-                        if (selectionMode() && canSelect) {
-                          toggleItemSelection(invItem.id);
-                        } else if (!selectionMode()) {
-                          handleViewItem(invItem, false);
-                        }
-                      }}
-                    >
+                const longPressHandlers = createLongPressHandlers(invItem.id, canSelect);
+                  
+                return (
+                  <div 
+                    class={getItemClassNames(invItem)}
+                    onClick={() => {
+                      if (selectionMode() && canSelect) {
+                        toggleItemSelection(invItem.id);
+                      } else if (!selectionMode()) {
+                        handleViewItem(invItem, false);
+                      }
+                    }}
+                    {...longPressHandlers}
+                  >
                       <div style={{ display: "flex", "align-items": "center", gap: "1rem", flex: 1 }}>
                         <div style={{ flex: 1 }}>
                         <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{invItem.name}</div>
@@ -1181,6 +1246,7 @@ export default function InventoryPage() {
         <ItemDetailModal
           item={selectedItem()}
           isOpen={showItemDetailModal()}
+          preventBackgroundClose={showSellModal() || showDropModal()}
           onClose={() => {
             setShowItemDetailModal(false);
             setSelectedItem(null);
@@ -1288,6 +1354,156 @@ export default function InventoryPage() {
             </div>
           </div>
         </div>
+      </Show>
+
+      {/* Sell Confirmation Modal */}
+      <Show when={showSellModal() && sellItemData()}>
+        {(data) => (
+          <div 
+            style={{ 
+              position: "fixed", 
+              top: 0, 
+              left: 0, 
+              right: 0, 
+              bottom: 0, 
+              background: "rgba(0, 0, 0, 0.85)", 
+              display: "flex", 
+              "align-items": "center", 
+              "justify-content": "center",
+              "z-index": 1001,
+              padding: "1rem"
+            }}
+            onClick={() => {
+              setShowSellModal(false);
+              setSellItemData(null);
+              setShowItemDetailModal(false);
+              setSelectedItem(null);
+            }}
+          >
+            <div 
+              class="card"
+              style={{ 
+                "max-width": "400px",
+                width: "100%",
+                background: "var(--bg-dark)",
+                border: "2px solid var(--warning)",
+                "box-shadow": "0 0 20px rgba(251, 191, 36, 0.3)"
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 style={{ 
+                color: "var(--warning)", 
+                "text-align": "center",
+                "font-size": "1.5rem",
+                "margin-bottom": "1rem"
+              }}>
+                Sell Item?
+              </h2>
+              
+              <div style={{ 
+                "text-align": "center",
+                "margin-bottom": "1.5rem"
+              }}>
+                <div style={{ 
+                  "font-size": "1.1rem",
+                  "font-weight": "bold",
+                  "margin-bottom": "0.5rem"
+                }}>
+                  {data().itemName}
+                </div>
+                
+                <Show when={data().quantity > 1}>
+                  <div style={{
+                    display: "flex",
+                    "align-items": "center",
+                    "justify-content": "center",
+                    gap: "1rem",
+                    "margin-bottom": "1rem"
+                  }}>
+                    <button
+                      class="button secondary"
+                      onClick={() => setSellQuantity(Math.max(1, sellQuantity() - 1))}
+                      disabled={sellQuantity() <= 1}
+                      style={{ padding: "0.5rem 1rem", "font-size": "1.25rem" }}
+                    >
+                      −
+                    </button>
+                    <div style={{ 
+                      "font-size": "1.5rem",
+                      "font-weight": "bold",
+                      "min-width": "80px",
+                      "text-align": "center"
+                    }}>
+                      {sellQuantity()}
+                    </div>
+                    <button
+                      class="button secondary"
+                      onClick={() => setSellQuantity(Math.min(data().quantity, sellQuantity() + 1))}
+                      disabled={sellQuantity() >= data().quantity}
+                      style={{ padding: "0.5rem 1rem", "font-size": "1.25rem" }}
+                    >
+                      +
+                    </button>
+                  </div>
+                </Show>
+                
+                <div style={{
+                  padding: "1rem",
+                  background: "var(--bg-light)",
+                  "border-radius": "6px",
+                  display: "inline-block"
+                }}>
+                  <div style={{ 
+                    "font-size": "0.875rem", 
+                    color: "var(--text-secondary)",
+                    "margin-bottom": "0.25rem"
+                  }}>
+                    You will receive (40% of value)
+                  </div>
+                  <div style={{ 
+                    "font-size": "2rem",
+                    "font-weight": "bold",
+                    color: "var(--warning)"
+                  }}>
+                    💰 {Math.floor(data().value * 0.4) * sellQuantity()}
+                  </div>
+                  <div style={{ 
+                    "font-size": "1rem",
+                    color: "var(--warning)"
+                  }}>
+                    Gold
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "1rem" }}>
+                <button
+                  class="button secondary"
+                  onClick={() => {
+                    setShowSellModal(false);
+                    setSellItemData(null);
+                    setShowItemDetailModal(false);
+                    setSelectedItem(null);
+                  }}
+                  style={{ flex: 1 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  class="button"
+                  onClick={handleSellConfirm}
+                  style={{ 
+                    flex: 1,
+                    background: "var(--warning)",
+                    color: "var(--bg-dark)"
+                  }}
+                >
+                  Sell
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </Show>
 
       {/* Drop Confirmation Modal */}

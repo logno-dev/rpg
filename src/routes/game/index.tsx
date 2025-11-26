@@ -987,6 +987,10 @@ export default function GamePage() {
       setSellItemData(null);
       setSellQuantity(1);
       
+      // Close item detail modal if it's open
+      setShowItemDetailModal(false);
+      setSelectedItem(null);
+      
       // Don't clear optimistic states - they persist until next update
       
     } catch (error: any) {
@@ -2908,7 +2912,7 @@ export default function GamePage() {
                     display: "flex", 
                     "align-items": "center", 
                     "justify-content": "center",
-                    "z-index": 1000,
+                    "z-index": 1001,
                     padding: "1rem"
                   }}
                   onClick={() => {
@@ -3025,6 +3029,9 @@ export default function GamePage() {
                         onClick={() => {
                           setShowSellModal(false);
                           setSellItemData(null);
+                          // Close item detail modal too
+                          setShowItemDetailModal(false);
+                          setSelectedItem(null);
                         }}
                         style={{ flex: 1 }}
                       >
@@ -3640,6 +3647,7 @@ export default function GamePage() {
               <ItemDetailModal
                 item={selectedItem()}
                 isOpen={showItemDetailModal()}
+                preventBackgroundClose={showSellModal() || showDropModal()}
                 onClose={() => {
                   setShowItemDetailModal(false);
                   setSelectedItem(null);
@@ -3652,7 +3660,10 @@ export default function GamePage() {
                 onLearnAbility={handleLearnAbility}
                 onUseItem={handleUseItem}
                 onEquip={handleEquip}
-                onSell={handleSellClick}
+                onSell={(id, name, value, qty) => {
+                  console.log('[INDEX] onSell wrapper called', { id, name, value, qty });
+                  handleSellClick(id, name, value, qty);
+                }}
                 onDrop={handleDropClick}
                 onBuy={handleBuyItem}
                 currentGold={currentGold()}
