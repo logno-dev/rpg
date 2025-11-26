@@ -73,7 +73,7 @@ export default function CreateCharacter() {
       if (!response.ok) {
         setError(data.error || 'An error occurred');
       } else {
-        navigate(`/game/${data.characterId}`);
+        navigate('/game');
       }
     } catch (err: any) {
       setError(err.message || "An error occurred");
