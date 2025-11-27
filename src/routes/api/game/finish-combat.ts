@@ -170,51 +170,103 @@ export async function POST(event: APIEvent) {
         }
       }
       
-      // Roll for crafting materials
-      const craftingLootResult = await db.execute({
-        sql: 'SELECT * FROM mob_crafting_loot WHERE mob_id = ?',
-        args: [mobId || mob.id],
-      });
-      
-      for (const craftingLoot of craftingLootResult.rows as any[]) {
-        if (Math.random() < craftingLoot.drop_chance) {
-          const quantity = Math.floor(
-            Math.random() * (craftingLoot.max_quantity - craftingLoot.min_quantity + 1)
-          ) + craftingLoot.min_quantity;
-          
-          // Get material details
-          const materialResult = await db.execute({
-            sql: 'SELECT * FROM crafting_materials WHERE id = ?',
-            args: [craftingLoot.material_id],
-          });
-          const material = materialResult.rows[0] as any;
-          
-          // Check if material exists in character's crafting inventory
-          const craftingInvResult = await db.execute({
-            sql: 'SELECT * FROM character_crafting_materials WHERE character_id = ? AND material_id = ?',
-            args: [characterId, material.id],
-          });
-          
-          if (craftingInvResult.rows.length > 0) {
-            // Update quantity
-            await db.execute({
-              sql: 'UPDATE character_crafting_materials SET quantity = quantity + ? WHERE character_id = ? AND material_id = ?',
-              args: [quantity, characterId, material.id],
+      // Roll for crafting materials (regular mobs)
+      if (!isNamedMob) {
+        const craftingLootResult = await db.execute({
+          sql: 'SELECT * FROM mob_crafting_loot WHERE mob_id = ?',
+          args: [mobId || mob.id],
+        });
+        
+        for (const craftingLoot of craftingLootResult.rows as any[]) {
+          if (Math.random() < craftingLoot.drop_chance) {
+            const quantity = Math.floor(
+              Math.random() * (craftingLoot.max_quantity - craftingLoot.min_quantity + 1)
+            ) + craftingLoot.min_quantity;
+            
+            // Get material details
+            const materialResult = await db.execute({
+              sql: 'SELECT * FROM crafting_materials WHERE id = ?',
+              args: [craftingLoot.material_id],
             });
-          } else {
-            // Add new material
-            await db.execute({
-              sql: 'INSERT INTO character_crafting_materials (character_id, material_id, quantity) VALUES (?, ?, ?)',
-              args: [characterId, material.id, quantity],
+            const material = materialResult.rows[0] as any;
+            
+            // Check if material exists in character's crafting inventory
+            const craftingInvResult = await db.execute({
+              sql: 'SELECT * FROM character_crafting_materials WHERE character_id = ? AND material_id = ?',
+              args: [characterId, material.id],
+            });
+            
+            if (craftingInvResult.rows.length > 0) {
+              // Update quantity
+              await db.execute({
+                sql: 'UPDATE character_crafting_materials SET quantity = quantity + ? WHERE character_id = ? AND material_id = ?',
+                args: [quantity, characterId, material.id],
+              });
+            } else {
+              // Add new material
+              await db.execute({
+                sql: 'INSERT INTO character_crafting_materials (character_id, material_id, quantity) VALUES (?, ?, ?)',
+                args: [characterId, material.id, quantity],
+              });
+            }
+            
+            loot.push({ 
+              name: material.name, 
+              quantity, 
+              rarity: material.rarity,
+              type: 'crafting_material'
             });
           }
-          
-          loot.push({ 
-            name: material.name, 
-            quantity, 
-            rarity: material.rarity,
-            type: 'crafting_material'
-          });
+        }
+      }
+      
+      // Roll for crafting materials (named mobs/bosses)
+      if (isNamedMob) {
+        const namedCraftingLootResult = await db.execute({
+          sql: 'SELECT * FROM named_mob_crafting_loot WHERE named_mob_id = ?',
+          args: [namedMobId],
+        });
+        
+        for (const craftingLoot of namedCraftingLootResult.rows as any[]) {
+          if (Math.random() < craftingLoot.drop_chance) {
+            const quantity = Math.floor(
+              Math.random() * (craftingLoot.max_quantity - craftingLoot.min_quantity + 1)
+            ) + craftingLoot.min_quantity;
+            
+            // Get material details
+            const materialResult = await db.execute({
+              sql: 'SELECT * FROM crafting_materials WHERE id = ?',
+              args: [craftingLoot.material_id],
+            });
+            const material = materialResult.rows[0] as any;
+            
+            // Check if material exists in character's crafting inventory
+            const craftingInvResult = await db.execute({
+              sql: 'SELECT * FROM character_crafting_materials WHERE character_id = ? AND material_id = ?',
+              args: [characterId, material.id],
+            });
+            
+            if (craftingInvResult.rows.length > 0) {
+              // Update quantity
+              await db.execute({
+                sql: 'UPDATE character_crafting_materials SET quantity = quantity + ? WHERE character_id = ? AND material_id = ?',
+                args: [quantity, characterId, material.id],
+              });
+            } else {
+              // Add new material
+              await db.execute({
+                sql: 'INSERT INTO character_crafting_materials (character_id, material_id, quantity) VALUES (?, ?, ?)',
+                args: [characterId, material.id, quantity],
+              });
+            }
+            
+            loot.push({ 
+              name: material.name, 
+              quantity, 
+              rarity: material.rarity,
+              type: 'crafting_material'
+            });
+          }
         }
       }
       
