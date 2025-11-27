@@ -1,6 +1,6 @@
 import { createSignal, Show } from "solid-js";
 import { useNavigate, redirect, createAsync } from "@solidjs/router";
-import { getUser } from "~/lib/auth";
+import { getUser, setSelectedCharacter } from "~/lib/auth";
 
 async function checkAuth() {
   "use server";
@@ -73,6 +73,8 @@ export default function CreateCharacter() {
       if (!response.ok) {
         setError(data.error || 'An error occurred');
       } else {
+        // Set the newly created character as the active character
+        await setSelectedCharacter(data.characterId);
         navigate('/game');
       }
     } catch (err: any) {
