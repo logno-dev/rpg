@@ -70,8 +70,7 @@ export function CombatEngine(props: CombatEngineProps) {
   const [effectsStore, effectsActions] = useActiveEffects();
   
   // Calculate actual max health including constitution bonus, equipment, AND active effects
-  const getActualMaxHealth = () => {
-    // Get base constitution
+  const getActualConstitution = () => {
     let totalConstitution = props.character.constitution;
     
     // Add equipment bonuses
@@ -83,7 +82,6 @@ export function CombatEngine(props: CombatEngineProps) {
       });
     }
     
-    // Also check weapon for constitution bonus
     if (props.equippedWeapon?.constitution_bonus) {
       totalConstitution += props.equippedWeapon.constitution_bonus;
     }
@@ -92,16 +90,10 @@ export function CombatEngine(props: CombatEngineProps) {
     const effectBonus = effectsActions.getTotalStatBonus('constitution');
     totalConstitution += effectBonus;
     
-    // New formula: Base + (Level × 20) + (CON - 10) × 8
-    const baseHealth = 100;
-    const levelBonus = props.character.level * 20;
-    const constitutionBonus = (totalConstitution - 10) * 8;
-    
-    return baseHealth + levelBonus + constitutionBonus;
+    return totalConstitution;
   };
-  
-  const getActualMaxMana = () => {
-    // Get base intelligence
+
+  const getActualIntelligence = () => {
     let totalIntelligence = props.character.intelligence;
     
     // Add equipment bonuses
@@ -121,12 +113,122 @@ export function CombatEngine(props: CombatEngineProps) {
     const effectBonus = effectsActions.getTotalStatBonus('intelligence');
     totalIntelligence += effectBonus;
     
+    return totalIntelligence;
+  };
+
+  const getActualMaxHealth = () => {
+    const totalConstitution = getActualConstitution();
+    
+    // New formula: Base + (Level × 20) + (CON - 10) × 8
+    const baseHealth = 100;
+    const levelBonus = props.character.level * 20;
+    const constitutionBonus = (totalConstitution - 10) * 8;
+    
+    return baseHealth + levelBonus + constitutionBonus;
+  };
+  
+  const getActualMaxMana = () => {
+    const totalIntelligence = getActualIntelligence();
+    
     // Formula: Base + (Level × 20) + (INT - 10) × 5
     const baseMana = 100;
     const levelBonus = props.character.level * 20;
     const intelligenceBonus = (totalIntelligence - 10) * 5;
     
     return baseMana + levelBonus + intelligenceBonus;
+  };
+  
+  const getActualDexterity = () => {
+    // Get base dexterity
+    let totalDexterity = props.character.dexterity;
+    
+    // Add equipment bonuses
+    if (Array.isArray(props.equippedArmor)) {
+      props.equippedArmor.forEach((item: any) => {
+        if (item.dexterity_bonus) {
+          totalDexterity += item.dexterity_bonus;
+        }
+      });
+    }
+    
+    if (props.equippedWeapon?.dexterity_bonus) {
+      totalDexterity += props.equippedWeapon.dexterity_bonus;
+    }
+    
+    // Add active effect bonuses
+    const effectBonus = effectsActions.getTotalStatBonus('dexterity');
+    totalDexterity += effectBonus;
+    
+    return totalDexterity;
+  };
+
+  const getActualStrength = () => {
+    let totalStrength = props.character.strength;
+    
+    // Add equipment bonuses
+    if (Array.isArray(props.equippedArmor)) {
+      props.equippedArmor.forEach((item: any) => {
+        if (item.strength_bonus) {
+          totalStrength += item.strength_bonus;
+        }
+      });
+    }
+    
+    if (props.equippedWeapon?.strength_bonus) {
+      totalStrength += props.equippedWeapon.strength_bonus;
+    }
+    
+    // Add active effect bonuses
+    const effectBonus = effectsActions.getTotalStatBonus('strength');
+    totalStrength += effectBonus;
+    
+    return totalStrength;
+  };
+
+  const getActualWisdom = () => {
+    let totalWisdom = props.character.wisdom;
+    
+    // Add equipment bonuses
+    if (Array.isArray(props.equippedArmor)) {
+      props.equippedArmor.forEach((item: any) => {
+        if (item.wisdom_bonus) {
+          totalWisdom += item.wisdom_bonus;
+        }
+      });
+    }
+    
+    if (props.equippedWeapon?.wisdom_bonus) {
+      totalWisdom += props.equippedWeapon.wisdom_bonus;
+    }
+    
+    // Add active effect bonuses
+    const effectBonus = effectsActions.getTotalStatBonus('wisdom');
+    totalWisdom += effectBonus;
+    
+    return totalWisdom;
+  };
+
+  const getActualCharisma = () => {
+    let totalCharisma = props.character.charisma;
+    
+    // Add equipment bonuses
+    if (Array.isArray(props.equippedArmor)) {
+      props.equippedArmor.forEach((item: any) => {
+        if (item.charisma_bonus) {
+          totalCharisma += item.charisma_bonus;
+        }
+      });
+    }
+    
+    if (props.equippedWeapon?.charisma_bonus) {
+      totalCharisma += props.equippedWeapon.charisma_bonus;
+    }
+    
+    // Add active effect bonuses
+    const effectBonus = effectsActions.getTotalStatBonus('charisma');
+    totalCharisma += effectBonus;
+    
+    return totalCharisma;
   };
   
   // Calculate attack speed in ticks
@@ -145,7 +247,7 @@ export function CombatEngine(props: CombatEngineProps) {
 
   // Calculate initial attack ticks once
   const weaponSpeed = props.equippedWeapon?.attack_speed || 1.0;
-  const initialCharacterAttackTicks = calculateAttackTicks(weaponSpeed, props.character.dexterity);
+  const initialCharacterAttackTicks = calculateAttackTicks(weaponSpeed, getActualDexterity());
   const initialMobAttackTicks = calculateAttackTicks(props.mob.attack_speed, 10);
 
 
@@ -606,12 +708,12 @@ export function CombatEngine(props: CombatEngineProps) {
           
           // In-combat mana regeneration (slower than out of combat)
           // Base: 1% of max mana every 10 seconds, scaled by wisdom
-          const baseMaxMana = 100 + (props.character.intelligence * 5);
-          const baseManaRegen = Math.max(1, Math.floor(baseMaxMana * 0.01));
-          const wisBonus = Math.floor((props.character.wisdom - 10) * 0.3);
+          const actualMaxMana = getActualMaxMana();
+          const baseManaRegen = Math.max(1, Math.floor(actualMaxMana * 0.01));
+          const wisBonus = Math.floor((getActualWisdom() - 10) * 0.3);
           const manaRegen = Math.max(1, baseManaRegen + wisBonus);
           
-          const newMana = Math.min(baseMaxMana, currentMana() + manaRegen);
+          const newMana = Math.min(actualMaxMana, currentMana() + manaRegen);
           if (newMana > currentMana()) {
             setCurrentMana(newMana);
             // Notify parent of mana change
@@ -661,15 +763,15 @@ export function CombatEngine(props: CombatEngineProps) {
           const weaponDamageMax = props.equippedWeapon?.damage_max || 3;
           
           const damage = calculateDamage(
-            weaponDamageMin,
-            weaponDamageMax,
-            props.character.strength,
+            props.equippedWeapon?.damage_min || 1,
+            props.equippedWeapon?.damage_max || 3,
+            getActualStrength(),
             props.mob.defense
           );
 
           const newMobHealth = Math.max(0, currentState.mobHealth - damage);
           const weaponSpeed = props.equippedWeapon?.attack_speed || 1.0;
-          const nextAttackTicks = calculateAttackTicks(weaponSpeed, props.character.dexterity);
+          const nextAttackTicks = calculateAttackTicks(weaponSpeed, getActualDexterity());
 
           newState.mobHealth = newMobHealth;
           newState.log = [...currentState.log, `You attack for ${damage} damage!`];
