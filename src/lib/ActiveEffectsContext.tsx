@@ -43,15 +43,35 @@ export const ActiveEffectsProvider: ParentComponent = (props) => {
   const actions = {
     addEffect: (effect: Omit<ActiveEffect, 'id' | 'expiresAt'>) => {
       const now = Date.now();
-      const newEffect: ActiveEffect = {
-        ...effect,
-        id: `${effect.name}-${now}`,
-        expiresAt: now + effect.duration * 1000,
-      };
-
-      console.log('[EFFECTS] Adding effect:', newEffect.name, `+${newEffect.amount} ${newEffect.stat}`, `for ${newEffect.duration}s`);
       
-      setStore('effects', (effects) => [...effects, newEffect]);
+      // Check if an effect with the same name and stat already exists
+      const existingEffectIndex = store.effects.findIndex(
+        (e) => e.name === effect.name && e.stat === effect.stat
+      );
+
+      if (existingEffectIndex !== -1) {
+        // Effect already exists - refresh the timer instead of stacking
+        const existingEffect = store.effects[existingEffectIndex];
+        console.log('[EFFECTS] Refreshing effect:', effect.name, `+${effect.amount} ${effect.stat}`, `timer reset to ${effect.duration}s`);
+        
+        setStore('effects', existingEffectIndex, {
+          ...existingEffect,
+          expiresAt: now + effect.duration * 1000,
+          duration: effect.duration,
+          amount: effect.amount, // Update amount in case it changed
+        });
+      } else {
+        // New effect - add it
+        const newEffect: ActiveEffect = {
+          ...effect,
+          id: `${effect.name}-${now}`,
+          expiresAt: now + effect.duration * 1000,
+        };
+
+        console.log('[EFFECTS] Adding effect:', newEffect.name, `+${newEffect.amount} ${newEffect.stat}`, `for ${newEffect.duration}s`);
+        
+        setStore('effects', (effects) => [...effects, newEffect]);
+      }
     },
 
     removeEffect: (id: string) => {
