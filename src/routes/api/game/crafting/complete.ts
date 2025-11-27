@@ -92,14 +92,35 @@ export async function POST(event: APIEvent) {
     // If successful, select item from probability pool
     if (success && itemQuality) {
       // Get all possible outputs for this recipe group
-      const outputsResult = await db.execute({
-        sql: `SELECT ro.*, i.name as item_name, i.stackable
+      // If rare material was used, include named items; otherwise exclude them
+      let outputsQuery;
+      let outputsArgs;
+
+      if (session.rare_material_id) {
+        // Include items that either don't require rare materials OR require the specific rare material used
+        outputsQuery = `SELECT ro.*, i.name as item_name, i.stackable
               FROM recipe_outputs ro
               JOIN items i ON ro.item_id = i.id
               WHERE ro.recipe_group_id = ? 
               AND ro.min_profession_level <= ?
-              ORDER BY ro.min_profession_level`,
-        args: [session.recipe_id, session.profession_level]
+              AND (ro.requires_rare_material_id IS NULL OR ro.requires_rare_material_id = ?)
+              ORDER BY ro.min_profession_level`;
+        outputsArgs = [session.recipe_id, session.profession_level, session.rare_material_id];
+      } else {
+        // Exclude all named items
+        outputsQuery = `SELECT ro.*, i.name as item_name, i.stackable
+              FROM recipe_outputs ro
+              JOIN items i ON ro.item_id = i.id
+              WHERE ro.recipe_group_id = ? 
+              AND ro.min_profession_level <= ?
+              AND ro.is_named = 0
+              ORDER BY ro.min_profession_level`;
+        outputsArgs = [session.recipe_id, session.profession_level];
+      }
+
+      const outputsResult = await db.execute({
+        sql: outputsQuery,
+        args: outputsArgs
       });
 
       if (outputsResult.rows.length > 0) {

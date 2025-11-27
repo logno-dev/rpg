@@ -85,6 +85,9 @@ export default function CraftingPage() {
   const [minigameData, setMinigameData] = createSignal<any>(null);
   const [crafting, setCrafting] = createSignal(false);
   const [expandedBrackets, setExpandedBrackets] = createSignal<Set<string>>(new Set());
+  const [showRareMaterialPrompt, setShowRareMaterialPrompt] = createSignal(false);
+  const [availableRareMaterials, setAvailableRareMaterials] = createSignal<any[]>([]);
+  const [pendingRecipe, setPendingRecipe] = createSignal<Recipe | null>(null);
 
   // Fetch basic crafting data (professions and materials only)
   const fetchBasicCraftingData = async (characterId: number | undefined) => {
@@ -253,8 +256,8 @@ export default function CraftingPage() {
     });
   };
 
-  // Start crafting
-  const startCraft = async (recipe: Recipe) => {
+  // Start crafting (with optional rare material ID)
+  const startCraft = async (recipe: Recipe, rareMaterialId?: number) => {
     if (crafting() || !currentCharacter()) return;
 
     const profession = selectedProfession();
@@ -269,13 +272,19 @@ export default function CraftingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           characterId: currentCharacter()!.id,
-          recipeId: recipe.id
+          recipeId: recipe.id,
+          rareMaterialId
         })
       });
 
       const data = await response.json();
 
-      if (data.success) {
+      if (data.needsRareMaterialChoice) {
+        // Show rare material selection modal
+        setPendingRecipe(recipe);
+        setAvailableRareMaterials(data.availableRareMaterials);
+        setShowRareMaterialPrompt(true);
+      } else if (data.success) {
         setMinigameData({
           ...data.session,
           professionLevel: profData.level,
@@ -663,6 +672,79 @@ export default function CraftingPage() {
           </Show>
         </Suspense>
         
+        {/* Rare Material Selection Modal */}
+        <Show when={showRareMaterialPrompt()}>
+          <div style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 0.8)",
+            display: "flex",
+            "align-items": "center",
+            "justify-content": "center",
+            "z-index": 1000
+          }}>
+            <div class="card" style={{
+              "max-width": "500px",
+              width: "90%",
+              padding: "2rem"
+            }}>
+              <h2 style={{ "margin-top": 0 }}>Special Materials Available!</h2>
+              <p style={{ color: "var(--text-secondary)", "margin-bottom": "1.5rem" }}>
+                You have rare materials that can be used to craft legendary items. Would you like to use one?
+              </p>
+              
+              <div style={{ "margin-bottom": "1.5rem" }}>
+                <For each={availableRareMaterials()}>
+                  {(material) => (
+                    <button
+                      class="button primary"
+                      style={{ 
+                        width: "100%",
+                        "margin-bottom": "0.5rem",
+                        display: "flex",
+                        "justify-content": "space-between",
+                        "align-items": "center"
+                      }}
+                      onClick={() => {
+                        setShowRareMaterialPrompt(false);
+                        const recipe = pendingRecipe();
+                        if (recipe) {
+                          startCraft(recipe, material.id);
+                        }
+                      }}
+                    >
+                      <span>Use {material.name}</span>
+                      <span style={{ 
+                        color: "var(--accent)",
+                        "font-weight": "bold"
+                      }}>
+                        ({material.quantity} available)
+                      </span>
+                    </button>
+                  )}
+                </For>
+              </div>
+
+              <button
+                class="button secondary"
+                style={{ width: "100%" }}
+                onClick={() => {
+                  setShowRareMaterialPrompt(false);
+                  const recipe = pendingRecipe();
+                  if (recipe) {
+                    startCraft(recipe, undefined);
+                  }
+                }}
+              >
+                Use Normal Materials
+              </button>
+            </div>
+          </div>
+        </Show>
+
         {/* Crafting Minigame Modal */}
         <Show when={showMinigame() && minigameData() && currentCharacter()}>
           <CraftingMinigameNew

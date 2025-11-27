@@ -4,7 +4,7 @@ import { db } from "~/lib/db";
 export async function POST(event: APIEvent) {
   try {
     const body = await event.request.json();
-    const { characterId, recipeId } = body;
+    const { characterId, recipeId, rareMaterialId } = body;
 
     if (!characterId || !recipeId) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -27,6 +27,37 @@ export async function POST(event: APIEvent) {
     }
 
     const recipe = recipeResult.rows[0] as any;
+
+    // Check if this recipe has any named outputs that require rare materials
+    const namedOutputsResult = await db.execute({
+      sql: `SELECT DISTINCT ro.requires_rare_material_id, cm.name as material_name
+            FROM recipe_outputs ro
+            JOIN crafting_materials cm ON ro.requires_rare_material_id = cm.id
+            WHERE ro.recipe_group_id = ? AND ro.is_named = 1 AND ro.requires_rare_material_id IS NOT NULL`,
+      args: [recipeId]
+    });
+
+    // Check which rare materials the player has
+    const availableRareMaterials = [];
+    for (const namedOutput of namedOutputsResult.rows as any[]) {
+      const playerMaterialResult = await db.execute({
+        sql: `SELECT quantity FROM character_crafting_materials 
+              WHERE character_id = ? AND material_id = ?`,
+        args: [characterId, namedOutput.requires_rare_material_id]
+      });
+
+      const quantity = playerMaterialResult.rows.length > 0 
+        ? (playerMaterialResult.rows[0] as any).quantity 
+        : 0;
+
+      if (quantity > 0) {
+        availableRareMaterials.push({
+          id: namedOutput.requires_rare_material_id,
+          name: namedOutput.material_name,
+          quantity
+        });
+      }
+    }
 
     // Get character
     const charResult = await db.execute({
@@ -72,6 +103,20 @@ export async function POST(event: APIEvent) {
       });
     }
 
+    // If player has rare materials available and hasn't selected one, prompt them
+    if (!rareMaterialId && availableRareMaterials.length > 0) {
+      return new Response(
+        JSON.stringify({
+          needsRareMaterialChoice: true,
+          availableRareMaterials
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
     // Get recipe group materials
     const materialsResult = await db.execute({
       sql: `SELECT rgm.*, cm.name 
@@ -101,6 +146,39 @@ export async function POST(event: APIEvent) {
           headers: { "Content-Type": "application/json" },
         });
       }
+    }
+
+    // Check if rare material is provided and player has it
+    let usedRareMaterialId = null;
+    if (rareMaterialId) {
+      const rareMaterialResult = await db.execute({
+        sql: `SELECT quantity FROM character_crafting_materials 
+              WHERE character_id = ? AND material_id = ?`,
+        args: [characterId, rareMaterialId]
+      });
+
+      const hasRareMaterial = rareMaterialResult.rows.length > 0 
+        ? (rareMaterialResult.rows[0] as any).quantity 
+        : 0;
+
+      if (hasRareMaterial < 1) {
+        return new Response(JSON.stringify({ 
+          error: `You don't have the required rare material` 
+        }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      // Consume 1 rare material
+      await db.execute({
+        sql: `UPDATE character_crafting_materials 
+              SET quantity = quantity - 1 
+              WHERE character_id = ? AND material_id = ?`,
+        args: [characterId, rareMaterialId]
+      });
+
+      usedRareMaterialId = rareMaterialId;
     }
 
     // Consume materials
@@ -138,8 +216,8 @@ export async function POST(event: APIEvent) {
     // Create crafting session (still using recipe_id column for now - it now holds recipe_group_id)
     await db.execute({
       sql: `INSERT INTO crafting_sessions 
-            (character_id, recipe_id, profession_type, pin_x, pin_y, target_x, target_y, target_radius, start_time)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+            (character_id, recipe_id, profession_type, pin_x, pin_y, target_x, target_y, target_radius, rare_material_id, start_time)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
       args: [
         characterId,
         recipeId, // This is actually recipe_group_id now
@@ -148,7 +226,8 @@ export async function POST(event: APIEvent) {
         startY,
         targetX,
         targetY,
-        targetRadius
+        targetRadius,
+        usedRareMaterialId
       ]
     });
 

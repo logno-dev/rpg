@@ -65,10 +65,24 @@ export function CraftingMinigameNew(props: CraftingMinigameProps) {
 
   let animationFrame: number | undefined;
   const BAR_SPEED = 1.2; // pixels per frame (slightly slower)
-  const PERFECT_ZONE_START = 42;
-  const PERFECT_ZONE_END = 58;
-  const GOOD_ZONE_START = 30;
-  const GOOD_ZONE_END = 70;
+  // Perfect zone is at the peak of the sine wave (center at 50%)
+  // Wave starts at bottom (0%), peaks at center (50%), ends at bottom (100%)
+  const PERFECT_ZONE_START = 45;
+  const PERFECT_ZONE_END = 55;
+  const GOOD_ZONE_START = 35;
+  const GOOD_ZONE_END = 65;
+
+  // Sine wave calculation helper - shifted so peak is at center
+  const getSineY = (x: number) => {
+    // Shift the wave by -π/2 so it starts at bottom, peaks at center, ends at bottom
+    // x=0 -> bottom, x=50 -> peak (top), x=100 -> bottom
+    const radians = ((x / 100) * Math.PI * 2) - (Math.PI / 2);
+    // Sin returns -1 to 1, we want 0-100 inverted (peak at top)
+    // At x=0: sin(-π/2) = -1 -> y = 50-(-35) = 85 (bottom)
+    // At x=50: sin(π/2) = 1 -> y = 50-(35) = 15 (top)
+    // At x=100: sin(3π/2) = -1 -> y = 50-(-35) = 85 (bottom)
+    return 50 - (Math.sin(radians) * 35); // 35 = amplitude (keeps dot within bounds)
+  };
 
   const stages = () => PROFESSION_STAGES[props.profession];
   const colors = () => PROFESSION_COLORS[props.profession];
@@ -399,36 +413,67 @@ export function CraftingMinigameNew(props: CraftingMinigameProps) {
               </div>
             </div>
 
-            {/* The Bar - Ultra Clean */}
+            {/* The Bar - Sine Wave */}
             <div style={{
               position: "relative",
-              height: "60px",
+              height: "120px",
               background: "var(--bg-light)",
               "border-radius": "6px",
               "margin-bottom": "1rem",
               overflow: "hidden",
               border: "1px solid var(--border)"
             }}>
-              {/* Perfect Zone - Center stripe */}
-              <div style={{
-                position: "absolute",
-                left: `${PERFECT_ZONE_START}%`,
-                width: `${PERFECT_ZONE_END - PERFECT_ZONE_START}%`,
-                height: "100%",
-                background: "var(--success)",
-                opacity: "0.15"
-              }} />
+              {/* Draw the sine wave path using SVG */}
+              <svg 
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: "100%",
+                  "pointer-events": "none"
+                }}
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+              >
+                {/* Sine wave path */}
+                <path
+                  d={(() => {
+                    let path = "M 0," + getSineY(0);
+                    for (let x = 1; x <= 100; x++) {
+                      path += ` L ${x},${getSineY(x)}`;
+                    }
+                    return path;
+                  })()}
+                  stroke="var(--border)"
+                  stroke-width="0.5"
+                  fill="none"
+                  opacity="0.5"
+                />
+                
+                {/* Perfect zone highlight (around the peak) */}
+                <rect
+                  x={PERFECT_ZONE_START}
+                  y="0"
+                  width={PERFECT_ZONE_END - PERFECT_ZONE_START}
+                  height="100"
+                  fill="var(--success)"
+                  opacity="0.1"
+                />
+              </svg>
 
-              {/* Moving Marker */}
+              {/* Moving Dot */}
               <div style={{
                 position: "absolute",
                 left: `${barPosition()}%`,
-                top: "0",
-                width: "2px",
-                height: "100%",
-                background: "var(--text-primary)",
-                transform: "translateX(-50%)",
-                "z-index": "10"
+                top: `${getSineY(barPosition())}%`,
+                width: "16px",
+                height: "16px",
+                background: "var(--accent)",
+                "border-radius": "50%",
+                transform: "translate(-50%, -50%)",
+                "z-index": "10",
+                "box-shadow": "0 2px 8px rgba(0,0,0,0.3)"
               }} />
 
               {/* Hit Feedback */}

@@ -88,6 +88,8 @@ async function migrate() {
       '037_recipe_groups_system.sql',
       '038_seed_recipe_groups.sql',
       '039_fix_crafting_sessions_fk.sql',
+      '040_add_named_equipment_system.sql',
+      '041_add_rare_material_to_crafting_session.sql',
     ];
 
     for (const migrationFile of migrations) {
