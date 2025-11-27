@@ -922,16 +922,17 @@ export function CombatEngine(props: CombatEngineProps) {
         </div>
       </Show>
 
-      {/* Hotbar Actions */}
+      {/* Hotbar Actions - Compact */}
       <Show when={props.hotbarActions.length > 0 && state().isActive}>
         <div style={{ "margin-bottom": "0.5rem" }}>
-          <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "margin-bottom": "0.35rem" }}>
-            Action Bar (Press 1-8)
+          <div style={{ "font-size": "0.7rem", color: "var(--text-secondary)", "margin-bottom": "0.25rem" }}>
+            Action Bar (1-8)
           </div>
           <div style={{ 
-            display: "grid", 
-            "grid-template-columns": "repeat(auto-fit, minmax(140px, 1fr))",
-            gap: "0.5rem"
+            display: "flex",
+            "flex-wrap": "wrap",
+            gap: "0.35rem",
+            "justify-content": "center"
           }}>
             <For each={props.hotbarActions}>
               {(action) => {
@@ -995,17 +996,21 @@ export function CombatEngine(props: CombatEngineProps) {
                     disabled={isDisabled()}
                     style={{
                       position: "relative",
-                      padding: "0.75rem",
-                      width: "100%",
+                      padding: "0.4rem 0.3rem",
+                      flex: "1 1 100px",
+                      "min-width": "100px",
+                      "max-width": "140px",
                       background: isDisabled() ? "var(--bg-light)" : getActionColor(),
                       opacity: isDisabled() ? 0.5 : 1,
                       cursor: isDisabled() ? "not-allowed" : "pointer",
-                      "font-size": "0.875rem",
+                      "font-size": "0.75rem",
                       display: "flex",
                       "flex-direction": "column",
                       "align-items": "center",
-                      gap: "0.25rem",
-                      "min-height": "80px"
+                      "justify-content": "center",
+                      gap: "0.15rem",
+                      height: "52px", // Fixed height to prevent popping
+                      overflow: "hidden"
                     }}
                     title={`${name()}\n${description() || ''}\n\n${
                       action.type === 'ability' && action.ability ? (
@@ -1032,54 +1037,59 @@ export function CombatEngine(props: CombatEngineProps) {
                     {/* Slot number badge */}
                     <div style={{
                       position: "absolute",
-                      top: "4px",
-                      left: "4px",
-                      width: "18px",
-                      height: "18px",
+                      top: "2px",
+                      left: "2px",
+                      width: "14px",
+                      height: "14px",
                       background: "var(--bg-dark)",
-                      "border-radius": "3px",
+                      "border-radius": "2px",
                       display: "flex",
                       "align-items": "center",
                       "justify-content": "center",
-                      "font-size": "0.7rem",
-                      "font-weight": "bold"
+                      "font-size": "0.65rem",
+                      "font-weight": "bold",
+                      opacity: "0.8"
                     }}>
                       {action.slot}
                     </div>
                     
-                    <div style={{ "font-weight": "bold" }}>{name()}</div>
+                    {/* Name - truncated if too long */}
+                    <div style={{ 
+                      "font-weight": "600",
+                      "font-size": "0.75rem",
+                      "line-height": "1",
+                      "white-space": "nowrap",
+                      overflow: "hidden",
+                      "text-overflow": "ellipsis",
+                      "max-width": "100%",
+                      "padding": "0 0.25rem"
+                    }}>
+                      {name()}
+                    </div>
                     
-                    <Show when={action.type === 'ability' && action.ability?.mana_cost && action.ability.mana_cost > 0}>
-                      <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)" }}>
-                        {action.ability?.mana_cost} mana
-                      </div>
-                    </Show>
-                    
-                    <Show when={action.type === 'ability' && action.ability?.type === 'ability' && cooldown() === 0}>
-                      <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)" }}>
-                        {action.ability?.cooldown}s cooldown
-                      </div>
-                    </Show>
-                    
-                    <Show when={action.type === 'consumable' && action.item}>
-                      <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)" }}>
-                        x{action.item?.quantity || 0}
-                      </div>
-                    </Show>
-                    
-                    <Show when={cooldown() > 0}>
+                    {/* Info row - condensed */}
+                    <Show when={cooldown() > 0} fallback={
                       <div style={{ 
-                        "font-size": "1rem", 
+                        "font-size": "0.65rem", 
+                        color: "var(--text-secondary)",
+                        "line-height": "1",
+                        opacity: "0.9"
+                      }}>
+                        <Show when={action.type === 'ability' && action.ability?.mana_cost && action.ability.mana_cost > 0}>
+                          {action.ability?.mana_cost}mp
+                        </Show>
+                        <Show when={action.type === 'consumable' && action.item}>
+                          x{action.item?.quantity || 0}
+                        </Show>
+                      </div>
+                    }>
+                      <div style={{ 
+                        "font-size": "0.8rem", 
                         "font-weight": "bold",
-                        color: "var(--warning)"
+                        color: "var(--warning)",
+                        "line-height": "1"
                       }}>
                         {Math.ceil(cooldown())}s
-                      </div>
-                    </Show>
-                    
-                    <Show when={!check().canUse && !cooldown() && check().reason}>
-                      <div style={{ "font-size": "0.75rem", color: "var(--danger)" }}>
-                        {check().reason}
                       </div>
                     </Show>
                   </button>

@@ -27,14 +27,14 @@ export function ActiveEffectsDisplay(props: ActiveEffectsDisplayProps = {}) {
 
   return (
     <div class="card" style={{ "margin-bottom": "1rem" }}>
-      <h4 style={{ "margin-bottom": "0.75rem", "font-size": "0.875rem", color: "var(--text-secondary)" }}>
+      <h4 style={{ "margin-bottom": "0.5rem", "font-size": "0.8rem", color: "var(--text-secondary)" }}>
         🛡️ Active Effects
       </h4>
       <div style={{ 
         display: "flex", 
-        gap: "0.5rem", 
+        gap: "0.35rem", 
         "flex-wrap": "wrap",
-        "min-height": "60px", // Fixed height to prevent layout shift
+        "min-height": "52px", // Match hotbar fixed height
         "align-items": "flex-start"
       }}>
         <Show 
@@ -43,8 +43,8 @@ export function ActiveEffectsDisplay(props: ActiveEffectsDisplayProps = {}) {
             <div style={{ 
               color: "var(--text-secondary)", 
               "font-style": "italic",
-              "font-size": "0.875rem",
-              padding: "0.5rem",
+              "font-size": "0.75rem",
+              padding: "0.35rem",
               "align-self": "center"
             }}>
               No active effects
@@ -60,15 +60,19 @@ export function ActiveEffectsDisplay(props: ActiveEffectsDisplayProps = {}) {
               return (
                 <div
                   style={{
-                    padding: "0.5rem 0.75rem",
+                    padding: "0.35rem 0.5rem",
                     background: "var(--accent)",
                     color: "var(--bg-dark)",
-                    "border-radius": "6px",
-                    "font-size": "0.875rem",
-                    "font-weight": "bold",
+                    "border-radius": "4px",
+                    "font-size": "0.75rem",
+                    "font-weight": "600",
                     position: "relative",
                     overflow: "hidden",
-                    "min-width": "120px",
+                    "min-width": "100px",
+                    height: "52px", // Match hotbar height
+                    display: "flex",
+                    "flex-direction": "column",
+                    "justify-content": "center"
                   }}
                 >
                   {/* Background progress bar */}
@@ -85,11 +89,13 @@ export function ActiveEffectsDisplay(props: ActiveEffectsDisplayProps = {}) {
                   />
                   
                   {/* Content */}
-                  <div style={{ position: "relative", "z-index": 1 }}>
-                    <div>{effect.name}</div>
-                    <div style={{ "font-size": "0.75rem", opacity: 0.9 }}>
+                  <div style={{ position: "relative", "z-index": 1, "line-height": "1.2" }}>
+                    <div style={{ "white-space": "nowrap", overflow: "hidden", "text-overflow": "ellipsis" }}>
+                      {effect.name}
+                    </div>
+                    <div style={{ "font-size": "0.65rem", opacity: 0.9, "margin-top": "0.1rem" }}>
                       <Show when={effect.stat && effect.amount} fallback={
-                        <span>Active · {timeRemaining()}s</span>
+                        <span>{timeRemaining()}s</span>
                       }>
                         +{effect.amount} {effect.stat} · {timeRemaining()}s
                       </Show>
@@ -109,15 +115,19 @@ export function ActiveEffectsDisplay(props: ActiveEffectsDisplayProps = {}) {
               return (
                 <div
                   style={{
-                    padding: "0.5rem 0.75rem",
+                    padding: "0.35rem 0.5rem",
                     background: "var(--success)",
                     color: "white",
-                    "border-radius": "6px",
-                    "font-size": "0.875rem",
-                    "font-weight": "bold",
+                    "border-radius": "4px",
+                    "font-size": "0.75rem",
+                    "font-weight": "600",
                     position: "relative",
                     overflow: "hidden",
-                    "min-width": "120px",
+                    "min-width": "100px",
+                    height: "52px", // Match hotbar height
+                    display: "flex",
+                    "flex-direction": "column",
+                    "justify-content": "center"
                   }}
                 >
                   {/* Background progress bar */}
@@ -134,10 +144,12 @@ export function ActiveEffectsDisplay(props: ActiveEffectsDisplayProps = {}) {
                   />
                   
                   {/* Content */}
-                  <div style={{ position: "relative", "z-index": 1 }}>
-                    <div>💚 {hot.name}</div>
-                    <div style={{ "font-size": "0.75rem", opacity: 0.9 }}>
-                      {hot.ticks_remaining} heal{hot.ticks_remaining !== 1 ? 's' : ''} remaining · {timeRemaining()}s
+                  <div style={{ position: "relative", "z-index": 1, "line-height": "1.2" }}>
+                    <div style={{ "white-space": "nowrap", overflow: "hidden", "text-overflow": "ellipsis" }}>
+                      💚 {hot.name}
+                    </div>
+                    <div style={{ "font-size": "0.65rem", opacity: 0.9, "margin-top": "0.1rem" }}>
+                      {hot.ticks_remaining} tick{hot.ticks_remaining !== 1 ? 's' : ''} · {timeRemaining()}s
                     </div>
                   </div>
                 </div>
@@ -149,15 +161,19 @@ export function ActiveEffectsDisplay(props: ActiveEffectsDisplayProps = {}) {
           <Show when={props.combatThorns && Date.now() < props.combatThorns.expiresAt}>
             <div
               style={{
-                padding: "0.5rem 0.75rem",
+                padding: "0.35rem 0.5rem",
                 background: "var(--accent)",
                 color: "white",
-                "border-radius": "6px",
-                "font-size": "0.875rem",
-                "font-weight": "bold",
+                "border-radius": "4px",
+                "font-size": "0.75rem",
+                "font-weight": "600",
                 position: "relative",
                 overflow: "hidden",
-                "min-width": "120px",
+                "min-width": "100px",
+                height: "52px", // Match hotbar height
+                display: "flex",
+                "flex-direction": "column",
+                "justify-content": "center"
               }}
             >
               {/* Background progress bar */}
@@ -174,10 +190,12 @@ export function ActiveEffectsDisplay(props: ActiveEffectsDisplayProps = {}) {
               />
               
               {/* Content */}
-              <div style={{ position: "relative", "z-index": 1 }}>
-                <div>⚡ {props.combatThorns!.name}</div>
-                <div style={{ "font-size": "0.75rem", opacity: 0.9 }}>
-                  {props.combatThorns!.reflectPercent}% reflect · {Math.max(0, Math.ceil((props.combatThorns!.expiresAt - currentTime()) / 1000))}s
+              <div style={{ position: "relative", "z-index": 1, "line-height": "1.2" }}>
+                <div style={{ "white-space": "nowrap", overflow: "hidden", "text-overflow": "ellipsis" }}>
+                  ⚡ {props.combatThorns!.name}
+                </div>
+                <div style={{ "font-size": "0.65rem", opacity: 0.9, "margin-top": "0.1rem" }}>
+                  {props.combatThorns!.reflectPercent}% · {Math.max(0, Math.ceil((props.combatThorns!.expiresAt - currentTime()) / 1000))}s
                 </div>
               </div>
             </div>
