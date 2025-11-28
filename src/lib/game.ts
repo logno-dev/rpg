@@ -1967,7 +1967,7 @@ export async function updateQuestProgress(
 
     // Check if this objective matches
     let matches = false;
-    if (type === 'kill' && objective.type === 'kill') {
+    if (type === 'kill' && (objective.type === 'kill' || objective.type === 'hunt')) {
       // Check for specific mob kill
       if (objective.target_mob_id && objective.target_mob_id === targetId) {
         matches = true;
@@ -1976,7 +1976,7 @@ export async function updateQuestProgress(
       else if (!objective.target_mob_id && objective.target_region_id && regionId && objective.target_region_id === regionId) {
         matches = true;
       }
-    } else if (type === 'collect' && objective.type === 'collect' && objective.target_item_id === targetId) {
+    } else if (type === 'collect' && (objective.type === 'collect' || objective.type === 'collection') && objective.target_item_id === targetId) {
       matches = true;
     }
 
