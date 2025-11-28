@@ -1,4 +1,5 @@
 import { createSignal, createMemo, onMount, Show } from "solid-js";
+import { useNavigate } from "@solidjs/router";
 import { useCharacter } from "~/lib/CharacterContext";
 import { HealthRegen } from "~/components/HealthRegen";
 import { GameNavigation } from "~/components/GameNavigation";
@@ -10,6 +11,7 @@ type GameLayoutProps = {
 export function GameLayout(props: GameLayoutProps) {
   const [store, actions, computed] = useCharacter();
   const [isScrolled, setIsScrolled] = createSignal(false);
+  const navigate = useNavigate();
 
   const currentCharacter = () => store.character;
   const currentGold = () => store.character?.gold || 0;
@@ -195,9 +197,29 @@ export function GameLayout(props: GameLayoutProps) {
                 </div>
               </div>
               <Show when={currentCharacter() && currentCharacter()!.available_points > 0}>
-                <div style={{ padding: "0.5rem 1rem", background: "var(--warning)", color: "var(--bg-dark)", "border-radius": "6px", "font-weight": "bold" }}>
+                <button 
+                  style={{ 
+                    padding: "0.5rem 1rem", 
+                    background: "var(--warning)", 
+                    color: "var(--bg-dark)", 
+                    "border-radius": "6px", 
+                    "font-weight": "bold",
+                    border: "none",
+                    cursor: "pointer",
+                    transition: "all 0.2s"
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = "scale(1.05)";
+                    e.currentTarget.style.boxShadow = "0 4px 8px rgba(0, 0, 0, 0.3)";
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = "scale(1)";
+                    e.currentTarget.style.boxShadow = "none";
+                  }}
+                  onClick={() => navigate('/game/stats')}
+                >
                   {currentCharacter()!.available_points} Stat Points Available!
-                </div>
+                </button>
               </Show>
             </div>
 

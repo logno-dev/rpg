@@ -2055,16 +2055,6 @@ export default function GamePage() {
                               {region().description}
                             </p>
                           </div>
-                          <div style={{ 
-                            padding: "0.5rem 1rem", 
-                            background: "var(--accent)", 
-                            color: "var(--bg-dark)", 
-                            "border-radius": "6px",
-                            "font-weight": "bold",
-                            "font-size": "0.875rem"
-                          }}>
-                            Levels {region().min_level}-{region().max_level}
-                          </div>
                         </div>
                       </div>
                     )}
@@ -2079,7 +2069,7 @@ export default function GamePage() {
                       {(() => {
                         const area = currentSubAreaObject();
                         if (!area) return "Select Area";
-                        return `${area.name} (Lv. ${area.min_level}-${area.max_level})`;
+                        return `${area.name} (~Lv. ${area.min_level}-${area.max_level})`;
                       })()}
                     </button>
                   </Show>
@@ -2951,7 +2941,7 @@ export default function GamePage() {
                                   "border-radius": "4px",
                                   border: isCurrent() ? "1px solid rgba(255, 255, 255, 0.3)" : "1px solid rgba(96, 165, 250, 0.4)"
                                 }}>
-                                  Lv. {subArea.min_level}-{subArea.max_level}
+                                  ~Lv. {subArea.min_level}-{subArea.max_level}
                                 </span>
                               </div>
                               
@@ -3159,20 +3149,11 @@ export default function GamePage() {
                             </div>
                             
                             <div style={{ 
-                              "font-size": "0.875rem", 
-                              color: isCurrent ? "var(--bg-dark)" : "var(--text-secondary)",
-                              "margin-bottom": "0.5rem"
-                            }}>
-                              {region.description}
-                            </div>
-                            
-                            <div style={{ 
+                              color: isCurrent ? "var(--bg-dark)" : "var(--text-secondary)", 
                               "font-size": "0.875rem",
-                              "font-weight": "bold",
-                              color: isCurrent ? "var(--bg-dark)" : "var(--warning)",
                               "margin-bottom": "0.75rem"
                             }}>
-                              Recommended: Levels {region.min_level}-{region.max_level}
+                              {region.description}
                             </div>
 
                             <Show when={isLocked && region.unlock_requirement}>

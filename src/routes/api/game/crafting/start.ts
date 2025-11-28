@@ -104,7 +104,8 @@ export async function POST(event: APIEvent) {
     }
 
     // If player has rare materials available and hasn't selected one, prompt them
-    if (!rareMaterialId && availableRareMaterials.length > 0) {
+    // rareMaterialId === -1 means user explicitly chose to use normal materials
+    if (!rareMaterialId && rareMaterialId !== -1 && availableRareMaterials.length > 0) {
       return new Response(
         JSON.stringify({
           needsRareMaterialChoice: true,
@@ -149,8 +150,9 @@ export async function POST(event: APIEvent) {
     }
 
     // Check if rare material is provided and player has it
+    // rareMaterialId === -1 means user explicitly chose normal materials
     let usedRareMaterialId = null;
-    if (rareMaterialId) {
+    if (rareMaterialId && rareMaterialId !== -1) {
       const rareMaterialResult = await db.execute({
         sql: `SELECT quantity FROM character_crafting_materials 
               WHERE character_id = ? AND material_id = ?`,

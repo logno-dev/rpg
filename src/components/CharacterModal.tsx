@@ -1,11 +1,22 @@
-import { TrendingUp, Grid3x3, Users } from "lucide-solid";
-import { A } from "@solidjs/router";
+import { TrendingUp, Grid3x3, Users, LogOut } from "lucide-solid";
+import { A, useNavigate } from "@solidjs/router";
 
 type CharacterModalProps = {
   onClose: () => void;
 };
 
 export function CharacterModal(props: CharacterModalProps) {
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    try {
+      await fetch('/api/logout', { method: 'POST' });
+      navigate('/');
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
   return (
     <div 
       style={{ 
@@ -30,11 +41,47 @@ export function CharacterModal(props: CharacterModalProps) {
           width: "100%",
           "max-height": "90vh",
           overflow: "auto",
-          margin: 0
+          margin: 0,
+          position: "relative"
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 style={{ "margin-bottom": "1.5rem" }}>Character Menu</h2>
+        {/* Close button in top right corner */}
+        <button
+          style={{
+            position: "absolute",
+            top: "0.75rem",
+            right: "0.75rem",
+            width: "32px",
+            height: "32px",
+            "border-radius": "50%",
+            background: "var(--bg-light)",
+            border: "1px solid var(--text-secondary)",
+            color: "var(--text)",
+            display: "flex",
+            "align-items": "center",
+            "justify-content": "center",
+            cursor: "pointer",
+            "font-size": "1.25rem",
+            "line-height": "1",
+            padding: "0",
+            transition: "all 0.2s ease",
+            "z-index": 10
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "var(--danger)";
+            e.currentTarget.style.borderColor = "var(--danger)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "var(--bg-light)";
+            e.currentTarget.style.borderColor = "var(--text-secondary)";
+          }}
+          onClick={props.onClose}
+        >
+          ✕
+        </button>
+
+        <h2 style={{ "margin-bottom": "1.5rem", "padding-right": "2.5rem" }}>Character Menu</h2>
         
         <div style={{ display: "flex", "flex-direction": "column", gap: "0.75rem" }}>
           <A 
@@ -62,7 +109,7 @@ export function CharacterModal(props: CharacterModalProps) {
           >
             <TrendingUp size={24} style={{ "margin-right": "1rem", "flex-shrink": "0" }} />
             <div>
-              <div style={{ "font-weight": "600", "margin-bottom": "0.25rem" }}>Stats & Equipment</div>
+              <div style={{ "font-weight": "600", "margin-bottom": "0.25rem" }}>Character Stats</div>
               <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
                 View and manage your character
               </div>
@@ -132,6 +179,38 @@ export function CharacterModal(props: CharacterModalProps) {
               </div>
             </div>
           </A>
+
+          <button 
+            style={{ 
+              display: "flex",
+              "align-items": "center",
+              padding: "1rem",
+              background: "var(--bg-light)",
+              "border-radius": "6px",
+              border: "1px solid var(--border)",
+              color: "var(--text-primary)",
+              transition: "all 0.2s",
+              cursor: "pointer",
+              width: "100%"
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = "var(--danger)";
+              e.currentTarget.style.borderColor = "var(--danger)";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = "var(--bg-light)";
+              e.currentTarget.style.borderColor = "var(--border)";
+            }}
+            onClick={handleSignOut}
+          >
+            <LogOut size={24} style={{ "margin-right": "1rem", "flex-shrink": "0" }} />
+            <div style={{ "text-align": "left" }}>
+              <div style={{ "font-weight": "600", "margin-bottom": "0.25rem" }}>Sign Out</div>
+              <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
+                Log out of your account
+              </div>
+            </div>
+          </button>
         </div>
       </div>
     </div>

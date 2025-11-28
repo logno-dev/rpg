@@ -735,7 +735,7 @@ export default function CraftingPage() {
                   setShowRareMaterialPrompt(false);
                   const recipe = pendingRecipe();
                   if (recipe) {
-                    startCraft(recipe, undefined);
+                    startCraft(recipe, -1); // -1 means "use normal materials, don't prompt again"
                   }
                 }}
               >

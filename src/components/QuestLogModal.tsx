@@ -135,11 +135,47 @@ export function QuestLogModal(props: QuestLogModalProps) {
           overflow: "hidden",
           display: "flex",
           "flex-direction": "column",
-          margin: 0
+          margin: 0,
+          position: "relative"
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 style={{ "margin-bottom": "1.5rem" }}>Quest Log</h2>
+        {/* Close button in top right corner */}
+        <button
+          style={{
+            position: "absolute",
+            top: "0.75rem",
+            right: "0.75rem",
+            width: "32px",
+            height: "32px",
+            "border-radius": "50%",
+            background: "var(--bg-light)",
+            border: "1px solid var(--text-secondary)",
+            color: "var(--text)",
+            display: "flex",
+            "align-items": "center",
+            "justify-content": "center",
+            cursor: "pointer",
+            "font-size": "1.25rem",
+            "line-height": "1",
+            padding: "0",
+            transition: "all 0.2s ease",
+            "z-index": 10
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "var(--danger)";
+            e.currentTarget.style.borderColor = "var(--danger)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "var(--bg-light)";
+            e.currentTarget.style.borderColor = "var(--text-secondary)";
+          }}
+          onClick={props.onClose}
+        >
+          ✕
+        </button>
+
+        <h2 style={{ "margin-bottom": "1.5rem", "padding-right": "2.5rem" }}>Quest Log</h2>
         
         <div>
           {/* Tab Navigation */}
