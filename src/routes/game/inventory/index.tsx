@@ -72,6 +72,8 @@ export default function InventoryPage() {
   const [showSellModal, setShowSellModal] = createSignal(false);
   const [sellItemData, setSellItemData] = createSignal<{inventoryItemId: number, itemName: string, value: number, quantity: number} | null>(null);
   const [sellQuantity, setSellQuantity] = createSignal(1);
+  const [showEquipConfirmModal, setShowEquipConfirmModal] = createSignal(false);
+  const [equipConfirmData, setEquipConfirmData] = createSignal<{inventoryItemId: number, conflict: {name: string, slot: string}, message: string} | null>(null);
   
   // Loading states for actions
   const [isSelling, setIsSelling] = createSignal(false);
@@ -83,7 +85,7 @@ export default function InventoryPage() {
   const currentAbilities = () => store.abilities || [];
 
   // Handle equip/unequip
-  const handleEquip = async (inventoryItemId: number, unequip: boolean = false) => {
+  const handleEquip = async (inventoryItemId: number, unequip: boolean = false, confirmed: boolean = false) => {
     if (isEquipping()) return;
     
     setIsEquipping(true);
@@ -91,18 +93,55 @@ export default function InventoryPage() {
       const response = await fetch("/api/game/equip", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ characterId: characterId(), inventoryItemId, unequip })
+        body: JSON.stringify({ 
+          characterId: characterId(), 
+          inventoryItemId, 
+          equipped: unequip, // API expects 'equipped' (true=unequip, false=equip)
+          confirm: confirmed 
+        })
       });
       
       const result = await response.json();
+      
+      // If confirmation required, show modal
+      if (result.requiresConfirmation) {
+        setEquipConfirmData({
+          inventoryItemId,
+          conflict: result.conflict,
+          message: result.message
+        });
+        setShowEquipConfirmModal(true);
+        setIsEquipping(false);
+        return;
+      }
+      
+      // Success - update inventory
       if (result.success) {
         actions.setInventory(result.inventory);
+        
+        // Show toast notification if something was unequipped
+        if (result.unequippedItem) {
+          console.log(`Unequipped ${result.unequippedItem.name} to equip new item`);
+          // TODO: Add toast notification here
+        }
       }
     } catch (error) {
       console.error("Failed to equip item:", error);
     } finally {
       setIsEquipping(false);
     }
+  };
+
+  // Confirm equipment swap
+  const handleEquipConfirm = async () => {
+    const data = equipConfirmData();
+    if (!data) return;
+    
+    setShowEquipConfirmModal(false);
+    setEquipConfirmData(null);
+    
+    // Call handleEquip again with confirmed=true
+    await handleEquip(data.inventoryItemId, false, true);
   };
 
   // Handle sell item
@@ -1294,7 +1333,7 @@ export default function InventoryPage() {
         <ItemDetailModal
           item={selectedItem()}
           isOpen={showItemDetailModal()}
-          preventBackgroundClose={showSellModal() || showDropModal()}
+          preventBackgroundClose={showSellModal() || showDropModal() || showEquipConfirmModal()}
           onClose={() => {
             setShowItemDetailModal(false);
             setSelectedItem(null);
@@ -1547,6 +1586,79 @@ export default function InventoryPage() {
                   }}
                 >
                   Sell
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Show>
+
+      {/* Equip Confirmation Modal */}
+      <Show when={showEquipConfirmModal() && equipConfirmData()}>
+        {(data) => (
+          <div 
+            style={{ 
+              position: "fixed", 
+              top: 0, 
+              left: 0, 
+              right: 0, 
+              bottom: 0, 
+              background: "rgba(0, 0, 0, 0.85)", 
+              display: "flex", 
+              "align-items": "center", 
+              "justify-content": "center",
+              "z-index": 1001,
+              padding: "1rem"
+            }}
+            onClick={() => {
+              setShowEquipConfirmModal(false);
+              setEquipConfirmData(null);
+            }}
+          >
+            <div 
+              class="card"
+              style={{ 
+                "max-width": "400px",
+                width: "100%",
+                background: "var(--bg-dark)",
+                border: "2px solid var(--accent)",
+                "box-shadow": "0 0 20px rgba(59, 130, 246, 0.3)"
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 style={{ "margin-bottom": "1rem", color: "var(--accent)" }}>
+                ⚔️ Confirm Equipment Change
+              </h2>
+              
+              <p style={{ 
+                "margin-bottom": "1.5rem", 
+                "font-size": "1.125rem",
+                "line-height": "1.6"
+              }}>
+                {data().message}
+              </p>
+
+              <div style={{ display: "flex", gap: "1rem" }}>
+                <button
+                  class="button secondary"
+                  onClick={() => {
+                    setShowEquipConfirmModal(false);
+                    setEquipConfirmData(null);
+                  }}
+                  style={{ flex: 1 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  class="button"
+                  onClick={handleEquipConfirm}
+                  style={{ 
+                    flex: 1,
+                    background: "var(--accent)",
+                    color: "white"
+                  }}
+                >
+                  Continue
                 </button>
               </div>
             </div>

@@ -867,7 +867,62 @@ export async function addItemToInventory(characterId: number, itemId: number, qu
   });
 }
 
-export async function equipItem(characterId: number, inventoryItemId: number): Promise<void> {
+// Check what would be unequipped without actually equipping
+export async function checkEquipConflict(characterId: number, inventoryItemId: number): Promise<{ name: string; slot: string } | null> {
+  const invResult = await db.execute({
+    sql: `SELECT character_inventory.*, items.* 
+      FROM character_inventory 
+      JOIN items ON character_inventory.item_id = items.id 
+      WHERE character_inventory.id = ?`,
+    args: [inventoryItemId],
+  });
+
+  const invItem = invResult.rows[0] as any;
+  if (!invItem || invItem.character_id !== characterId) {
+    return null;
+  }
+
+  // If equipping a 2-handed weapon, check for offhand
+  if (invItem.slot === 'weapon' && invItem.is_two_handed === 1) {
+    const offhandCheck = await db.execute({
+      sql: `SELECT items.name, items.slot
+        FROM character_inventory
+        JOIN items ON character_inventory.item_id = items.id
+        WHERE character_inventory.character_id = ?
+        AND character_inventory.equipped = 1
+        AND items.slot = 'offhand'`,
+      args: [characterId],
+    });
+
+    if (offhandCheck.rows.length > 0) {
+      const offhand = offhandCheck.rows[0] as any;
+      return { name: offhand.name, slot: offhand.slot };
+    }
+  }
+
+  // If equipping an offhand, check for 2-handed weapon
+  if (invItem.slot === 'offhand') {
+    const twoHandedCheck = await db.execute({
+      sql: `SELECT items.name, items.slot
+        FROM character_inventory
+        JOIN items ON character_inventory.item_id = items.id
+        WHERE character_inventory.character_id = ?
+        AND character_inventory.equipped = 1
+        AND items.slot = 'weapon'
+        AND items.is_two_handed = 1`,
+      args: [characterId],
+    });
+
+    if (twoHandedCheck.rows.length > 0) {
+      const twoHandedWeapon = twoHandedCheck.rows[0] as any;
+      return { name: twoHandedWeapon.name, slot: twoHandedWeapon.slot };
+    }
+  }
+
+  return null;
+}
+
+export async function equipItem(characterId: number, inventoryItemId: number): Promise<{ unequippedItem?: { name: string; slot: string } }> {
   const invResult = await db.execute({
     sql: `SELECT character_inventory.*, items.* 
       FROM character_inventory 
@@ -918,8 +973,25 @@ export async function equipItem(characterId: number, inventoryItemId: number): P
   }
 
   // TWO-HANDED WEAPON LOGIC
+  let unequippedItem: { name: string; slot: string } | undefined;
+
   // If equipping a 2-handed weapon, auto-unequip any offhand
   if (invItem.slot === 'weapon' && invItem.is_two_handed === 1) {
+    const offhandCheck = await db.execute({
+      sql: `SELECT items.name, items.slot
+        FROM character_inventory
+        JOIN items ON character_inventory.item_id = items.id
+        WHERE character_inventory.character_id = ?
+        AND character_inventory.equipped = 1
+        AND items.slot = 'offhand'`,
+      args: [characterId],
+    });
+
+    if (offhandCheck.rows.length > 0) {
+      const offhand = offhandCheck.rows[0] as any;
+      unequippedItem = { name: offhand.name, slot: offhand.slot };
+    }
+
     await db.execute({
       sql: `UPDATE character_inventory 
         SET equipped = 0 
@@ -934,10 +1006,10 @@ export async function equipItem(characterId: number, inventoryItemId: number): P
     });
   }
 
-  // If equipping an offhand, check if a 2-handed weapon is equipped
+  // If equipping an offhand, auto-unequip 2-handed weapon
   if (invItem.slot === 'offhand') {
     const twoHandedCheck = await db.execute({
-      sql: `SELECT items.name 
+      sql: `SELECT items.name, items.slot
         FROM character_inventory
         JOIN items ON character_inventory.item_id = items.id
         WHERE character_inventory.character_id = ?
@@ -949,7 +1021,20 @@ export async function equipItem(characterId: number, inventoryItemId: number): P
 
     if (twoHandedCheck.rows.length > 0) {
       const twoHandedWeapon = twoHandedCheck.rows[0] as any;
-      throw new Error(`Cannot equip offhand: ${twoHandedWeapon.name} is a two-handed weapon. Unequip it first.`);
+      unequippedItem = { name: twoHandedWeapon.name, slot: twoHandedWeapon.slot };
+
+      await db.execute({
+        sql: `UPDATE character_inventory 
+          SET equipped = 0 
+          WHERE character_id = ? 
+          AND id IN (
+            SELECT character_inventory.id 
+            FROM character_inventory 
+            JOIN items ON character_inventory.item_id = items.id 
+            WHERE items.slot = 'weapon' AND items.is_two_handed = 1 AND character_inventory.equipped = 1
+          )`,
+        args: [characterId],
+      });
     }
   }
 
@@ -974,6 +1059,8 @@ export async function equipItem(characterId: number, inventoryItemId: number): P
     sql: 'UPDATE character_inventory SET equipped = 1 WHERE id = ?',
     args: [inventoryItemId],
   });
+
+  return { unequippedItem };
 }
 
 export async function unequipItem(inventoryItemId: number): Promise<void> {
