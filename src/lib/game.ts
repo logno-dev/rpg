@@ -1724,3 +1724,432 @@ export async function getAbilitiesWithEffects(characterId: number) {
   return abilitiesWithEffects;
 }
 
+// ==================== QUEST FUNCTIONS ====================
+
+export async function getQuestsInRegion(regionId: number, characterId: number): Promise<any[]> {
+  const result = await db.execute({
+    sql: `
+      SELECT 
+        q.*,
+        cq.status as character_status,
+        cq.current_objective,
+        cq.id as character_quest_id
+      FROM quests q
+      LEFT JOIN character_quests cq ON q.id = cq.quest_id AND cq.character_id = ?
+      WHERE q.region_id = ?
+      ORDER BY q.min_level, q.id
+    `,
+    args: [characterId, regionId],
+  });
+
+  return result.rows;
+}
+
+export async function getQuestDetails(questId: number, characterId: number): Promise<any> {
+  const questResult = await db.execute({
+    sql: `
+      SELECT 
+        q.*,
+        cq.status as character_status,
+        cq.current_objective,
+        cq.id as character_quest_id,
+        cq.started_at,
+        cq.completed_at
+      FROM quests q
+      LEFT JOIN character_quests cq ON q.id = cq.quest_id AND cq.character_id = ?
+      WHERE q.id = ?
+    `,
+    args: [characterId, questId],
+  });
+
+  if (questResult.rows.length === 0) return null;
+
+  const quest = questResult.rows[0];
+
+  // Get objectives with progress
+  const objectivesResult = await db.execute({
+    sql: `
+      SELECT 
+        qo.*,
+        COALESCE(cqo.current_count, 0) as current_count,
+        COALESCE(cqo.completed, 0) as completed,
+        m.name as mob_name,
+        cm.name as item_name,
+        r.name as region_name,
+        sa.name as sub_area_name
+      FROM quest_objectives qo
+      LEFT JOIN character_quest_objectives cqo ON qo.id = cqo.quest_objective_id 
+        AND cqo.character_quest_id = ?
+      LEFT JOIN mobs m ON qo.target_mob_id = m.id
+      LEFT JOIN crafting_materials cm ON qo.target_item_id = cm.id
+      LEFT JOIN regions r ON qo.target_region_id = r.id
+      LEFT JOIN sub_areas sa ON qo.target_sub_area_id = sa.id
+      WHERE qo.quest_id = ?
+      ORDER BY qo.objective_order
+    `,
+    args: [quest.character_quest_id || 0, questId],
+  });
+
+  // Get rewards
+  const rewardsResult = await db.execute({
+    sql: `
+      SELECT 
+        qr.*,
+        i.name as item_name,
+        cm.name as material_name
+      FROM quest_rewards qr
+      LEFT JOIN items i ON qr.reward_item_id = i.id
+      LEFT JOIN crafting_materials cm ON qr.reward_material_id = cm.id
+      WHERE qr.quest_id = ?
+    `,
+    args: [questId],
+  });
+
+  return {
+    ...quest,
+    objectives: objectivesResult.rows,
+    rewards: rewardsResult.rows,
+  };
+}
+
+export async function acceptQuest(characterId: number, questId: number): Promise<void> {
+  const character = await getCharacter(characterId);
+  if (!character) throw new Error('Character not found');
+
+  const quest = await db.execute({
+    sql: 'SELECT * FROM quests WHERE id = ?',
+    args: [questId],
+  });
+
+  if (quest.rows.length === 0) throw new Error('Quest not found');
+
+  const questData = quest.rows[0] as any;
+
+  // Check level requirement
+  if (character.level < questData.min_level) {
+    throw new Error(`Level ${questData.min_level} required`);
+  }
+
+  // Check if already active or completed (for non-repeatable)
+  const existingQuest = await db.execute({
+    sql: 'SELECT * FROM character_quests WHERE character_id = ? AND quest_id = ?',
+    args: [characterId, questId],
+  });
+
+  if (existingQuest.rows.length > 0) {
+    const existing = existingQuest.rows[0] as any;
+    if (existing.status === 'active') {
+      throw new Error('Quest already active');
+    }
+    if (existing.status === 'completed' && !questData.repeatable) {
+      throw new Error('Quest already completed');
+    }
+    // If repeatable, check cooldown
+    if (questData.repeatable && existing.last_completion_at) {
+      const lastCompletion = new Date(existing.last_completion_at).getTime();
+      const now = Date.now();
+      const cooldownMs = questData.cooldown_hours * 60 * 60 * 1000;
+      if (now - lastCompletion < cooldownMs) {
+        throw new Error('Quest on cooldown');
+      }
+    }
+  }
+
+  // Create or update character quest
+  await db.execute({
+    sql: `
+      INSERT INTO character_quests (character_id, quest_id, status, current_objective, started_at)
+      VALUES (?, ?, 'active', 1, CURRENT_TIMESTAMP)
+      ON CONFLICT(character_id, quest_id) DO UPDATE SET
+        status = 'active',
+        current_objective = 1,
+        started_at = CURRENT_TIMESTAMP
+    `,
+    args: [characterId, questId],
+  });
+
+  // Get the character_quest_id
+  const charQuestResult = await db.execute({
+    sql: 'SELECT id FROM character_quests WHERE character_id = ? AND quest_id = ?',
+    args: [characterId, questId],
+  });
+
+  const characterQuestId = (charQuestResult.rows[0] as any).id;
+
+  // Initialize objective progress
+  const objectives = await db.execute({
+    sql: 'SELECT id FROM quest_objectives WHERE quest_id = ?',
+    args: [questId],
+  });
+
+  for (const obj of objectives.rows) {
+    await db.execute({
+      sql: `
+        INSERT INTO character_quest_objectives (character_quest_id, quest_objective_id, current_count, completed)
+        VALUES (?, ?, 0, 0)
+        ON CONFLICT(character_quest_id, quest_objective_id) DO UPDATE SET
+          current_count = 0,
+          completed = 0
+      `,
+      args: [characterQuestId, (obj as any).id],
+    });
+  }
+}
+
+export async function updateQuestProgress(
+  characterId: number,
+  type: 'kill' | 'collect',
+  targetId: number,
+  count: number = 1,
+  regionId?: number
+): Promise<void> {
+  console.log('[updateQuestProgress] Called with:', { characterId, type, targetId, count, regionId });
+  
+  // Get all active quests
+  const activeQuests = await db.execute({
+    sql: 'SELECT id, quest_id, current_objective FROM character_quests WHERE character_id = ? AND status = ?',
+    args: [characterId, 'active'],
+  });
+
+  console.log('[updateQuestProgress] Active quests found:', activeQuests.rows.length);
+
+  for (const charQuest of activeQuests.rows) {
+    const cq = charQuest as any;
+    console.log('[updateQuestProgress] Processing quest:', cq);
+
+    // Get current objective
+    const objectiveResult = await db.execute({
+      sql: `
+        SELECT qo.*, cqo.current_count, cqo.completed
+        FROM quest_objectives qo
+        JOIN character_quest_objectives cqo ON qo.id = cqo.quest_objective_id
+        WHERE qo.quest_id = ? 
+          AND qo.objective_order = ?
+          AND cqo.character_quest_id = ?
+          AND cqo.completed = 0
+      `,
+      args: [cq.quest_id, cq.current_objective, cq.id],
+    });
+
+    if (objectiveResult.rows.length === 0) {
+      console.log('[updateQuestProgress] No objective found for quest:', cq.quest_id);
+      continue;
+    }
+
+    const objective = objectiveResult.rows[0] as any;
+    console.log('[updateQuestProgress] Checking objective:', objective);
+
+    // Check if this objective matches
+    let matches = false;
+    if (type === 'kill' && objective.type === 'kill') {
+      // Check for specific mob kill
+      if (objective.target_mob_id && objective.target_mob_id === targetId) {
+        matches = true;
+      }
+      // Check for region-based kill (any mob in region)
+      else if (!objective.target_mob_id && objective.target_region_id && regionId && objective.target_region_id === regionId) {
+        matches = true;
+      }
+    } else if (type === 'collect' && objective.type === 'collect' && objective.target_item_id === targetId) {
+      matches = true;
+    }
+
+    console.log('[updateQuestProgress] Matches:', matches);
+    
+    if (!matches) continue;
+
+    console.log('[updateQuestProgress] Updating progress for objective:', objective.id);
+    
+    // Update progress
+    const newCount = Math.min(objective.current_count + count, objective.required_count);
+    const isCompleted = newCount >= objective.required_count;
+
+    await db.execute({
+      sql: `
+        UPDATE character_quest_objectives
+        SET current_count = ?, completed = ?
+        WHERE character_quest_id = ? AND quest_objective_id = ?
+      `,
+      args: [newCount, isCompleted ? 1 : 0, cq.id, objective.id],
+    });
+
+    // If auto-complete and objective is done, move to next objective
+    if (isCompleted && objective.auto_complete) {
+      await advanceQuestObjective(cq.id, cq.quest_id, cq.current_objective);
+    }
+  }
+}
+
+async function advanceQuestObjective(characterQuestId: number, questId: number, currentObjective: number): Promise<void> {
+  // Check if there are more objectives
+  const nextObjective = await db.execute({
+    sql: 'SELECT id FROM quest_objectives WHERE quest_id = ? AND objective_order = ?',
+    args: [questId, currentObjective + 1],
+  });
+
+  if (nextObjective.rows.length > 0) {
+    // Move to next objective
+    await db.execute({
+      sql: 'UPDATE character_quests SET current_objective = ? WHERE id = ?',
+      args: [currentObjective + 1, characterQuestId],
+    });
+  } else {
+    // All objectives complete - quest is done (but not turned in yet)
+    // Keep status as active until player turns in
+  }
+}
+
+export async function turnInQuest(characterId: number, questId: number): Promise<any> {
+  const character = await getCharacter(characterId);
+  if (!character) throw new Error('Character not found');
+
+  // Get character quest
+  const charQuestResult = await db.execute({
+    sql: 'SELECT * FROM character_quests WHERE character_id = ? AND quest_id = ? AND status = ?',
+    args: [characterId, questId, 'active'],
+  });
+
+  if (charQuestResult.rows.length === 0) {
+    throw new Error('Quest not active');
+  }
+
+  const charQuest = charQuestResult.rows[0] as any;
+
+  // Check all objectives are complete
+  const incompleteObjectives = await db.execute({
+    sql: `
+      SELECT COUNT(*) as count
+      FROM quest_objectives qo
+      JOIN character_quest_objectives cqo ON qo.id = cqo.quest_objective_id
+      WHERE qo.quest_id = ? AND cqo.character_quest_id = ? AND cqo.completed = 0
+    `,
+    args: [questId, charQuest.id],
+  });
+
+  if ((incompleteObjectives.rows[0] as any).count > 0) {
+    throw new Error('Not all objectives complete');
+  }
+
+  // Get rewards
+  const rewards = await db.execute({
+    sql: 'SELECT * FROM quest_rewards WHERE quest_id = ?',
+    args: [questId],
+  });
+
+  const rewardSummary: any = {
+    xp: 0,
+    gold: 0,
+    items: [],
+    materials: [],
+  };
+
+  // Apply rewards
+  for (const reward of rewards.rows) {
+    const r = reward as any;
+    
+    if (r.reward_type === 'xp') {
+      await db.execute({
+        sql: 'UPDATE characters SET experience = experience + ? WHERE id = ?',
+        args: [r.reward_amount, characterId],
+      });
+      rewardSummary.xp = r.reward_amount;
+    } else if (r.reward_type === 'gold') {
+      await db.execute({
+        sql: 'UPDATE characters SET gold = gold + ? WHERE id = ?',
+        args: [r.reward_amount, characterId],
+      });
+      rewardSummary.gold = r.reward_amount;
+    } else if (r.reward_type === 'item') {
+      await addItemToInventory(characterId, r.reward_item_id, r.reward_amount);
+      rewardSummary.items.push({ id: r.reward_item_id, quantity: r.reward_amount });
+    } else if (r.reward_type === 'crafting_material') {
+      await addCraftingMaterialToInventory(characterId, r.reward_material_id, r.reward_amount);
+      rewardSummary.materials.push({ id: r.reward_material_id, quantity: r.reward_amount });
+    }
+  }
+
+  // Check if repeatable
+  const questData = await db.execute({
+    sql: 'SELECT repeatable FROM quests WHERE id = ?',
+    args: [questId],
+  });
+
+  const isRepeatable = (questData.rows[0] as any).repeatable;
+
+  // Update quest status
+  await db.execute({
+    sql: `
+      UPDATE character_quests
+      SET status = 'completed', completed_at = CURRENT_TIMESTAMP, last_completion_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `,
+    args: [charQuest.id],
+  });
+
+  // Remove quest items from inventory if any
+  const questItems = await db.execute({
+    sql: `
+      SELECT cm.id
+      FROM crafting_materials cm
+      WHERE cm.is_quest_item = 1 AND cm.quest_id = ?
+    `,
+    args: [questId],
+  });
+
+  for (const item of questItems.rows) {
+    await removeCraftingMaterialFromInventory(characterId, (item as any).id, 999); // Remove all
+  }
+
+  return {
+    rewards: rewardSummary,
+    repeatable: isRepeatable,
+  };
+}
+
+async function addCraftingMaterialToInventory(characterId: number, materialId: number, quantity: number): Promise<void> {
+  await db.execute({
+    sql: `
+      INSERT INTO character_crafting_materials (character_id, material_id, quantity)
+      VALUES (?, ?, ?)
+      ON CONFLICT(character_id, material_id) DO UPDATE SET
+        quantity = quantity + ?
+    `,
+    args: [characterId, materialId, quantity, quantity],
+  });
+}
+
+async function removeCraftingMaterialFromInventory(characterId: number, materialId: number, quantity: number): Promise<void> {
+  await db.execute({
+    sql: `
+      UPDATE character_crafting_materials
+      SET quantity = MAX(0, quantity - ?)
+      WHERE character_id = ? AND material_id = ?
+    `,
+    args: [quantity, characterId, materialId],
+  });
+
+  // Remove if quantity is 0
+  await db.execute({
+    sql: 'DELETE FROM character_crafting_materials WHERE character_id = ? AND material_id = ? AND quantity <= 0',
+    args: [characterId, materialId],
+  });
+}
+
+export async function getActiveQuests(characterId: number): Promise<any[]> {
+  const result = await db.execute({
+    sql: `
+      SELECT 
+        q.*,
+        cq.current_objective,
+        cq.started_at
+      FROM character_quests cq
+      JOIN quests q ON cq.quest_id = q.id
+      WHERE cq.character_id = ? AND cq.status = 'active'
+      ORDER BY q.region_id, q.min_level
+    `,
+    args: [characterId],
+  });
+
+  return result.rows;
+}
+

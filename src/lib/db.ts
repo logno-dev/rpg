@@ -328,3 +328,76 @@ export type ActiveEffect = {
   stat_scaling?: string;
   scaling_factor?: number;
 };
+
+export type CraftingMaterial = {
+  id: number;
+  name: string;
+  description: string | null;
+  rarity: string;
+  value: number;
+  stackable: number;
+  is_quest_item: number;
+  quest_id: number | null;
+  created_at: number;
+};
+
+export type Quest = {
+  id: number;
+  name: string;
+  description: string;
+  region_id: number;
+  min_level: number;
+  repeatable: number;
+  cooldown_hours: number;
+  chain_id: number | null;
+  chain_order: number | null;
+  created_at: string;
+};
+
+export type QuestObjective = {
+  id: number;
+  quest_id: number;
+  objective_order: number;
+  type: 'kill' | 'collect' | 'talk';
+  description: string;
+  target_mob_id: number | null;
+  target_item_id: number | null;
+  target_region_id: number | null;
+  target_sub_area_id: number | null;
+  required_count: number;
+  auto_complete: number;
+};
+
+export type QuestReward = {
+  id: number;
+  quest_id: number;
+  reward_type: 'xp' | 'gold' | 'item' | 'crafting_material';
+  reward_item_id: number | null;
+  reward_material_id: number | null;
+  reward_amount: number;
+};
+
+export type CharacterQuest = {
+  id: number;
+  character_id: number;
+  quest_id: number;
+  status: 'available' | 'active' | 'completed' | 'failed';
+  current_objective: number;
+  started_at: string | null;
+  completed_at: string | null;
+  last_completion_at: string | null;
+};
+
+export type CharacterQuestObjective = {
+  id: number;
+  character_quest_id: number;
+  quest_objective_id: number;
+  current_count: number;
+  completed: number;
+};
+
+export type QuestWithProgress = Quest & {
+  objectives: (QuestObjective & { current_count: number; completed: number })[];
+  rewards: QuestReward[];
+  character_quest?: CharacterQuest;
+};

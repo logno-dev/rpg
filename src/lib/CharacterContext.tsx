@@ -91,6 +91,7 @@ type CharacterStore = {
   hotbar: HotbarSlot[];
   regions: Region[];
   currentRegion: Region | null;
+  currentSubArea: number | null;
   merchants: Merchant[];
   dungeons: Dungeon[];
   dungeonSession: DungeonSession | null;
@@ -106,6 +107,7 @@ type CharacterContextValue = [
     setHotbar: (hotbar: HotbarSlot[]) => void;
     setRegions: (regions: Region[]) => void;
     setCurrentRegion: (region: Region) => void;
+    setCurrentSubArea: (subAreaId: number | null) => void;
     setMerchants: (merchants: Merchant[]) => void;
     setDungeons: (dungeons: Dungeon[]) => void;
     setDungeonSession: (session: DungeonSession | null) => void;
@@ -149,6 +151,7 @@ export const CharacterProvider: ParentComponent<{ initialData?: Partial<Characte
     hotbar: props.initialData?.hotbar || [],
     regions: props.initialData?.regions || [],
     currentRegion: props.initialData?.currentRegion || null,
+    currentSubArea: props.initialData?.currentSubArea || null,
     merchants: props.initialData?.merchants || [],
     dungeons: props.initialData?.dungeons || [],
     dungeonSession: null,
@@ -178,6 +181,10 @@ export const CharacterProvider: ParentComponent<{ initialData?: Partial<Characte
 
     setCurrentRegion: (region: Region) => {
       setStore("currentRegion", region);
+    },
+
+    setCurrentSubArea: (subAreaId: number | null) => {
+      setStore("currentSubArea", subAreaId);
     },
 
     setMerchants: (merchants: Merchant[]) => {
@@ -334,10 +341,13 @@ export const CharacterProvider: ParentComponent<{ initialData?: Partial<Characte
         character: null,
         inventory: [],
         abilities: [],
+        hotbar: [],
         regions: [],
         currentRegion: null,
+        currentSubArea: null,
         merchants: [],
         dungeons: [],
+        dungeonSession: null,
         isLoading: false,
       });
     },

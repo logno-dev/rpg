@@ -320,7 +320,8 @@ label {
   z-index: 1000;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.25rem;
   min-height: 70px;
 }
 
@@ -330,19 +331,23 @@ label {
   align-items: center;
   justify-content: center;
   gap: 0.25rem;
-  padding: 0.5rem;
+  padding: 0.5rem 0.25rem;
   color: var(--text-secondary);
   text-decoration: none;
+  background: transparent;
+  border: none;
   border-radius: 6px;
   transition: all 0.2s;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   min-height: 60px;
+  font-family: inherit;
 }
 
 .mobile-nav .nav-item span {
   display: block;
   text-align: center;
   white-space: nowrap;
+  font-size: 0.7rem;
 }
 
 .mobile-nav .nav-item:hover {

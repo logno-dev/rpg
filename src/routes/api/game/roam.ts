@@ -21,13 +21,14 @@ export async function POST(event: APIEvent) {
         if (mob) mobs.push(mob);
       }
       
-      // Check if any are aggressive
-      const aggressiveMob = mobs.find(m => m.aggressive);
+      // Check if any are aggressive - only auto-aggro 50% of the time
+      const aggressiveMobs = mobs.filter(m => m.aggressive);
+      const shouldAutoAggro = aggressiveMobs.length > 0 && Math.random() < 0.5;
       
       return json({
         mobs,
-        initiated: !!aggressiveMob,
-        aggroMob: aggressiveMob || null,
+        initiated: shouldAutoAggro,
+        aggroMob: shouldAutoAggro ? aggressiveMobs[Math.floor(Math.random() * aggressiveMobs.length)] : null,
       });
     } else {
       // Fallback to old system for regions without sub-areas

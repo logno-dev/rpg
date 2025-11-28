@@ -1,7 +1,13 @@
 import { A } from "@solidjs/router";
-import { Swords, Backpack, TrendingUp, Grid3x3, User, Hammer } from "lucide-solid";
+import { createSignal, Show } from "solid-js";
+import { Swords, Backpack, ScrollText, Hammer, User } from "lucide-solid";
+import { CharacterModal } from "./CharacterModal";
+import { QuestLogModal } from "./QuestLogModal";
 
 export function GameNavigation() {
+  const [showCharacterModal, setShowCharacterModal] = createSignal(false);
+  const [showQuestLogModal, setShowQuestLogModal] = createSignal(false);
+
   return (
     <>
       {/* Desktop Navigation */}
@@ -17,23 +23,19 @@ export function GameNavigation() {
               <Backpack size={18} style={{ "margin-right": "0.5rem" }} />
               Inventory
             </A>
-            <A href="/game/stats" class="button" activeClass="active">
-              <TrendingUp size={18} style={{ "margin-right": "0.5rem" }} />
-              Stats
-            </A>
-            <A href="/game/hotbar" class="button" activeClass="active">
-              <Grid3x3 size={18} style={{ "margin-right": "0.5rem" }} />
-              Hotbar
-            </A>
+            <button class="button" onClick={() => setShowQuestLogModal(true)}>
+              <ScrollText size={18} style={{ "margin-right": "0.5rem" }} />
+              Quest Log
+            </button>
             <A href="/game/crafting" class="button" activeClass="active">
               <Hammer size={18} style={{ "margin-right": "0.5rem" }} />
               Crafting
             </A>
+            <button class="button" onClick={() => setShowCharacterModal(true)}>
+              <User size={18} style={{ "margin-right": "0.5rem" }} />
+              Character
+            </button>
           </div>
-          <A href="/character-select" class="button secondary">
-            <User size={18} style={{ "margin-right": "0.5rem" }} />
-            Character Select
-          </A>
         </div>
       </div>
 
@@ -47,23 +49,27 @@ export function GameNavigation() {
           <Backpack size={24} />
           <span>Inventory</span>
         </A>
-        <A href="/game/stats" class="nav-item" activeClass="active">
-          <TrendingUp size={24} />
-          <span>Stats</span>
-        </A>
-        <A href="/game/hotbar" class="nav-item" activeClass="active">
-          <Grid3x3 size={24} />
-          <span>Hotbar</span>
-        </A>
+        <button class="nav-item" onClick={() => setShowQuestLogModal(true)}>
+          <ScrollText size={24} />
+          <span>Quests</span>
+        </button>
         <A href="/game/crafting" class="nav-item" activeClass="active">
           <Hammer size={24} />
           <span>Crafting</span>
         </A>
-        <A href="/character-select" class="nav-item" activeClass="active">
+        <button class="nav-item" onClick={() => setShowCharacterModal(true)}>
           <User size={24} />
           <span>Character</span>
-        </A>
+        </button>
       </nav>
+
+      {/* Modals */}
+      <Show when={showCharacterModal()}>
+        <CharacterModal onClose={() => setShowCharacterModal(false)} />
+      </Show>
+      <Show when={showQuestLogModal()}>
+        <QuestLogModal onClose={() => setShowQuestLogModal(false)} />
+      </Show>
     </>
   );
 }

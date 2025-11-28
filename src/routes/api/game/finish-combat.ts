@@ -1,6 +1,7 @@
 import { json } from '@solidjs/router';
 import type { APIEvent } from '@solidjs/start/server';
 import { db } from '~/lib/db';
+import { updateQuestProgress } from '~/lib/game';
 
 export async function POST(event: APIEvent) {
   try {
@@ -342,6 +343,29 @@ export async function POST(event: APIEvent) {
         required_wisdom: row.ability_required_wisdom || row.required_wisdom,
         required_charisma: row.ability_required_charisma || row.required_charisma,
       }));
+
+      // Update quest progress for kill objectives
+      console.log('[Quest Progress] Mob object:', mob);
+      const mobRegionId = mob.region_id || mob.current_region;
+      console.log('[Quest Progress] Checking quest progress for:', { 
+        characterId, 
+        mobId, 
+        namedMobId, 
+        mobRegionId,
+        mobName: mob.name,
+        mobHasRegionId: !!mob.region_id,
+        mobHasCurrentRegion: !!mob.current_region
+      });
+      
+      if (mobId) {
+        await updateQuestProgress(characterId, 'kill', mobId, 1, mobRegionId);
+      } else if (namedMobId) {
+        // For named mobs, update quest progress using the named mob's base mob_id if it has one
+        // Otherwise just use the namedMobId directly
+        await updateQuestProgress(characterId, 'kill', namedMobId, 1, mobRegionId);
+      }
+      
+      console.log('[Quest Progress] Quest progress updated');
 
       // Close the combat session
       await db.execute({

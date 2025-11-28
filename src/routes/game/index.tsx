@@ -78,9 +78,14 @@ export default function GamePage() {
   const [isRoaming, setIsRoaming] = createSignal(false);
   const [isTraveling, setIsTraveling] = createSignal(false);
   const [subAreas, setSubAreas] = createSignal<any[]>([]);
-  const [selectedSubArea, setSelectedSubArea] = createSignal<number | null>(null);
   const [showSubAreaModal, setShowSubAreaModal] = createSignal(false);
   const [subAreaMobs, setSubAreaMobs] = createSignal<Record<number, any[]>>({});
+  
+  // Use selectedSubArea from context
+  const selectedSubArea = () => store.currentSubArea;
+  const setSelectedSubArea = (subAreaId: number | null) => {
+    actions.setCurrentSubArea(subAreaId);
+  };
   
   // Load sub-areas when region changes
   createEffect(() => {
@@ -89,13 +94,49 @@ export default function GamePage() {
     if (currentRegion) {
       fetch(`/api/game/sub-areas?regionId=${currentRegion}`)
         .then(res => res.json())
-        .then(data => {
+        .then(async (data) => {
           setSubAreas(data.subAreas || []);
-          // Set selected sub-area to character's current sub-area or first available
-          if (currentChar?.current_sub_area) {
-            setSelectedSubArea(currentChar.current_sub_area);
-          } else if (data.subAreas && data.subAreas.length > 0) {
-            setSelectedSubArea(data.subAreas[0].id);
+          
+          // Auto-select first sub-area if none available
+          if (!data.subAreas || data.subAreas.length === 0) {
+            return;
+          }
+          
+          // Check if character's current_sub_area is valid for this region
+          const charSubArea = currentChar?.current_sub_area;
+          const isCharSubAreaValid = charSubArea && data.subAreas.some((sa: any) => sa.id === charSubArea);
+          
+          // Check if context sub-area is valid for this region
+          const contextSubArea = store.currentSubArea;
+          const isContextSubAreaValid = contextSubArea && data.subAreas.some((sa: any) => sa.id === contextSubArea);
+          
+          let selectedSubAreaId: number;
+          
+          // Priority: character's sub-area (if valid) > context sub-area (if valid) > first sub-area
+          if (isCharSubAreaValid) {
+            selectedSubAreaId = charSubArea!;
+            actions.setCurrentSubArea(charSubArea);
+          } else if (isContextSubAreaValid) {
+            selectedSubAreaId = contextSubArea!;
+            actions.setCurrentSubArea(contextSubArea);
+          } else {
+            // Auto-select first sub-area in the region
+            selectedSubAreaId = data.subAreas[0].id;
+            actions.setCurrentSubArea(selectedSubAreaId);
+            
+            // Persist auto-selection to database
+            const charId = characterId();
+            if (charId) {
+              try {
+                await fetch('/api/game/update-sub-area', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ characterId: charId, subAreaId: selectedSubAreaId })
+                });
+              } catch (err) {
+                console.error('Failed to persist auto-selected sub-area:', err);
+              }
+            }
           }
         })
         .catch(err => console.error('Failed to load sub-areas:', err));
@@ -2023,8 +2064,12 @@ export default function GamePage() {
                       onClick={() => setShowSubAreaModal(true)} 
                       style={{ width: "100%", "margin-bottom": "1rem" }}
                     >
-                      {subAreas().find((sa: any) => sa.id === selectedSubArea())?.name || "Select Area"} 
-                      {selectedSubArea() && ` (Lv. ${subAreas().find((sa: any) => sa.id === selectedSubArea())?.min_level}-${subAreas().find((sa: any) => sa.id === selectedSubArea())?.max_level})`}
+                      <Show 
+                        when={selectedSubArea() && subAreas().find((sa: any) => sa.id === selectedSubArea())}
+                        fallback="Select Area"
+                      >
+                        {(area) => `${area().name} (Lv. ${area().min_level}-${area().max_level})`}
+                      </Show>
                     </button>
                   </Show>
 
@@ -2848,9 +2893,23 @@ export default function GamePage() {
                                 cursor: "pointer",
                                 transition: "all 0.2s ease"
                               }}
-                              onClick={() => {
+                              onClick={async () => {
                                 setSelectedSubArea(subArea.id);
                                 setShowSubAreaModal(false);
+                                
+                                // Persist to database
+                                const charId = characterId();
+                                if (charId) {
+                                  try {
+                                    await fetch('/api/game/update-sub-area', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ characterId: charId, subAreaId: subArea.id })
+                                    });
+                                  } catch (err) {
+                                    console.error('Failed to persist sub-area selection:', err);
+                                  }
+                                }
                               }}
                               onMouseEnter={(e) => {
                                 if (!isCurrent) {
