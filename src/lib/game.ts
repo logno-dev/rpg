@@ -1733,7 +1733,8 @@ export async function getQuestsInRegion(regionId: number, characterId: number): 
         q.*,
         cq.status as character_status,
         cq.current_objective,
-        cq.id as character_quest_id
+        cq.id as character_quest_id,
+        cq.last_completion_at
       FROM quests q
       LEFT JOIN character_quests cq ON q.id = cq.quest_id AND cq.character_id = ?
       WHERE q.region_id = ?
@@ -1742,7 +1743,31 @@ export async function getQuestsInRegion(regionId: number, characterId: number): 
     args: [characterId, regionId],
   });
 
-  return result.rows;
+  // Fetch rewards for each quest
+  const questsWithRewards = await Promise.all(
+    result.rows.map(async (quest: any) => {
+      const rewardsResult = await db.execute({
+        sql: `
+          SELECT 
+            qr.*,
+            i.name as item_name,
+            cm.name as material_name
+          FROM quest_rewards qr
+          LEFT JOIN items i ON qr.reward_item_id = i.id
+          LEFT JOIN crafting_materials cm ON qr.reward_material_id = cm.id
+          WHERE qr.quest_id = ?
+        `,
+        args: [quest.id],
+      });
+      
+      return {
+        ...quest,
+        rewards: rewardsResult.rows,
+      };
+    })
+  );
+
+  return questsWithRewards;
 }
 
 export async function getQuestDetails(questId: number, characterId: number): Promise<any> {
@@ -1846,7 +1871,8 @@ export async function acceptQuest(characterId: number, questId: number): Promise
     }
     // If repeatable, check cooldown
     if (questData.repeatable && existing.last_completion_at) {
-      const lastCompletion = new Date(existing.last_completion_at).getTime();
+      // Parse timestamp as UTC by appending 'Z' to force UTC interpretation
+      const lastCompletion = new Date(existing.last_completion_at + 'Z').getTime();
       const now = Date.now();
       const cooldownMs = questData.cooldown_hours * 60 * 60 * 1000;
       if (now - lastCompletion < cooldownMs) {
@@ -2061,10 +2087,22 @@ export async function turnInQuest(characterId: number, questId: number): Promise
       rewardSummary.gold = r.reward_amount;
     } else if (r.reward_type === 'item') {
       await addItemToInventory(characterId, r.reward_item_id, r.reward_amount);
-      rewardSummary.items.push({ id: r.reward_item_id, quantity: r.reward_amount });
+      // Get item name
+      const itemResult = await db.execute({
+        sql: 'SELECT name FROM items WHERE id = ?',
+        args: [r.reward_item_id],
+      });
+      const itemName = itemResult.rows.length > 0 ? (itemResult.rows[0] as any).name : 'Item';
+      rewardSummary.items.push({ id: r.reward_item_id, quantity: r.reward_amount, name: itemName });
     } else if (r.reward_type === 'crafting_material') {
       await addCraftingMaterialToInventory(characterId, r.reward_material_id, r.reward_amount);
-      rewardSummary.materials.push({ id: r.reward_material_id, quantity: r.reward_amount });
+      // Get material name
+      const materialResult = await db.execute({
+        sql: 'SELECT name FROM crafting_materials WHERE id = ?',
+        args: [r.reward_material_id],
+      });
+      const materialName = materialResult.rows.length > 0 ? (materialResult.rows[0] as any).name : 'Material';
+      rewardSummary.materials.push({ id: r.reward_material_id, quantity: r.reward_amount, name: materialName });
     }
   }
 
@@ -2104,6 +2142,50 @@ export async function turnInQuest(characterId: number, questId: number): Promise
     rewards: rewardSummary,
     repeatable: isRepeatable,
   };
+}
+
+export async function abandonQuest(characterId: number, questId: number): Promise<void> {
+  // Check if character has this quest active
+  const charQuest = await db.execute({
+    sql: 'SELECT id, status FROM character_quests WHERE character_id = ? AND quest_id = ?',
+    args: [characterId, questId],
+  });
+
+  if (charQuest.rows.length === 0) {
+    throw new Error('Quest not found');
+  }
+
+  const quest = charQuest.rows[0] as any;
+  
+  if (quest.status !== 'active') {
+    throw new Error('Quest is not active');
+  }
+
+  // Delete quest objectives progress
+  await db.execute({
+    sql: 'DELETE FROM character_quest_objectives WHERE character_quest_id = ?',
+    args: [quest.id],
+  });
+
+  // Delete the character quest
+  await db.execute({
+    sql: 'DELETE FROM character_quests WHERE id = ?',
+    args: [quest.id],
+  });
+
+  // Remove any quest items from inventory
+  const questItems = await db.execute({
+    sql: `
+      SELECT cm.id
+      FROM crafting_materials cm
+      WHERE cm.is_quest_item = 1 AND cm.quest_id = ?
+    `,
+    args: [questId],
+  });
+
+  for (const item of questItems.rows) {
+    await removeCraftingMaterialFromInventory(characterId, (item as any).id, 999); // Remove all
+  }
 }
 
 async function addCraftingMaterialToInventory(characterId: number, materialId: number, quantity: number): Promise<void> {

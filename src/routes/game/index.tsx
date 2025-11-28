@@ -146,18 +146,19 @@ export default function GamePage() {
   // Load mob data when modal opens
   createEffect(() => {
     if (showSubAreaModal() && subAreas().length > 0) {
-      const mobsData: Record<number, any[]> = {};
-      Promise.all(subAreas().map((subArea: any) => 
+      // Fetch mobs for each sub-area individually and update reactively
+      subAreas().forEach((subArea: any) => {
         fetch(`/api/game/sub-area-mobs?subAreaId=${subArea.id}`)
           .then(res => res.json())
           .then(mobData => {
             console.log(`Loaded mobs for ${subArea.name}:`, mobData.mobs);
-            mobsData[subArea.id] = mobData.mobs || [];
+            // Update the signal with new data for this sub-area
+            setSubAreaMobs(prev => ({
+              ...prev,
+              [subArea.id]: mobData.mobs || []
+            }));
           })
-          .catch(err => console.error(`Failed to load mobs for sub-area ${subArea.id}:`, err))
-      )).then(() => {
-        console.log('All mob data loaded:', mobsData);
-        setSubAreaMobs(mobsData);
+          .catch(err => console.error(`Failed to load mobs for sub-area ${subArea.id}:`, err));
       });
     }
   });
@@ -2880,16 +2881,16 @@ export default function GamePage() {
                     <div style={{ display: "flex", "flex-direction": "column", gap: "1rem" }}>
                       <For each={subAreas()}>
                         {(subArea) => {
-                          const isCurrent = subArea.id === selectedSubArea();
-                          const mobs = subAreaMobs()[subArea.id] || [];
+                          const isCurrent = () => subArea.id === selectedSubArea();
+                          const mobs = () => subAreaMobs()[subArea.id] || [];
                           
                           return (
                             <div 
                               style={{ 
                                 padding: "0.875rem", 
-                                background: isCurrent ? "#6b46c1" : "var(--bg-light)", 
+                                background: isCurrent() ? "#6b46c1" : "var(--bg-light)", 
                                 "border-radius": "6px",
-                                border: isCurrent ? "2px solid #7c3aed" : "none",
+                                border: isCurrent() ? "2px solid #7c3aed" : "none",
                                 cursor: "pointer",
                                 transition: "all 0.2s ease"
                               }}
@@ -2912,12 +2913,12 @@ export default function GamePage() {
                                 }
                               }}
                               onMouseEnter={(e) => {
-                                if (!isCurrent) {
+                                if (!isCurrent()) {
                                   e.currentTarget.style.background = "var(--bg-medium)";
                                 }
                               }}
                               onMouseLeave={(e) => {
-                                if (!isCurrent) {
+                                if (!isCurrent()) {
                                   e.currentTarget.style.background = "var(--bg-light)";
                                 }
                               }}
@@ -2926,16 +2927,16 @@ export default function GamePage() {
                                 <h3 style={{ 
                                   margin: 0, 
                                   "font-size": "1.05rem",
-                                  color: isCurrent ? "#ffffff" : "var(--text)"
+                                  color: isCurrent() ? "#ffffff" : "var(--text)"
                                 }}>{subArea.name}</h3>
                                 <span style={{ 
                                   "font-size": "0.8rem", 
-                                  color: isCurrent ? "#ffffff" : "#60a5fa",
+                                  color: isCurrent() ? "#ffffff" : "#60a5fa",
                                   "font-weight": "700",
                                   padding: "0.3rem 0.6rem",
-                                  background: isCurrent ? "rgba(255, 255, 255, 0.15)" : "rgba(96, 165, 250, 0.25)",
+                                  background: isCurrent() ? "rgba(255, 255, 255, 0.15)" : "rgba(96, 165, 250, 0.25)",
                                   "border-radius": "4px",
-                                  border: isCurrent ? "1px solid rgba(255, 255, 255, 0.3)" : "1px solid rgba(96, 165, 250, 0.4)"
+                                  border: isCurrent() ? "1px solid rgba(255, 255, 255, 0.3)" : "1px solid rgba(96, 165, 250, 0.4)"
                                 }}>
                                   Lv. {subArea.min_level}-{subArea.max_level}
                                 </span>
@@ -2944,7 +2945,7 @@ export default function GamePage() {
                               <p style={{ 
                                 margin: "0 0 0.75rem 0", 
                                 "font-size": "0.875rem", 
-                                color: isCurrent ? "rgba(255, 255, 255, 0.85)" : "var(--text-secondary)" 
+                                color: isCurrent() ? "rgba(255, 255, 255, 0.85)" : "var(--text-secondary)" 
                               }}>
                                 {subArea.description}
                               </p>
@@ -2952,12 +2953,12 @@ export default function GamePage() {
                               <div style={{ 
                                 "margin-top": "0.75rem",
                                 "padding-top": "0.75rem",
-                                "border-top": isCurrent ? "1px solid rgba(255, 255, 255, 0.2)" : "1px solid var(--bg-dark)"
+                                "border-top": isCurrent() ? "1px solid rgba(255, 255, 255, 0.2)" : "1px solid var(--bg-dark)"
                               }}>
                                 <div style={{ 
                                   "font-size": "0.7rem", 
                                   "font-weight": "600",
-                                  color: isCurrent ? "rgba(255, 255, 255, 0.7)" : "var(--text-secondary)",
+                                  color: isCurrent() ? "rgba(255, 255, 255, 0.7)" : "var(--text-secondary)",
                                   "margin-bottom": "0.5rem",
                                   "text-transform": "uppercase",
                                   "letter-spacing": "0.5px"
@@ -2965,7 +2966,7 @@ export default function GamePage() {
                                   Creatures Found Here:
                                 </div>
                                 <Show 
-                                  when={mobs.length > 0}
+                                  when={mobs().length > 0}
                                   fallback={
                                     <div style={{ 
                                       "font-size": "0.8rem",
@@ -2981,23 +2982,23 @@ export default function GamePage() {
                                     "flex-wrap": "wrap", 
                                     gap: "0.5rem" 
                                   }}>
-                                    <For each={mobs}>
+                                    <For each={mobs()}>
                                       {(mob: any) => (
                                         <span style={{ 
                                           "font-size": "0.8rem",
                                           padding: "0.35rem 0.65rem",
-                                          background: isCurrent ? "rgba(0, 0, 0, 0.3)" : "var(--bg-dark)",
+                                          background: isCurrent() ? "rgba(0, 0, 0, 0.3)" : "var(--bg-dark)",
                                           "border-radius": "4px",
-                                          color: isCurrent ? "#ffffff" : "var(--text)",
+                                          color: isCurrent() ? "#ffffff" : "var(--text)",
                                           display: "inline-flex",
                                           "align-items": "center",
                                           gap: "0.5rem",
-                                          border: isCurrent ? "1px solid rgba(255, 255, 255, 0.2)" : "none"
+                                          border: isCurrent() ? "1px solid rgba(255, 255, 255, 0.2)" : "none"
                                         }}>
                                           {mob.name}
                                           <span style={{ 
                                             "font-size": "0.7rem",
-                                            color: isCurrent ? "rgba(255, 255, 255, 0.7)" : "#94a3b8",
+                                            color: isCurrent() ? "rgba(255, 255, 255, 0.7)" : "#94a3b8",
                                             "font-weight": "600"
                                           }}>
                                             Lv. {Math.max(1, mob.level - (mob.level_variance || 1))}-{mob.level + (mob.level_variance || 1)}

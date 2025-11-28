@@ -203,20 +203,24 @@ export async function POST(event: APIEvent) {
                 sql: 'UPDATE character_crafting_materials SET quantity = quantity + ? WHERE character_id = ? AND material_id = ?',
                 args: [quantity, characterId, material.id],
               });
-            } else {
-              // Add new material
-              await db.execute({
-                sql: 'INSERT INTO character_crafting_materials (character_id, material_id, quantity) VALUES (?, ?, ?)',
-                args: [characterId, material.id, quantity],
-              });
-            }
-            
-            loot.push({ 
-              name: material.name, 
-              quantity, 
-              rarity: material.rarity,
-              type: 'crafting_material'
-            });
+             } else {
+               // Add new material
+               await db.execute({
+                 sql: 'INSERT INTO character_crafting_materials (character_id, material_id, quantity) VALUES (?, ?, ?)',
+                 args: [characterId, material.id, quantity],
+               });
+             }
+             
+             loot.push({ 
+               name: material.name, 
+               quantity, 
+               rarity: material.rarity,
+               type: 'crafting_material'
+             });
+             
+             // Update quest progress for collect objectives
+             console.log('[Quest Progress] Checking collect quest for material:', material.id, material.name);
+             await updateQuestProgress(characterId, 'collect', material.id, quantity);
           }
         }
       }
@@ -253,20 +257,24 @@ export async function POST(event: APIEvent) {
                 sql: 'UPDATE character_crafting_materials SET quantity = quantity + ? WHERE character_id = ? AND material_id = ?',
                 args: [quantity, characterId, material.id],
               });
-            } else {
-              // Add new material
-              await db.execute({
-                sql: 'INSERT INTO character_crafting_materials (character_id, material_id, quantity) VALUES (?, ?, ?)',
-                args: [characterId, material.id, quantity],
-              });
-            }
-            
-            loot.push({ 
-              name: material.name, 
-              quantity, 
-              rarity: material.rarity,
-              type: 'crafting_material'
-            });
+             } else {
+               // Add new material
+               await db.execute({
+                 sql: 'INSERT INTO character_crafting_materials (character_id, material_id, quantity) VALUES (?, ?, ?)',
+                 args: [characterId, material.id, quantity],
+               });
+             }
+             
+             loot.push({ 
+               name: material.name, 
+               quantity, 
+               rarity: material.rarity,
+               type: 'crafting_material'
+             });
+             
+             // Update quest progress for collect objectives
+             console.log('[Quest Progress] Checking collect quest for material:', material.id, material.name);
+             await updateQuestProgress(characterId, 'collect', material.id, quantity);
           }
         }
       }
