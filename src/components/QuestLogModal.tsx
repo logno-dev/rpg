@@ -453,7 +453,12 @@ export function QuestLogModal(props: QuestLogModalProps) {
                           e.currentTarget.style.borderColor = "var(--border)";
                         }}
                       >
-                          <div style={{ display: "flex", "justify-content": "space-between", "align-items": "start", "margin-bottom": "1rem" }}>
+                          <div style={{ 
+                            display: "flex", 
+                            "flex-direction": "column",
+                            gap: "1rem",
+                            "margin-bottom": "1rem"
+                          }}>
                           <div style={{ flex: 1 }}>
                             <div style={{ display: "flex", "align-items": "center", gap: "0.5rem", "margin-bottom": "0.5rem" }}>
                               <h3 style={{ margin: 0, color: "var(--accent)" }}>{quest.name}</h3>
@@ -526,7 +531,11 @@ export function QuestLogModal(props: QuestLogModalProps) {
                           </div>
                           <button 
                             class="button"
-                            style={{ "white-space": "nowrap", "font-size": "0.875rem" }}
+                            style={{ 
+                              "white-space": "nowrap", 
+                              "font-size": "0.875rem",
+                              width: "100%"
+                            }}
                             disabled={cooldownRemaining > 0}
                             onClick={async () => {
                               try {
