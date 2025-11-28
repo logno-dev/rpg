@@ -32,6 +32,7 @@ export type Character = {
   current_mana: number;
   gold: number;
   current_region: number;
+  current_sub_area: number | null;
   created_at: number;
   updated_at: number;
 };
@@ -159,6 +160,24 @@ export type Region = {
   locked: number;
   unlock_requirement: string | null;
   created_at: number;
+};
+
+export type SubArea = {
+  id: number;
+  region_id: number;
+  name: string;
+  description: string | null;
+  min_level: number;
+  max_level: number;
+  created_at: number;
+};
+
+export type SubAreaMob = {
+  id: number;
+  sub_area_id: number;
+  mob_id: number;
+  spawn_weight: number;
+  level_variance: number;
 };
 
 export type Merchant = {

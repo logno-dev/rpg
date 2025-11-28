@@ -51,6 +51,27 @@ async function getTotalStats(characterId: number): Promise<{ constitution: numbe
   };
 }
 
+// Scale mob stats based on level variance
+export function scaleMobStats(baseMob: Mob, levelVariance: number): Mob {
+  if (levelVariance === 0) return baseMob;
+  
+  // Ensure new level is at least 1
+  const newLevel = Math.max(1, baseMob.level + levelVariance);
+  const scaleFactor = newLevel / baseMob.level;
+  
+  return {
+    ...baseMob,
+    level: newLevel,
+    max_health: Math.round(baseMob.max_health * scaleFactor),
+    damage_min: Math.round(baseMob.damage_min * scaleFactor),
+    damage_max: Math.round(baseMob.damage_max * scaleFactor),
+    defense: Math.round(baseMob.defense * scaleFactor),
+    experience_reward: Math.round(baseMob.experience_reward * scaleFactor),
+    gold_min: Math.round(baseMob.gold_min * scaleFactor),
+    gold_max: Math.round(baseMob.gold_max * scaleFactor),
+  };
+}
+
 // Character Management
 export async function createCharacter(
   userId: number,
@@ -1155,6 +1176,72 @@ export async function getRegion(regionId: number): Promise<Region | null> {
   return result.rows[0] as Region | null;
 }
 
+// Sub-Areas
+export async function getSubAreasInRegion(regionId: number): Promise<any[]> {
+  const result = await db.execute({
+    sql: 'SELECT * FROM sub_areas WHERE region_id = ? ORDER BY min_level',
+    args: [regionId],
+  });
+
+  return result.rows as any[];
+}
+
+export async function setCharacterSubArea(characterId: number, subAreaId: number | null): Promise<void> {
+  await db.execute({
+    sql: 'UPDATE characters SET current_sub_area = ? WHERE id = ?',
+    args: [subAreaId, characterId],
+  });
+}
+
+export async function getRandomMobFromSubArea(subAreaId: number): Promise<Mob | null> {
+  // Get all mobs from this sub-area with their spawn weights and level variance
+  const result = await db.execute({
+    sql: `SELECT mobs.*, sub_area_mobs.spawn_weight, sub_area_mobs.level_variance
+          FROM sub_area_mobs
+          JOIN mobs ON sub_area_mobs.mob_id = mobs.id
+          WHERE sub_area_mobs.sub_area_id = ?`,
+    args: [subAreaId],
+  });
+
+  if (result.rows.length === 0) return null;
+
+  // Weighted random selection
+  const mobsWithWeights = result.rows as any[];
+  const totalWeight = mobsWithWeights.reduce((sum: number, mob: any) => sum + mob.spawn_weight, 0);
+  let random = Math.random() * totalWeight;
+
+  for (const mobData of mobsWithWeights) {
+    random -= mobData.spawn_weight;
+    if (random <= 0) {
+      // Apply level variance
+      const variance = mobData.level_variance || 1;
+      const levelAdjustment = Math.floor(Math.random() * (variance * 2 + 1)) - variance; // Range: -variance to +variance
+      
+      // Create base mob without variance properties
+      const baseMob: Mob = {
+        id: mobData.id,
+        name: mobData.name,
+        level: mobData.level,
+        area: mobData.area,
+        max_health: mobData.max_health,
+        damage_min: mobData.damage_min,
+        damage_max: mobData.damage_max,
+        defense: mobData.defense,
+        attack_speed: mobData.attack_speed,
+        evasiveness: mobData.evasiveness,
+        experience_reward: mobData.experience_reward,
+        gold_min: mobData.gold_min,
+        gold_max: mobData.gold_max,
+        aggressive: mobData.aggressive,
+        created_at: mobData.created_at,
+      };
+      
+      return scaleMobStats(baseMob, levelAdjustment);
+    }
+  }
+
+  return null;
+}
 
 // Abilities
 export async function getCharacterAbilities(characterId: number): Promise<any[]> {

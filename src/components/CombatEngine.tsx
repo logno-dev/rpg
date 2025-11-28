@@ -463,11 +463,18 @@ export function CombatEngine(props: CombatEngineProps) {
     damageMin: number,
     damageMax: number,
     attackerStrength: number,
+    attackerLevel: number,
     defenderArmor: number
   ): number => {
     const baseDamage = Math.floor(Math.random() * (damageMax - damageMin + 1)) + damageMin;
     const strengthBonus = Math.floor((attackerStrength - 10) / 2);
-    const totalDamage = Math.max(1, baseDamage + strengthBonus - defenderArmor);
+    const rawDamage = baseDamage + strengthBonus;
+    
+    // Level-scaled armor: armor / (armor + 10 * attackerLevel)
+    const armorEffectiveness = defenderArmor / (defenderArmor + 10 * attackerLevel);
+    const damageReduction = rawDamage * armorEffectiveness;
+    const totalDamage = Math.max(1, Math.floor(rawDamage - damageReduction));
+    
     return totalDamage;
   };
 
@@ -822,6 +829,7 @@ export function CombatEngine(props: CombatEngineProps) {
               props.equippedWeapon?.damage_min || 1,
               props.equippedWeapon?.damage_max || 3,
               getActualStrength(),
+              props.character.level,
               props.mob.defense
             );
 
@@ -868,6 +876,7 @@ export function CombatEngine(props: CombatEngineProps) {
               props.mob.damage_min,
               props.mob.damage_max,
               10,
+              props.mob.level,
               totalArmor
             );
 

@@ -77,6 +77,49 @@ export default function GamePage() {
   const [combatLog, setCombatLog] = createSignal<string[]>([]);
   const [isRoaming, setIsRoaming] = createSignal(false);
   const [isTraveling, setIsTraveling] = createSignal(false);
+  const [subAreas, setSubAreas] = createSignal<any[]>([]);
+  const [selectedSubArea, setSelectedSubArea] = createSignal<number | null>(null);
+  const [showSubAreaModal, setShowSubAreaModal] = createSignal(false);
+  const [subAreaMobs, setSubAreaMobs] = createSignal<Record<number, any[]>>({});
+  
+  // Load sub-areas when region changes
+  createEffect(() => {
+    const currentRegion = store.currentRegion?.id;
+    const currentChar = store.character;
+    if (currentRegion) {
+      fetch(`/api/game/sub-areas?regionId=${currentRegion}`)
+        .then(res => res.json())
+        .then(data => {
+          setSubAreas(data.subAreas || []);
+          // Set selected sub-area to character's current sub-area or first available
+          if (currentChar?.current_sub_area) {
+            setSelectedSubArea(currentChar.current_sub_area);
+          } else if (data.subAreas && data.subAreas.length > 0) {
+            setSelectedSubArea(data.subAreas[0].id);
+          }
+        })
+        .catch(err => console.error('Failed to load sub-areas:', err));
+    }
+  });
+  
+  // Load mob data when modal opens
+  createEffect(() => {
+    if (showSubAreaModal() && subAreas().length > 0) {
+      const mobsData: Record<number, any[]> = {};
+      Promise.all(subAreas().map((subArea: any) => 
+        fetch(`/api/game/sub-area-mobs?subAreaId=${subArea.id}`)
+          .then(res => res.json())
+          .then(mobData => {
+            console.log(`Loaded mobs for ${subArea.name}:`, mobData.mobs);
+            mobsData[subArea.id] = mobData.mobs || [];
+          })
+          .catch(err => console.error(`Failed to load mobs for sub-area ${subArea.id}:`, err))
+      )).then(() => {
+        console.log('All mob data loaded:', mobsData);
+        setSubAreaMobs(mobsData);
+      });
+    }
+  });
   
   // Track enemy health for sticky header
   const [enemyCurrentHealth, setEnemyCurrentHealth] = createSignal(0);
@@ -584,7 +627,10 @@ export default function GamePage() {
       const response = await fetch('/api/game/roam', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ characterId: characterId() }),
+        body: JSON.stringify({ 
+          characterId: characterId(),
+          subAreaId: selectedSubArea()
+        }),
       });
 
       const result = await response.json();
@@ -1971,8 +2017,19 @@ export default function GamePage() {
                     )}
                   </Show>
 
+                  <Show when={subAreas().length > 0}>
+                    <button 
+                      class="button secondary" 
+                      onClick={() => setShowSubAreaModal(true)} 
+                      style={{ width: "100%", "margin-bottom": "1rem" }}
+                    >
+                      {subAreas().find((sa: any) => sa.id === selectedSubArea())?.name || "Select Area"} 
+                      {selectedSubArea() && ` (Lv. ${subAreas().find((sa: any) => sa.id === selectedSubArea())?.min_level}-${subAreas().find((sa: any) => sa.id === selectedSubArea())?.max_level})`}
+                    </button>
+                  </Show>
+
                   <div style={{ display: "grid", "grid-template-columns": "1fr 1fr", gap: "1rem" }}>
-                    <button class="button" onClick={handleRoam} disabled={isRoaming()} style={{ width: "100%" }}>
+                    <button class="button" onClick={handleRoam} disabled={isRoaming() || (subAreas().length > 0 && !selectedSubArea())} style={{ width: "100%" }}>
                       {isRoaming() ? "Roaming..." : "Roam Area"}
                     </button>
                     <button class="button secondary" onClick={() => setShowTravelModal(true)} style={{ width: "100%" }}>
@@ -2692,6 +2749,211 @@ export default function GamePage() {
                     >
                       Continue Dungeon →
                     </button>
+                  </div>
+                </div>
+              </div>
+            </Show>
+
+            {/* Sub-Area Selection Modal */}
+            <Show when={showSubAreaModal()}>
+              <div 
+                style={{ 
+                  position: "fixed", 
+                  top: 0, 
+                  left: 0, 
+                  right: 0, 
+                  bottom: 0, 
+                  background: "rgba(0, 0, 0, 0.85)", 
+                  display: "flex", 
+                  "align-items": "center", 
+                  "justify-content": "center",
+                  "z-index": 1000,
+                  padding: "1rem"
+                }}
+                onClick={() => setShowSubAreaModal(false)}
+              >
+                <div 
+                  class="card"
+                  style={{ 
+                    "max-width": "700px",
+                    width: "100%",
+                    "max-height": "calc(100vh - 6rem)",
+                    display: "flex",
+                    "flex-direction": "column",
+                    overflow: "hidden"
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div style={{ 
+                    position: "relative",
+                    padding: "1rem 1rem 0.75rem 1rem",
+                    "border-bottom": "2px solid var(--bg-light)",
+                    "flex-shrink": 0,
+                    background: "var(--bg-dark)"
+                  }}>
+                    <button
+                      style={{
+                        position: "absolute",
+                        top: "0.75rem",
+                        right: "0.75rem",
+                        width: "32px",
+                        height: "32px",
+                        "border-radius": "50%",
+                        background: "var(--bg-light)",
+                        border: "1px solid var(--text-secondary)",
+                        color: "var(--text)",
+                        display: "flex",
+                        "align-items": "center",
+                        "justify-content": "center",
+                        cursor: "pointer",
+                        "font-size": "1.25rem",
+                        "line-height": "1",
+                        padding: "0",
+                        transition: "all 0.2s ease"
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "var(--danger)";
+                        e.currentTarget.style.borderColor = "var(--danger)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "var(--bg-light)";
+                        e.currentTarget.style.borderColor = "var(--text-secondary)";
+                      }}
+                      onClick={() => setShowSubAreaModal(false)}
+                    >
+                      ✕
+                    </button>
+                    
+                    <h2 style={{ margin: 0, "padding-right": "2.5rem", "font-size": "1.25rem" }}>Select Hunting Area</h2>
+                  </div>
+
+                  <div style={{ 
+                    "overflow-y": "auto",
+                    padding: "1rem",
+                    flex: "1"
+                  }}>
+                    <div style={{ display: "flex", "flex-direction": "column", gap: "1rem" }}>
+                      <For each={subAreas()}>
+                        {(subArea) => {
+                          const isCurrent = subArea.id === selectedSubArea();
+                          const mobs = subAreaMobs()[subArea.id] || [];
+                          
+                          return (
+                            <div 
+                              style={{ 
+                                padding: "0.875rem", 
+                                background: isCurrent ? "#6b46c1" : "var(--bg-light)", 
+                                "border-radius": "6px",
+                                border: isCurrent ? "2px solid #7c3aed" : "none",
+                                cursor: "pointer",
+                                transition: "all 0.2s ease"
+                              }}
+                              onClick={() => {
+                                setSelectedSubArea(subArea.id);
+                                setShowSubAreaModal(false);
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isCurrent) {
+                                  e.currentTarget.style.background = "var(--bg-medium)";
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isCurrent) {
+                                  e.currentTarget.style.background = "var(--bg-light)";
+                                }
+                              }}
+                            >
+                              <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center", "margin-bottom": "0.5rem" }}>
+                                <h3 style={{ 
+                                  margin: 0, 
+                                  "font-size": "1.05rem",
+                                  color: isCurrent ? "#ffffff" : "var(--text)"
+                                }}>{subArea.name}</h3>
+                                <span style={{ 
+                                  "font-size": "0.8rem", 
+                                  color: isCurrent ? "#ffffff" : "#60a5fa",
+                                  "font-weight": "700",
+                                  padding: "0.3rem 0.6rem",
+                                  background: isCurrent ? "rgba(255, 255, 255, 0.15)" : "rgba(96, 165, 250, 0.25)",
+                                  "border-radius": "4px",
+                                  border: isCurrent ? "1px solid rgba(255, 255, 255, 0.3)" : "1px solid rgba(96, 165, 250, 0.4)"
+                                }}>
+                                  Lv. {subArea.min_level}-{subArea.max_level}
+                                </span>
+                              </div>
+                              
+                              <p style={{ 
+                                margin: "0 0 0.75rem 0", 
+                                "font-size": "0.875rem", 
+                                color: isCurrent ? "rgba(255, 255, 255, 0.85)" : "var(--text-secondary)" 
+                              }}>
+                                {subArea.description}
+                              </p>
+                              
+                              <div style={{ 
+                                "margin-top": "0.75rem",
+                                "padding-top": "0.75rem",
+                                "border-top": isCurrent ? "1px solid rgba(255, 255, 255, 0.2)" : "1px solid var(--bg-dark)"
+                              }}>
+                                <div style={{ 
+                                  "font-size": "0.7rem", 
+                                  "font-weight": "600",
+                                  color: isCurrent ? "rgba(255, 255, 255, 0.7)" : "var(--text-secondary)",
+                                  "margin-bottom": "0.5rem",
+                                  "text-transform": "uppercase",
+                                  "letter-spacing": "0.5px"
+                                }}>
+                                  Creatures Found Here:
+                                </div>
+                                <Show 
+                                  when={mobs.length > 0}
+                                  fallback={
+                                    <div style={{ 
+                                      "font-size": "0.8rem",
+                                      color: "var(--text-secondary)",
+                                      "font-style": "italic"
+                                    }}>
+                                      Loading creatures...
+                                    </div>
+                                  }
+                                >
+                                  <div style={{ 
+                                    display: "flex", 
+                                    "flex-wrap": "wrap", 
+                                    gap: "0.5rem" 
+                                  }}>
+                                    <For each={mobs}>
+                                      {(mob: any) => (
+                                        <span style={{ 
+                                          "font-size": "0.8rem",
+                                          padding: "0.35rem 0.65rem",
+                                          background: isCurrent ? "rgba(0, 0, 0, 0.3)" : "var(--bg-dark)",
+                                          "border-radius": "4px",
+                                          color: isCurrent ? "#ffffff" : "var(--text)",
+                                          display: "inline-flex",
+                                          "align-items": "center",
+                                          gap: "0.5rem",
+                                          border: isCurrent ? "1px solid rgba(255, 255, 255, 0.2)" : "none"
+                                        }}>
+                                          {mob.name}
+                                          <span style={{ 
+                                            "font-size": "0.7rem",
+                                            color: isCurrent ? "rgba(255, 255, 255, 0.7)" : "#94a3b8",
+                                            "font-weight": "600"
+                                          }}>
+                                            Lv. {Math.max(1, mob.level - (mob.level_variance || 1))}-{mob.level + (mob.level_variance || 1)}
+                                          </span>
+                                        </span>
+                                      )}
+                                    </For>
+                                  </div>
+                                </Show>
+                              </div>
+                            </div>
+                          );
+                        }}
+                      </For>
+                    </div>
                   </div>
                 </div>
               </div>
