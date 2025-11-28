@@ -87,6 +87,17 @@ export default function GamePage() {
     actions.setCurrentSubArea(subAreaId);
   };
   
+  // Create a memo for the current sub-area object
+  const currentSubAreaObject = createMemo(() => {
+    const id = selectedSubArea();
+    const areas = subAreas();
+    console.log('[DEBUG] currentSubAreaObject recomputing:', { id, areasCount: areas.length });
+    if (!id) return null;
+    const found = areas.find((sa: any) => sa.id === id) || null;
+    console.log('[DEBUG] currentSubAreaObject result:', found);
+    return found;
+  });
+  
   // Load sub-areas when region changes
   createEffect(() => {
     const currentRegion = store.currentRegion?.id;
@@ -2065,12 +2076,11 @@ export default function GamePage() {
                       onClick={() => setShowSubAreaModal(true)} 
                       style={{ width: "100%", "margin-bottom": "1rem" }}
                     >
-                      <Show 
-                        when={selectedSubArea() && subAreas().find((sa: any) => sa.id === selectedSubArea())}
-                        fallback="Select Area"
-                      >
-                        {(area) => `${area().name} (Lv. ${area().min_level}-${area().max_level})`}
-                      </Show>
+                      {(() => {
+                        const area = currentSubAreaObject();
+                        if (!area) return "Select Area";
+                        return `${area.name} (Lv. ${area.min_level}-${area.max_level})`;
+                      })()}
                     </button>
                   </Show>
 
@@ -2895,7 +2905,10 @@ export default function GamePage() {
                                 transition: "all 0.2s ease"
                               }}
                               onClick={async () => {
+                                console.log('[DEBUG] Selecting sub-area:', subArea.id, subArea.name);
+                                console.log('[DEBUG] Before update - selectedSubArea():', selectedSubArea());
                                 setSelectedSubArea(subArea.id);
+                                console.log('[DEBUG] After update - selectedSubArea():', selectedSubArea());
                                 setShowSubAreaModal(false);
                                 
                                 // Persist to database
