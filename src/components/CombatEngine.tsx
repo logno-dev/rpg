@@ -38,6 +38,7 @@ type CombatEngineProps = {
   character: Character;
   mob: Mob;
   equippedWeapon?: Item;
+  equippedOffhand?: Item;
   equippedArmor: Item[];
   currentHealth: number; // External health state (from potions, etc.)
   currentMana: number; // External mana state
@@ -495,6 +496,28 @@ export function CombatEngine(props: CombatEngineProps) {
     const cooldownRemaining = abilityCooldowns().get(ability.id) || 0;
     if (cooldownRemaining > 0) {
       return { canUse: false, reason: `${cooldownRemaining.toFixed(1)}s` };
+    }
+    
+    // Check weapon type requirement
+    if ((ability as any).weapon_type_requirement) {
+      const requiredTypes = (ability as any).weapon_type_requirement.split(',');
+      const equippedType = (props.equippedWeapon as any)?.weapon_type;
+      
+      if (!equippedType || !requiredTypes.includes(equippedType)) {
+        const typesList = requiredTypes.join(' or ');
+        return { canUse: false, reason: `Requires ${typesList}` };
+      }
+    }
+    
+    // Check offhand type requirement
+    if ((ability as any).offhand_type_requirement) {
+      const requiredTypes = (ability as any).offhand_type_requirement.split(',');
+      const equippedType = (props.equippedOffhand as any)?.offhand_type;
+      
+      if (!equippedType || !requiredTypes.includes(equippedType)) {
+        const typesList = requiredTypes.join(' or ');
+        return { canUse: false, reason: `Requires ${typesList} (offhand)` };
+      }
     }
     
     return { canUse: true };

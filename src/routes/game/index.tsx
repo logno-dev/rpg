@@ -459,6 +459,10 @@ export default function GamePage() {
     return data()?.inventory.find((i: any) => i.slot === 'weapon' && i.equipped);
   };
 
+  const equippedOffhand = () => {
+    return data()?.inventory.find((i: any) => i.slot === 'offhand' && i.equipped);
+  };
+
   const equippedArmor = () => {
     // Return all equipped armor pieces as an array
     return data()?.inventory.filter((i: any) => i.equipped && i.armor > 0) || [];
@@ -2006,6 +2010,7 @@ export default function GamePage() {
                   character={data()!.character}
                   mob={activeMob()!}
                   equippedWeapon={equippedWeapon()}
+                  equippedOffhand={equippedOffhand()}
                   equippedArmor={equippedArmor()}
                   currentHealth={currentHealth()}
                   currentMana={currentMana()}

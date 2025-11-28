@@ -985,6 +985,8 @@ export default function GMPage() {
                         <th style={{ padding: "0.5rem", "text-align": "right" }}>Mana</th>
                         <th style={{ padding: "0.5rem", "text-align": "right" }}>Cooldown</th>
                         <th style={{ padding: "0.5rem", "text-align": "center" }}>Primary Stat</th>
+                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Weapon Req</th>
+                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Offhand Req</th>
                         <th style={{ padding: "0.5rem", "text-align": "center" }}>Actions</th>
                       </tr>
                     </thead>
@@ -1007,6 +1009,46 @@ export default function GMPage() {
                             <td style={{ padding: "0.5rem", "text-align": "right" }}>{ability.mana_cost || 0}</td>
                             <td style={{ padding: "0.5rem", "text-align": "right" }}>{ability.cooldown}s</td>
                             <td style={{ padding: "0.5rem", "text-align": "center" }}>{ability.primary_stat || "-"}</td>
+                            <td style={{ padding: "0.5rem", "text-align": "center", "font-size": "0.85rem" }}>
+                              {ability.weapon_type_requirement ? (
+                                <div style={{ display: "flex", "flex-wrap": "wrap", gap: "0.25rem", "justify-content": "center" }}>
+                                  <For each={ability.weapon_type_requirement.split(',')}>
+                                    {(type: string) => (
+                                      <span style={{ 
+                                        padding: "0.2rem 0.4rem", 
+                                        background: "var(--accent)", 
+                                        "border-radius": "4px",
+                                        color: "var(--bg-dark)",
+                                        "font-weight": "600",
+                                        "white-space": "nowrap"
+                                      }}>
+                                        {type}
+                                      </span>
+                                    )}
+                                  </For>
+                                </div>
+                              ) : "-"}
+                            </td>
+                            <td style={{ padding: "0.5rem", "text-align": "center", "font-size": "0.85rem" }}>
+                              {ability.offhand_type_requirement ? (
+                                <div style={{ display: "flex", "flex-wrap": "wrap", gap: "0.25rem", "justify-content": "center" }}>
+                                  <For each={ability.offhand_type_requirement.split(',')}>
+                                    {(type: string) => (
+                                      <span style={{ 
+                                        padding: "0.2rem 0.4rem", 
+                                        background: "var(--success)", 
+                                        "border-radius": "4px",
+                                        color: "var(--bg-dark)",
+                                        "font-weight": "600",
+                                        "white-space": "nowrap"
+                                      }}>
+                                        {type}
+                                      </span>
+                                    )}
+                                  </For>
+                                </div>
+                              ) : "-"}
+                            </td>
                             <td style={{ padding: "0.5rem", "text-align": "center" }}>
                               <button 
                                 class="button secondary" 
@@ -2144,6 +2186,65 @@ export default function GMPage() {
                   <label>Required CHA</label>
                   <input type="number" min="0" value={editingAbility()?.required_charisma ?? 0} 
                          onInput={(e) => setEditingAbility({...editingAbility()!, required_charisma: parseInt(e.currentTarget.value)})} />
+                </div>
+                
+                <div style={{ "grid-column": "1 / -1", "margin-top": "0.5rem" }}>
+                  <h3 style={{ "font-size": "1rem", "margin-bottom": "0.5rem", color: "var(--accent)" }}>Equipment Requirements</h3>
+                  <p style={{ "font-size": "0.875rem", color: "var(--text-secondary)", margin: "0 0 0.5rem 0" }}>
+                    Hold Ctrl/Cmd to select multiple weapon or offhand types
+                  </p>
+                </div>
+                
+                <div>
+                  <label>Weapon Types Required</label>
+                  <select 
+                    multiple 
+                    size="6"
+                    value={editingAbility()?.weapon_type_requirement?.split(',').filter(Boolean) || []} 
+                    onChange={(e) => {
+                      const selected = Array.from(e.currentTarget.selectedOptions).map(opt => opt.value);
+                      setEditingAbility({...editingAbility()!, weapon_type_requirement: selected.length > 0 ? selected.join(',') : null});
+                    }}
+                    style={{ width: "100%", padding: "0.5rem" }}
+                  >
+                    <option value="sword">Sword</option>
+                    <option value="greatsword">Greatsword</option>
+                    <option value="axe">Axe</option>
+                    <option value="greataxe">Greataxe</option>
+                    <option value="mace">Mace</option>
+                    <option value="dagger">Dagger</option>
+                    <option value="bow">Bow</option>
+                    <option value="wand">Wand</option>
+                    <option value="staff">Staff (2H)</option>
+                    <option value="polearm">Polearm</option>
+                  </select>
+                  <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "margin-top": "0.25rem" }}>
+                    Selected: {editingAbility()?.weapon_type_requirement || 'None (Any Weapon)'}
+                  </div>
+                </div>
+                
+                <div>
+                  <label>Offhand Types Required</label>
+                  <select 
+                    multiple 
+                    size="6"
+                    value={editingAbility()?.offhand_type_requirement?.split(',').filter(Boolean) || []} 
+                    onChange={(e) => {
+                      const selected = Array.from(e.currentTarget.selectedOptions).map(opt => opt.value);
+                      setEditingAbility({...editingAbility()!, offhand_type_requirement: selected.length > 0 ? selected.join(',') : null});
+                    }}
+                    style={{ width: "100%", padding: "0.5rem" }}
+                  >
+                    <option value="shield">Shield</option>
+                    <option value="orb">Orb</option>
+                    <option value="tome">Tome</option>
+                    <option value="focus">Focus</option>
+                    <option value="quiver">Quiver</option>
+                    <option value="dagger">Dagger (Offhand)</option>
+                  </select>
+                  <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "margin-top": "0.25rem" }}>
+                    Selected: {editingAbility()?.offhand_type_requirement || 'None (No Requirement)'}
+                  </div>
                 </div>
               </div>
               <div style={{ display: "flex", gap: "1rem", "margin-top": "1.5rem" }}>
