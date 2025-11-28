@@ -2366,6 +2366,7 @@ export default function GMPage() {
                         <option value="intelligence">Intelligence</option>
                         <option value="wisdom">Wisdom</option>
                         <option value="charisma">Charisma</option>
+                        <option value="evasiveness">Evasiveness</option>
                         <option value="armor">Armor</option>
                         <option value="damage">Damage</option>
                         <option value="thorns">Thorns (Reflect Damage)</option>

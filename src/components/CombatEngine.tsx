@@ -230,6 +230,26 @@ export function CombatEngine(props: CombatEngineProps) {
     
     return totalCharisma;
   };
+
+  const getActualEvasiveness = () => {
+    let totalEvasiveness = props.character.evasiveness || 10;
+    
+    // Add active effect bonuses (from abilities like Dodge)
+    const effectBonus = effectsActions.getTotalStatBonus('evasiveness');
+    totalEvasiveness += effectBonus;
+    
+    return totalEvasiveness;
+  };
+
+  const getMobEvasiveness = () => {
+    let totalEvasiveness = props.mob.evasiveness || 10;
+    
+    // Could add debuff effects here in the future
+    // const effectBonus = effectsActions.getTotalStatBonus('mob_evasiveness');
+    // totalEvasiveness += effectBonus;
+    
+    return totalEvasiveness;
+  };
   
   // Calculate attack speed in ticks
   const calculateAttackTicks = (baseSpeed: number, dexterity: number): number => {
@@ -417,6 +437,26 @@ export function CombatEngine(props: CombatEngineProps) {
     // If user scrolls to bottom, resume auto-scroll
     // If user scrolls up, disable auto-scroll
     setUserScrolledUp(!isAtBottom);
+  };
+
+  const calculateHitChance = (
+    attackerLevel: number,
+    defenderLevel: number,
+    defenderEvasiveness: number
+  ): number => {
+    // Base hit chance: 95%
+    let hitChance = 95;
+    
+    // Level difference: +/- 2% per level
+    const levelDiff = defenderLevel - attackerLevel;
+    hitChance -= levelDiff * 2;
+    
+    // Evasiveness: +2% dodge per point above 10
+    const evasivenessDiff = defenderEvasiveness - 10;
+    hitChance -= evasivenessDiff * 2;
+    
+    // Cap between 5% and 99%
+    return Math.max(5, Math.min(99, hitChance));
   };
 
   const calculateDamage = (
@@ -762,29 +802,45 @@ export function CombatEngine(props: CombatEngineProps) {
           const weaponDamageMin = props.equippedWeapon?.damage_min || 1;
           const weaponDamageMax = props.equippedWeapon?.damage_max || 3;
           
-          const damage = calculateDamage(
-            props.equippedWeapon?.damage_min || 1,
-            props.equippedWeapon?.damage_max || 3,
-            getActualStrength(),
-            props.mob.defense
+          // Calculate hit chance
+          const hitChance = calculateHitChance(
+            props.character.level,
+            props.mob.level,
+            getMobEvasiveness()
           );
-
-          const newMobHealth = Math.max(0, currentState.mobHealth - damage);
+          const hitRoll = Math.random() * 100;
+          const didHit = hitRoll <= hitChance;
+          
           const weaponSpeed = props.equippedWeapon?.attack_speed || 1.0;
           const nextAttackTicks = calculateAttackTicks(weaponSpeed, getActualDexterity());
-
-          newState.mobHealth = newMobHealth;
-          newState.log = [...currentState.log, `You attack for ${damage} damage!`];
+          
           newState.characterTicks = 0;
           newState.characterAttackTicks = nextAttackTicks;
+          
+          if (didHit) {
+            const damage = calculateDamage(
+              props.equippedWeapon?.damage_min || 1,
+              props.equippedWeapon?.damage_max || 3,
+              getActualStrength(),
+              props.mob.defense
+            );
 
-          if (newMobHealth <= 0) {
-            newState.isActive = false;
-            newState.result = 'victory';
-            newState.log = [...newState.log, `Victory! You defeated ${props.mob.name}!`];
-            setTimeout(() => props.onCombatEnd('victory', newState), 0);
-            clearInterval(intervalId);
-            return newState;
+            const newMobHealth = Math.max(0, currentState.mobHealth - damage);
+
+            newState.mobHealth = newMobHealth;
+            newState.log = [...currentState.log, `You attack for ${damage} damage!`];
+
+            if (newMobHealth <= 0) {
+              newState.isActive = false;
+              newState.result = 'victory';
+              newState.log = [...newState.log, `Victory! You defeated ${props.mob.name}!`];
+              setTimeout(() => props.onCombatEnd('victory', newState), 0);
+              clearInterval(intervalId);
+              return newState;
+            }
+          } else {
+            // Attack missed
+            newState.log = [...currentState.log, `Your attack missed!`];
           }
         } else {
           newState.characterTicks = newCharTicks;
@@ -792,56 +848,71 @@ export function CombatEngine(props: CombatEngineProps) {
 
         // Check if mob should attack
         if (newMobTicks >= currentState.mobAttackTicks) {
-          const totalArmor = getTotalArmor();
-          
-          const damage = calculateDamage(
-            props.mob.damage_min,
-            props.mob.damage_max,
-            10,
-            totalArmor
+          // Calculate hit chance
+          const hitChance = calculateHitChance(
+            props.mob.level,
+            props.character.level,
+            getActualEvasiveness()
           );
-
-          const newCharHealth = Math.max(0, currentState.characterHealth - damage);
+          const hitRoll = Math.random() * 100;
+          const didHit = hitRoll <= hitChance;
+          
           const nextAttackTicks = calculateAttackTicks(props.mob.attack_speed, 10);
-
-          newState.characterHealth = newCharHealth;
-          newState.log = [...newState.log, `${props.mob.name} attacks for ${damage} damage!`];
           newState.mobTicks = 0;
           newState.mobAttackTicks = nextAttackTicks;
           
-          // Check for Thorns effect (damage reflection)
-          const currentThorns = thornsEffect();
-          if (currentThorns && Date.now() < currentThorns.expiresAt) {
-            const reflectedDamage = Math.floor(damage * (currentThorns.reflectPercent / 100));
-            if (reflectedDamage > 0) {
-              newState.mobHealth = Math.max(0, newState.mobHealth - reflectedDamage);
-              newState.log = [...newState.log, `⚡ ${currentThorns.name} reflects ${reflectedDamage} damage!`];
-              
-              // Check if mob died from reflected damage
-              if (newState.mobHealth <= 0) {
-                newState.isActive = false;
-                newState.result = 'victory';
-                newState.log = [...newState.log, `Victory! ${props.mob.name} was defeated by reflected damage!`];
-                setTimeout(() => props.onCombatEnd('victory', newState), 0);
-                clearInterval(intervalId);
-                return newState;
+          if (didHit) {
+            const totalArmor = getTotalArmor();
+            
+            const damage = calculateDamage(
+              props.mob.damage_min,
+              props.mob.damage_max,
+              10,
+              totalArmor
+            );
+
+            const newCharHealth = Math.max(0, currentState.characterHealth - damage);
+
+            newState.characterHealth = newCharHealth;
+            newState.log = [...newState.log, `${props.mob.name} attacks for ${damage} damage!`];
+            
+            // Check for Thorns effect (damage reflection)
+            const currentThorns = thornsEffect();
+            if (currentThorns && Date.now() < currentThorns.expiresAt) {
+              const reflectedDamage = Math.floor(damage * (currentThorns.reflectPercent / 100));
+              if (reflectedDamage > 0) {
+                newState.mobHealth = Math.max(0, newState.mobHealth - reflectedDamage);
+                newState.log = [...newState.log, `⚡ ${currentThorns.name} reflects ${reflectedDamage} damage!`];
+                
+                // Check if mob died from reflected damage
+                if (newState.mobHealth <= 0) {
+                  newState.isActive = false;
+                  newState.result = 'victory';
+                  newState.log = [...newState.log, `Victory! ${props.mob.name} was defeated by reflected damage!`];
+                  setTimeout(() => props.onCombatEnd('victory', newState), 0);
+                  clearInterval(intervalId);
+                  return newState;
+                }
               }
+            } else if (currentThorns && Date.now() >= currentThorns.expiresAt) {
+              // Thorns expired, clear it
+              setThornsEffect(null);
             }
-          } else if (currentThorns && Date.now() >= currentThorns.expiresAt) {
-            // Thorns expired, clear it
-            setThornsEffect(null);
-          }
 
-          // Update parent component with new health (preserve current mana)
-          props.onHealthChange(newCharHealth, currentMana());
+            // Update parent component with new health (preserve current mana)
+            props.onHealthChange(newCharHealth, currentMana());
 
-          if (newCharHealth <= 0) {
-            newState.isActive = false;
-            newState.result = 'defeat';
-            newState.log = [...newState.log, `Defeat! You were slain by ${props.mob.name}...`];
-            setTimeout(() => props.onCombatEnd('defeat', newState), 0);
-            clearInterval(intervalId);
-            return newState;
+            if (newCharHealth <= 0) {
+              newState.isActive = false;
+              newState.result = 'defeat';
+              newState.log = [...newState.log, `Defeat! You were slain by ${props.mob.name}...`];
+              setTimeout(() => props.onCombatEnd('defeat', newState), 0);
+              clearInterval(intervalId);
+              return newState;
+            }
+          } else {
+            // Attack missed
+            newState.log = [...newState.log, `${props.mob.name}'s attack missed!`];
           }
         } else {
           newState.mobTicks = newMobTicks;

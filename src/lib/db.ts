@@ -25,6 +25,7 @@ export type Character = {
   intelligence: number;
   wisdom: number;
   charisma: number;
+  evasiveness: number;
   max_health: number;
   current_health: number;
   max_mana: number;
@@ -85,6 +86,7 @@ export type Mob = {
   damage_max: number;
   defense: number;
   attack_speed: number;
+  evasiveness: number;
   experience_reward: number;
   gold_min: number;
   gold_max: number;
@@ -100,16 +102,8 @@ export type Ability = {
   category: string; // 'damage', 'heal', 'buff'
   level: number; // Tier (1, 2, 3)
   base_id: number | null;
-  primary_stat: string | null; // 'strength', 'intelligence', etc.
-  stat_scaling: number;
   mana_cost: number;
   cooldown: number;
-  damage_min: number;
-  damage_max: number;
-  healing: number;
-  buff_stat: string | null;
-  buff_amount: number;
-  buff_duration: number;
   required_strength: number;
   required_dexterity: number;
   required_constitution: number;
@@ -118,6 +112,15 @@ export type Ability = {
   required_charisma: number;
   required_level: number;
   created_at: number;
+  // Legacy fields for backward compatibility (not in DB anymore)
+  primary_stat?: string | null;
+  stat_scaling?: number;
+  damage_min?: number;
+  damage_max?: number;
+  healing?: number;
+  buff_stat?: string | null;
+  buff_amount?: number;
+  buff_duration?: number;
 };
 
 export type CharacterAbility = {
@@ -185,6 +188,7 @@ export type NamedMob = {
   damage_max: number;
   defense: number;
   attack_speed: number;
+  evasiveness: number;
   experience_reward: number;
   gold_min: number;
   gold_max: number;
