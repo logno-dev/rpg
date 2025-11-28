@@ -1146,10 +1146,26 @@ export function CombatEngine(props: CombatEngineProps) {
                 const check = () => isAbility() ? canUseAbility(action.ability!) : { canUse: true };
                 const cooldown = () => isAbility() ? (abilityCooldowns().get(action.ability!.id) || 0) : 0;
                 const isDisabled = () => {
-                  if (action.type === 'consumable') {
-                    return !action.item || action.item.quantity === 0;
+                  if (action.type === 'ability' && action.ability) {
+                    return !canUseAbility(action.ability).canUse;
                   }
-                  return !check().canUse;
+                  if (action.type === 'consumable' && action.item) {
+                    return (action.item.quantity || 0) <= 0;
+                  }
+                  return false;
+                };
+                
+                const disabledReason = () => {
+                  if (action.type === 'ability' && action.ability) {
+                    const check = canUseAbility(action.ability);
+                    if (!check.canUse && check.reason) {
+                      // Only show equipment requirements, not mana/cooldown (those are already visible)
+                      if (check.reason.includes('Requires')) {
+                        return check.reason;
+                      }
+                    }
+                  }
+                  return null;
                 };
                 
                 // Determine action color based on type
@@ -1273,28 +1289,45 @@ export function CombatEngine(props: CombatEngineProps) {
                     </div>
                     
                     {/* Info row - condensed */}
-                    <Show when={cooldown() > 0} fallback={
-                      <div style={{ 
-                        "font-size": "0.65rem", 
-                        color: "var(--text-secondary)",
-                        "line-height": "1",
-                        opacity: "0.9"
-                      }}>
-                        <Show when={action.type === 'ability' && action.ability?.mana_cost && action.ability.mana_cost > 0}>
-                          {action.ability?.mana_cost}mp
-                        </Show>
-                        <Show when={action.type === 'consumable' && action.item}>
-                          x{action.item?.quantity || 0}
-                        </Show>
-                      </div>
+                    <Show when={disabledReason()} fallback={
+                      <Show when={cooldown() > 0} fallback={
+                        <div style={{ 
+                          "font-size": "0.65rem", 
+                          color: "var(--text-secondary)",
+                          "line-height": "1",
+                          opacity: "0.9"
+                        }}>
+                          <Show when={action.type === 'ability' && action.ability?.mana_cost && action.ability.mana_cost > 0}>
+                            {action.ability?.mana_cost}mp
+                          </Show>
+                          <Show when={action.type === 'consumable' && action.item}>
+                            x{action.item?.quantity || 0}
+                          </Show>
+                        </div>
+                      }>
+                        <div style={{ 
+                          "font-size": "0.8rem", 
+                          "font-weight": "bold",
+                          color: "var(--warning)",
+                          "line-height": "1"
+                        }}>
+                          {Math.ceil(cooldown())}s
+                        </div>
+                      </Show>
                     }>
                       <div style={{ 
-                        "font-size": "0.8rem", 
-                        "font-weight": "bold",
-                        color: "var(--warning)",
-                        "line-height": "1"
+                        "font-size": "0.6rem", 
+                        color: "var(--error)",
+                        "line-height": "1",
+                        "font-weight": "600",
+                        "text-align": "center",
+                        "max-width": "100%",
+                        "white-space": "nowrap",
+                        overflow: "hidden",
+                        "text-overflow": "ellipsis",
+                        padding: "0 0.2rem"
                       }}>
-                        {Math.ceil(cooldown())}s
+                        {disabledReason()}
                       </div>
                     </Show>
                   </button>

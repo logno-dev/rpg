@@ -917,6 +917,42 @@ export async function equipItem(characterId: number, inventoryItemId: number): P
     throw new Error(`Requirements not met: ${requirements.join(', ')}`);
   }
 
+  // TWO-HANDED WEAPON LOGIC
+  // If equipping a 2-handed weapon, auto-unequip any offhand
+  if (invItem.slot === 'weapon' && invItem.is_two_handed === 1) {
+    await db.execute({
+      sql: `UPDATE character_inventory 
+        SET equipped = 0 
+        WHERE character_id = ? 
+        AND id IN (
+          SELECT character_inventory.id 
+          FROM character_inventory 
+          JOIN items ON character_inventory.item_id = items.id 
+          WHERE items.slot = 'offhand' AND character_inventory.equipped = 1
+        )`,
+      args: [characterId],
+    });
+  }
+
+  // If equipping an offhand, check if a 2-handed weapon is equipped
+  if (invItem.slot === 'offhand') {
+    const twoHandedCheck = await db.execute({
+      sql: `SELECT items.name 
+        FROM character_inventory
+        JOIN items ON character_inventory.item_id = items.id
+        WHERE character_inventory.character_id = ?
+        AND character_inventory.equipped = 1
+        AND items.slot = 'weapon'
+        AND items.is_two_handed = 1`,
+      args: [characterId],
+    });
+
+    if (twoHandedCheck.rows.length > 0) {
+      const twoHandedWeapon = twoHandedCheck.rows[0] as any;
+      throw new Error(`Cannot equip offhand: ${twoHandedWeapon.name} is a two-handed weapon. Unequip it first.`);
+    }
+  }
+
   // Unequip any item in the same slot
   if (invItem.slot) {
     await db.execute({
