@@ -1,5 +1,5 @@
 import { createAsync, useParams, redirect, revalidate, useNavigate, A, cache } from "@solidjs/router";
-import { createSignal, Show, For, createEffect, onCleanup, createMemo, on, onMount, batch } from "solid-js";
+import { createSignal, Show, For, createEffect, onCleanup, createMemo, on, onMount, batch, Suspense } from "solid-js";
 import { getUser, getSelectedCharacter as getSelectedCharacterFromSession } from "~/lib/auth";
 import { getCharacter, getInventory, getAllRegions, getRegion, getCharacterAbilities, getMerchantsInRegion, getDungeonsInRegion, getActiveDungeon, getHotbar, getAbilitiesWithEffects } from "~/lib/game";
 import { db, type Mob, type Item, type Region, type NamedMob } from "~/lib/db";
@@ -16,6 +16,9 @@ import { useActiveEffects } from "~/lib/ActiveEffectsContext";
 const getGameData = cache(async () => {
   "use server";
   
+  const startTime = performance.now();
+  console.log('[LOADER] Starting game data fetch');
+  
   const user = await getUser();
   if (!user) throw redirect("/");
   
@@ -23,26 +26,41 @@ const getGameData = cache(async () => {
   const characterId = await getSelectedCharacterFromSession();
   if (!characterId) throw redirect("/character-select");
 
+  const characterStart = performance.now();
   // Fetch character and verify ownership
   const character = await getCharacter(characterId);
   if (!character || character.user_id !== user.id) {
     throw redirect("/character-select");
   }
+  console.log(`[LOADER] Character fetch: ${(performance.now() - characterStart).toFixed(2)}ms`);
 
   // Check for active dungeon - return it in data so client can handle redirect
+  const dungeonStart = performance.now();
   const activeDungeonProgress = await getActiveDungeon(characterId);
+  console.log(`[LOADER] Active dungeon check: ${(performance.now() - dungeonStart).toFixed(2)}ms`);
 
   // Fetch essential data in parallel (merchants/dungeons lazy-loaded)
+  const parallelStart = performance.now();
   const [inventory, regions, abilities, hotbar] = await Promise.all([
     getInventory(characterId),
     getAllRegions(character.level, characterId),
     getAbilitiesWithEffects(characterId),
     getHotbar(characterId),
   ]);
+  console.log(`[LOADER] Parallel data fetch: ${(performance.now() - parallelStart).toFixed(2)}ms`);
+  console.log(`[LOADER]   - Inventory: ${inventory.length} items`);
+  console.log(`[LOADER]   - Regions: ${regions.length} regions`);
+  console.log(`[LOADER]   - Abilities: ${abilities.length} abilities`);
+  console.log(`[LOADER]   - Hotbar: ${hotbar.length} slots`);
   
   // Get current region info
+  const regionStart = performance.now();
   const regionId = character.current_region ?? 1;
   const currentRegion = await getRegion(regionId);
+  console.log(`[LOADER] Current region fetch: ${(performance.now() - regionStart).toFixed(2)}ms`);
+  
+  const totalTime = performance.now() - startTime;
+  console.log(`[LOADER] Total load time: ${totalTime.toFixed(2)}ms`);
   
   if (!currentRegion) {
     const fallbackRegion = regions[0];
@@ -1797,14 +1815,123 @@ export default function GamePage() {
     return () => window.removeEventListener('scroll', handleScroll);
   });
 
-  return (
-    <div>
-      {/* Navigation */}
-      <GameNavigation />
+  // Loading skeleton component with pulsing bars
+  const LoadingSkeleton = () => {
+    const SkeletonBar = (props: { width?: string; height?: string; mb?: string }) => (
+      <div style={{ 
+        width: props.width || "100%", 
+        height: props.height || "1rem",
+        "margin-bottom": props.mb || "0.5rem",
+        background: "linear-gradient(90deg, var(--bg-light) 25%, var(--bg-medium) 50%, var(--bg-light) 75%)",
+        "background-size": "200% 100%",
+        "border-radius": "4px",
+        animation: "shimmer 1.5s infinite"
+      }} />
+    );
 
-      {/* Sticky Character Stats Header */}
-      <Show when={isScrolled() && data()}>
-        <div style={{
+    return (
+      <div>
+        <GameNavigation />
+        <div class="container" style={{ "padding-bottom": "calc(5rem + env(safe-area-inset-bottom, 0px))" }}>
+          {/* Character Info Skeleton */}
+          <div class="card">
+            <div style={{ display: "flex", "justify-content": "space-between", "align-items": "start", "flex-wrap": "wrap", gap: "1rem" }}>
+              <div style={{ flex: 1, "min-width": "250px" }}>
+                <SkeletonBar width="40%" height="2rem" mb="0.5rem" />
+                <SkeletonBar width="60%" height="1rem" mb="1rem" />
+                {/* XP Bar */}
+                <SkeletonBar width="30%" height="0.75rem" mb="0.25rem" />
+                <SkeletonBar width="100%" height="0.5rem" mb="0" />
+              </div>
+            </div>
+
+            {/* Health/Mana Bars */}
+            <div style={{ display: "grid", "grid-template-columns": "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", "margin-top": "1rem" }}>
+              <div>
+                <SkeletonBar width="40%" height="0.75rem" mb="0.25rem" />
+                <SkeletonBar width="100%" height="1rem" mb="0" />
+              </div>
+              <div>
+                <SkeletonBar width="40%" height="0.75rem" mb="0.25rem" />
+                <SkeletonBar width="100%" height="1rem" mb="0" />
+              </div>
+            </div>
+          </div>
+
+          {/* Current Location Skeleton */}
+          <div class="card">
+            <SkeletonBar width="30%" height="1.5rem" mb="1rem" />
+            <div style={{ 
+              padding: "1rem", 
+              background: "var(--bg-light)", 
+              "border-radius": "6px",
+              "margin-bottom": "1rem"
+            }}>
+              <SkeletonBar width="50%" height="1.25rem" mb="0.5rem" />
+              <SkeletonBar width="80%" height="0.875rem" mb="0" />
+            </div>
+            
+            {/* Action Buttons */}
+            <div style={{ display: "grid", "grid-template-columns": "1fr 1fr", gap: "1rem" }}>
+              <SkeletonBar width="100%" height="2.5rem" mb="0" />
+              <SkeletonBar width="100%" height="2.5rem" mb="0" />
+            </div>
+          </div>
+
+          {/* Dungeons Skeleton */}
+          <div class="card">
+            <SkeletonBar width="25%" height="1.5rem" mb="1rem" />
+            <div style={{ 
+              padding: "1rem",
+              background: "var(--bg-light)",
+              "border-radius": "6px",
+              border: "2px solid var(--accent)"
+            }}>
+              <SkeletonBar width="60%" height="1.25rem" mb="0.5rem" />
+              <SkeletonBar width="90%" height="0.875rem" mb="0.5rem" />
+              <SkeletonBar width="70%" height="0.875rem" mb="1rem" />
+              <SkeletonBar width="100%" height="2.5rem" mb="0" />
+            </div>
+          </div>
+
+          {/* Merchants Skeleton */}
+          <div class="card">
+            <SkeletonBar width="25%" height="1.5rem" mb="1rem" />
+            <div style={{ 
+              padding: "1rem",
+              background: "var(--bg-light)",
+              "border-radius": "6px"
+            }}>
+              <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center" }}>
+                <div style={{ flex: 1 }}>
+                  <SkeletonBar width="50%" height="1.25rem" mb="0.5rem" />
+                  <SkeletonBar width="70%" height="0.875rem" mb="0" />
+                </div>
+                <SkeletonBar width="120px" height="2.5rem" mb="0" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <style>{`
+          @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+          }
+        `}</style>
+      </div>
+    );
+  };
+
+  return (
+    <Suspense fallback={<LoadingSkeleton />}>
+      <div>
+        {/* Navigation */}
+        <GameNavigation />
+
+        {/* Sticky Character Stats Header */}
+        <Show when={isScrolled() && data()}>
+          <div style={{
           position: "fixed",
           top: 0,
           left: 0,
@@ -1924,7 +2051,7 @@ export default function GamePage() {
         </div>
       </Show>
 
-      <Show when={data()}>
+      <Show when={data()} fallback={<LoadingSkeleton />}>
         <div class="container" style={{ "padding-bottom": "calc(5rem + env(safe-area-inset-bottom, 0px))" }}>
           {/* Passive Health/Mana Regeneration */}
           <HealthRegen
@@ -4153,5 +4280,6 @@ export default function GamePage() {
           </div>
       </Show>
     </div>
+    </Suspense>
   );
 }

@@ -794,22 +794,92 @@ export default function InventoryPage() {
     };
   };
 
-  const LoadingSkeleton = () => (
-    <>
-      <div class="card">
-        <div style={{ height: "400px", display: "flex", "align-items": "center", "justify-content": "center", "flex-direction": "column", gap: "1rem", animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite" }}>
-          <div style={{ "font-size": "3rem" }}>📦</div>
-          <div style={{ "font-size": "1.25rem", color: "var(--text-secondary)" }}>Loading inventory...</div>
+  const LoadingSkeleton = () => {
+    const SkeletonBar = (props: { width?: string; height?: string; mb?: string }) => (
+      <div style={{ 
+        width: props.width || "100%", 
+        height: props.height || "1rem",
+        "margin-bottom": props.mb || "0.5rem",
+        background: "linear-gradient(90deg, var(--bg-light) 25%, var(--bg-medium) 50%, var(--bg-light) 75%)",
+        "background-size": "200% 100%",
+        "border-radius": "4px",
+        animation: "shimmer 1.5s infinite"
+      }} />
+    );
+
+    return (
+      <>
+        {/* Equipment Slots Skeleton */}
+        <div class="card">
+          <SkeletonBar width="30%" height="1.5rem" mb="1rem" />
+          <div style={{ display: "grid", "grid-template-columns": "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
+            <For each={[1, 2, 3, 4, 5, 6]}>
+              {() => (
+                <div style={{
+                  padding: "1rem",
+                  background: "var(--bg-light)",
+                  "border-radius": "6px",
+                  border: "2px dashed #444",
+                  "min-height": "120px"
+                }}>
+                  <SkeletonBar width="40%" height="0.75rem" mb="0.75rem" />
+                  <SkeletonBar width="70%" height="1rem" mb="0.5rem" />
+                  <SkeletonBar width="50%" height="0.75rem" mb="0.5rem" />
+                  <SkeletonBar width="90%" height="0.75rem" mb="0" />
+                </div>
+              )}
+            </For>
+          </div>
         </div>
-      </div>
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.3; }
-        }
-      `}</style>
-    </>
-  );
+
+        {/* Inventory Skeleton */}
+        <div class="card">
+          <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center", "margin-bottom": "1rem" }}>
+            <SkeletonBar width="25%" height="1.5rem" mb="0" />
+            <SkeletonBar width="120px" height="2.5rem" mb="0" />
+          </div>
+          
+          {/* Filter Tabs */}
+          <div style={{ display: "flex", gap: "0.5rem", "margin-bottom": "1.5rem", "flex-wrap": "wrap" }}>
+            <For each={[1, 2, 3, 4, 5, 6]}>
+              {() => <SkeletonBar width="80px" height="2.5rem" mb="0" />}
+            </For>
+          </div>
+          
+          {/* Items List */}
+          <div>
+            <SkeletonBar width="35%" height="1.25rem" mb="0.75rem" />
+            <For each={[1, 2, 3, 4, 5]}>
+              {() => (
+                <div style={{
+                  padding: "1rem",
+                  background: "var(--bg-light)",
+                  "border-radius": "6px",
+                  "margin-bottom": "0.75rem",
+                  display: "flex",
+                  "justify-content": "space-between",
+                  "align-items": "center"
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <SkeletonBar width="60%" height="1rem" mb="0.5rem" />
+                    <SkeletonBar width="40%" height="0.875rem" mb="0" />
+                  </div>
+                  <SkeletonBar width="40px" height="1rem" mb="0" />
+                </div>
+              )}
+            </For>
+          </div>
+        </div>
+
+        <style>{`
+          @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+          }
+        `}</style>
+      </>
+    );
+  };
 
   return (
     <GameLayout>

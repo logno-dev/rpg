@@ -341,9 +341,85 @@ export default function CraftingPage() {
         <h1>Crafting</h1>
         
         <Suspense fallback={
-          <div class="card" style={{ padding: "2rem", "text-align": "center" }}>
-            <div style={{ "font-size": "2rem", "margin-bottom": "1rem" }}>⚒️</div>
-            <p>Loading crafting data...</p>
+          <div>
+            {/* Profession Selection Skeleton */}
+            <div class="card" style={{ "margin-bottom": "1rem" }}>
+              <div style={{ 
+                width: "50%", 
+                height: "1rem",
+                "margin-bottom": "1rem",
+                background: "linear-gradient(90deg, var(--bg-light) 25%, var(--bg-medium) 50%, var(--bg-light) 75%)",
+                "background-size": "200% 100%",
+                "border-radius": "4px",
+                animation: "shimmer 1.5s infinite"
+              }} />
+            </div>
+
+            <div style={{ 
+              display: "grid", 
+              "grid-template-columns": "repeat(auto-fit, minmax(250px, 1fr))",
+              gap: "1rem",
+              "margin-bottom": "2rem"
+            }}>
+              <For each={[1, 2, 3]}>
+                {() => (
+                  <div class="card">
+                    <div style={{ 
+                      width: "80px", 
+                      height: "80px",
+                      "margin-bottom": "1rem",
+                      background: "linear-gradient(90deg, var(--bg-light) 25%, var(--bg-medium) 50%, var(--bg-light) 75%)",
+                      "background-size": "200% 100%",
+                      "border-radius": "8px",
+                      animation: "shimmer 1.5s infinite"
+                    }} />
+                    <div style={{ 
+                      width: "60%", 
+                      height: "1.5rem",
+                      "margin-bottom": "0.75rem",
+                      background: "linear-gradient(90deg, var(--bg-light) 25%, var(--bg-medium) 50%, var(--bg-light) 75%)",
+                      "background-size": "200% 100%",
+                      "border-radius": "4px",
+                      animation: "shimmer 1.5s infinite"
+                    }} />
+                    <div style={{ 
+                      width: "100%", 
+                      height: "0.9rem",
+                      "margin-bottom": "0.5rem",
+                      background: "linear-gradient(90deg, var(--bg-light) 25%, var(--bg-medium) 50%, var(--bg-light) 75%)",
+                      "background-size": "200% 100%",
+                      "border-radius": "4px",
+                      animation: "shimmer 1.5s infinite"
+                    }} />
+                    <div style={{ 
+                      width: "80%", 
+                      height: "0.9rem",
+                      "margin-bottom": "1rem",
+                      background: "linear-gradient(90deg, var(--bg-light) 25%, var(--bg-medium) 50%, var(--bg-light) 75%)",
+                      "background-size": "200% 100%",
+                      "border-radius": "4px",
+                      animation: "shimmer 1.5s infinite"
+                    }} />
+                    <div style={{ 
+                      width: "50%", 
+                      height: "1.25rem",
+                      margin: "0 auto",
+                      background: "linear-gradient(90deg, var(--bg-light) 25%, var(--bg-medium) 50%, var(--bg-light) 75%)",
+                      "background-size": "200% 100%",
+                      "border-radius": "4px",
+                      animation: "shimmer 1.5s infinite"
+                    }} />
+                  </div>
+                )}
+              </For>
+            </div>
+
+            <style>{`
+              @keyframes shimmer {
+                0% { background-position: -200% 0; }
+                100% { background-position: 200% 0; }
+              }
+            `}</style>
           </div>
         }>
           <Show when={currentCharacter()}>
