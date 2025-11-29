@@ -136,12 +136,12 @@ export async function getAllItems() {
             id, name, description, type, slot, rarity,
             strength_bonus, dexterity_bonus, constitution_bonus,
             intelligence_bonus, wisdom_bonus, charisma_bonus,
-            damage_min as damage, armor, value, stackable,
+            damage_min as damage, damage_max, armor, value, stackable,
             attack_speed, health_restore, mana_restore,
             required_level as level,
             required_strength, required_dexterity, required_constitution,
             required_intelligence, required_wisdom, required_charisma,
-            teaches_ability_id
+            teaches_ability_id, weapon_type, offhand_type, is_two_handed
           FROM items 
           ORDER BY type, required_level, name`,
     args: [],
@@ -154,12 +154,13 @@ export async function createItem(itemData: any) {
   await requireGM();
   
   const result = await db.execute({
-    sql: `INSERT INTO items (name, description, type, slot, rarity, value, damage_min, armor, 
+    sql: `INSERT INTO items (name, description, type, slot, rarity, value, damage_min, damage_max, armor, 
             strength_bonus, dexterity_bonus, constitution_bonus, intelligence_bonus, 
             wisdom_bonus, charisma_bonus, health_restore, mana_restore, attack_speed, 
             required_level, required_strength, required_dexterity, required_constitution,
-            required_intelligence, required_wisdom, required_charisma, stackable, teaches_ability_id)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            required_intelligence, required_wisdom, required_charisma, stackable, teaches_ability_id,
+            weapon_type, offhand_type, is_two_handed)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       itemData.name || '',
       itemData.description || '',
@@ -168,6 +169,7 @@ export async function createItem(itemData: any) {
       itemData.rarity || 'common',
       itemData.value ?? 0,
       itemData.damage ?? itemData.damage_min ?? 0,
+      itemData.damage_max ?? 0,
       itemData.armor ?? 0,
       itemData.strength_bonus ?? 0,
       itemData.dexterity_bonus ?? 0,
@@ -187,6 +189,9 @@ export async function createItem(itemData: any) {
       itemData.required_charisma ?? 0,
       itemData.stackable ?? 0,
       itemData.teaches_ability_id || null,
+      itemData.weapon_type || null,
+      itemData.offhand_type || null,
+      itemData.is_two_handed ?? 0,
     ],
   });
   
@@ -199,12 +204,13 @@ export async function updateItem(id: number, itemData: any) {
   await db.execute({
     sql: `UPDATE items SET
             name = ?, description = ?, type = ?, slot = ?, rarity = ?, value = ?,
-            damage_min = ?, armor = ?, strength_bonus = ?, dexterity_bonus = ?,
+            damage_min = ?, damage_max = ?, armor = ?, strength_bonus = ?, dexterity_bonus = ?,
             constitution_bonus = ?, intelligence_bonus = ?, wisdom_bonus = ?,
             charisma_bonus = ?, health_restore = ?, mana_restore = ?,
             attack_speed = ?, required_level = ?, required_strength = ?,
             required_dexterity = ?, required_constitution = ?, required_intelligence = ?,
-            required_wisdom = ?, required_charisma = ?, stackable = ?, teaches_ability_id = ?
+            required_wisdom = ?, required_charisma = ?, stackable = ?, teaches_ability_id = ?,
+            weapon_type = ?, offhand_type = ?, is_two_handed = ?
           WHERE id = ?`,
     args: [
       itemData.name || '', 
@@ -213,7 +219,8 @@ export async function updateItem(id: number, itemData: any) {
       itemData.slot || null, 
       itemData.rarity || 'common', 
       itemData.value ?? 0, 
-      itemData.damage ?? itemData.damage_min ?? 0, 
+      itemData.damage ?? itemData.damage_min ?? 0,
+      itemData.damage_max ?? 0,
       itemData.armor ?? 0, 
       itemData.strength_bonus ?? 0,
       itemData.dexterity_bonus ?? 0, 
@@ -233,6 +240,9 @@ export async function updateItem(id: number, itemData: any) {
       itemData.required_charisma ?? 0,
       itemData.stackable ?? 0,
       itemData.teaches_ability_id || null,
+      itemData.weapon_type || null,
+      itemData.offhand_type || null,
+      itemData.is_two_handed ?? 0,
       id,
     ],
   });
@@ -325,8 +335,9 @@ export async function createAbility(abilityData: any) {
   const result = await db.execute({
     sql: `INSERT INTO abilities (name, description, type, category, required_level, mana_cost, cooldown,
             required_strength, required_dexterity, required_constitution,
-            required_intelligence, required_wisdom, required_charisma)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            required_intelligence, required_wisdom, required_charisma,
+            weapon_type_requirement, offhand_type_requirement)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       abilityData.name || '',
       abilityData.description || '',
@@ -341,6 +352,8 @@ export async function createAbility(abilityData: any) {
       abilityData.required_intelligence ?? 0,
       abilityData.required_wisdom ?? 0,
       abilityData.required_charisma ?? 0,
+      abilityData.weapon_type_requirement || null,
+      abilityData.offhand_type_requirement || null,
     ],
   });
   
@@ -355,7 +368,8 @@ export async function updateAbility(id: number, abilityData: any) {
             name = ?, description = ?, type = ?, category = ?, required_level = ?,
             mana_cost = ?, cooldown = ?,
             required_strength = ?, required_dexterity = ?, required_constitution = ?,
-            required_intelligence = ?, required_wisdom = ?, required_charisma = ?
+            required_intelligence = ?, required_wisdom = ?, required_charisma = ?,
+            weapon_type_requirement = ?, offhand_type_requirement = ?
           WHERE id = ?`,
     args: [
       abilityData.name || '',
@@ -371,6 +385,8 @@ export async function updateAbility(id: number, abilityData: any) {
       abilityData.required_intelligence ?? 0,
       abilityData.required_wisdom ?? 0,
       abilityData.required_charisma ?? 0,
+      abilityData.weapon_type_requirement || null,
+      abilityData.offhand_type_requirement || null,
       id,
     ],
   });

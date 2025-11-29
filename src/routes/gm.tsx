@@ -1995,6 +1995,133 @@ export default function GMPage() {
                 </div>
                 
                 <div style={{ "grid-column": "1 / -1", "margin-top": "0.5rem" }}>
+                  <h4 style={{ "font-size": "1rem", "margin-bottom": "0.5rem", color: "var(--accent)" }}>Equipment Properties</h4>
+                </div>
+                
+                <div>
+                  <label>Slot</label>
+                  <select value={editingItem()?.slot || ''} 
+                          onChange={(e) => setEditingItem({...editingItem()!, slot: e.currentTarget.value || null})}>
+                    <option value="">None</option>
+                    <option value="weapon">Weapon</option>
+                    <option value="offhand">Offhand</option>
+                    <option value="head">Head</option>
+                    <option value="chest">Chest</option>
+                    <option value="legs">Legs</option>
+                    <option value="hands">Hands</option>
+                    <option value="feet">Feet</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label>Weapon Type</label>
+                  <select value={editingItem()?.weapon_type || ''} 
+                          onChange={(e) => setEditingItem({...editingItem()!, weapon_type: e.currentTarget.value || null})}>
+                    <option value="">None</option>
+                    <option value="sword">Sword (1H)</option>
+                    <option value="axe">Axe (1H)</option>
+                    <option value="dagger">Dagger (1H)</option>
+                    <option value="mace">Mace (1H)</option>
+                    <option value="staff">Staff (2H)</option>
+                    <option value="bow">Bow (1H)</option>
+                    <option value="greatsword">Greatsword (2H)</option>
+                    <option value="greataxe">Greataxe (2H)</option>
+                    <option value="dual_dagger">Dual Daggers (Offhand)</option>
+                    <option value="dual_sword">Dual Swords (Offhand)</option>
+                  </select>
+                  <small style={{ display: "block", "font-size": "0.75rem", color: "var(--text-secondary)", "margin-top": "0.25rem" }}>
+                    For weapon items only
+                  </small>
+                </div>
+                
+                <div>
+                  <label>Offhand Type</label>
+                  <select value={editingItem()?.offhand_type || ''} 
+                          onChange={(e) => setEditingItem({...editingItem()!, offhand_type: e.currentTarget.value || null})}>
+                    <option value="">None</option>
+                    <option value="shield">Shield</option>
+                    <option value="tome">Tome</option>
+                    <option value="orb">Orb</option>
+                    <option value="dual_dagger">Dual Daggers</option>
+                    <option value="dual_sword">Dual Swords</option>
+                  </select>
+                  <small style={{ display: "block", "font-size": "0.75rem", color: "var(--text-secondary)", "margin-top": "0.25rem" }}>
+                    For offhand items only
+                  </small>
+                </div>
+                
+                <div>
+                  <label>Damage Min</label>
+                  <input type="number" min="0" value={editingItem()?.damage_min || 0} 
+                         onInput={(e) => setEditingItem({...editingItem()!, damage_min: parseInt(e.currentTarget.value)})} />
+                </div>
+                
+                <div>
+                  <label>Damage Max</label>
+                  <input type="number" min="0" value={editingItem()?.damage_max || 0} 
+                         onInput={(e) => setEditingItem({...editingItem()!, damage_max: parseInt(e.currentTarget.value)})} />
+                </div>
+                
+                <div>
+                  <label>Attack Speed</label>
+                  <input type="number" step="0.1" min="0" value={editingItem()?.attack_speed || 1.0} 
+                         onInput={(e) => setEditingItem({...editingItem()!, attack_speed: parseFloat(e.currentTarget.value)})} />
+                  <small style={{ display: "block", "font-size": "0.75rem", color: "var(--text-secondary)", "margin-top": "0.25rem" }}>
+                    Seconds between attacks (lower = faster)
+                  </small>
+                </div>
+                
+                <div>
+                  <label>Two-Handed</label>
+                  <select value={editingItem()?.is_two_handed || 0} 
+                          onChange={(e) => setEditingItem({...editingItem()!, is_two_handed: parseInt(e.currentTarget.value)})}>
+                    <option value={0}>No</option>
+                    <option value={1}>Yes</option>
+                  </select>
+                  <small style={{ display: "block", "font-size": "0.75rem", color: "var(--text-secondary)", "margin-top": "0.25rem" }}>
+                    Auto-unequips offhand when equipped
+                  </small>
+                </div>
+                
+                <div style={{ "grid-column": "1 / -1", "margin-top": "0.5rem" }}>
+                  <h4 style={{ "font-size": "1rem", "margin-bottom": "0.5rem", color: "var(--accent)" }}>Stat Requirements</h4>
+                  <p style={{ "font-size": "0.875rem", color: "var(--text-secondary)", margin: "0 0 0.5rem 0" }}>
+                    Character must meet these stats to equip this item
+                  </p>
+                </div>
+                
+                <div>
+                  <label>Required STR</label>
+                  <input type="number" min="0" value={editingItem()?.required_strength || 0} 
+                         onInput={(e) => setEditingItem({...editingItem()!, required_strength: parseInt(e.currentTarget.value)})} />
+                </div>
+                <div>
+                  <label>Required DEX</label>
+                  <input type="number" min="0" value={editingItem()?.required_dexterity || 0} 
+                         onInput={(e) => setEditingItem({...editingItem()!, required_dexterity: parseInt(e.currentTarget.value)})} />
+                </div>
+                <div>
+                  <label>Required CON</label>
+                  <input type="number" min="0" value={editingItem()?.required_constitution || 0} 
+                         onInput={(e) => setEditingItem({...editingItem()!, required_constitution: parseInt(e.currentTarget.value)})} />
+                </div>
+                <div>
+                  <label>Required INT</label>
+                  <input type="number" min="0" value={editingItem()?.required_intelligence || 0} 
+                         onInput={(e) => setEditingItem({...editingItem()!, required_intelligence: parseInt(e.currentTarget.value)})} />
+                </div>
+                <div>
+                  <label>Required WIS</label>
+                  <input type="number" min="0" value={editingItem()?.required_wisdom || 0} 
+                         onInput={(e) => setEditingItem({...editingItem()!, required_wisdom: parseInt(e.currentTarget.value)})} />
+                </div>
+                <div>
+                  <label>Required CHA</label>
+                  <input type="number" min="0" value={editingItem()?.required_charisma || 0} 
+                         onInput={(e) => setEditingItem({...editingItem()!, required_charisma: parseInt(e.currentTarget.value)})} />
+                </div>
+                
+                <div style={{ "grid-column": "1 / -1", "margin-top": "0.5rem" }}>
                   <h4 style={{ "font-size": "1rem", "margin-bottom": "0.5rem", color: "var(--accent)" }}>Consumable Settings</h4>
                 </div>
                 
@@ -2199,24 +2326,25 @@ export default function GMPage() {
                   <label>Weapon Types Required</label>
                   <select 
                     multiple 
-                    size="6"
-                    value={editingAbility()?.weapon_type_requirement?.split(',').filter(Boolean) || []} 
+                    size="8"
                     onChange={(e) => {
                       const selected = Array.from(e.currentTarget.selectedOptions).map(opt => opt.value);
                       setEditingAbility({...editingAbility()!, weapon_type_requirement: selected.length > 0 ? selected.join(',') : null});
                     }}
                     style={{ width: "100%", padding: "0.5rem" }}
                   >
-                    <option value="sword">Sword</option>
-                    <option value="greatsword">Greatsword</option>
-                    <option value="axe">Axe</option>
-                    <option value="greataxe">Greataxe</option>
-                    <option value="mace">Mace</option>
-                    <option value="dagger">Dagger</option>
-                    <option value="bow">Bow</option>
-                    <option value="wand">Wand</option>
-                    <option value="staff">Staff (2H)</option>
-                    <option value="polearm">Polearm</option>
+                    <option value="sword" selected={editingAbility()?.weapon_type_requirement?.includes('sword') && !editingAbility()?.weapon_type_requirement?.includes('dual_sword')}>Sword (1H)</option>
+                    <option value="greatsword" selected={editingAbility()?.weapon_type_requirement?.includes('greatsword')}>Greatsword (2H)</option>
+                    <option value="axe" selected={editingAbility()?.weapon_type_requirement?.includes('axe') && !editingAbility()?.weapon_type_requirement?.includes('greataxe')}>Axe (1H)</option>
+                    <option value="greataxe" selected={editingAbility()?.weapon_type_requirement?.includes('greataxe')}>Greataxe (2H)</option>
+                    <option value="mace" selected={editingAbility()?.weapon_type_requirement?.includes('mace')}>Mace (1H)</option>
+                    <option value="dagger" selected={editingAbility()?.weapon_type_requirement?.includes('dagger') && !editingAbility()?.weapon_type_requirement?.includes('dual_dagger')}>Dagger (1H)</option>
+                    <option value="dual_dagger" selected={editingAbility()?.weapon_type_requirement?.includes('dual_dagger')}>Dual Daggers</option>
+                    <option value="dual_sword" selected={editingAbility()?.weapon_type_requirement?.includes('dual_sword')}>Dual Swords</option>
+                    <option value="bow" selected={editingAbility()?.weapon_type_requirement?.includes('bow')}>Bow</option>
+                    <option value="wand" selected={editingAbility()?.weapon_type_requirement?.includes('wand')}>Wand</option>
+                    <option value="staff" selected={editingAbility()?.weapon_type_requirement?.includes('staff')}>Staff (2H)</option>
+                    <option value="polearm" selected={editingAbility()?.weapon_type_requirement?.includes('polearm')}>Polearm</option>
                   </select>
                   <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "margin-top": "0.25rem" }}>
                     Selected: {editingAbility()?.weapon_type_requirement || 'None (Any Weapon)'}
@@ -2227,20 +2355,20 @@ export default function GMPage() {
                   <label>Offhand Types Required</label>
                   <select 
                     multiple 
-                    size="6"
-                    value={editingAbility()?.offhand_type_requirement?.split(',').filter(Boolean) || []} 
+                    size="8"
                     onChange={(e) => {
                       const selected = Array.from(e.currentTarget.selectedOptions).map(opt => opt.value);
                       setEditingAbility({...editingAbility()!, offhand_type_requirement: selected.length > 0 ? selected.join(',') : null});
                     }}
                     style={{ width: "100%", padding: "0.5rem" }}
                   >
-                    <option value="shield">Shield</option>
-                    <option value="orb">Orb</option>
-                    <option value="tome">Tome</option>
-                    <option value="focus">Focus</option>
-                    <option value="quiver">Quiver</option>
-                    <option value="dagger">Dagger (Offhand)</option>
+                    <option value="shield" selected={editingAbility()?.offhand_type_requirement?.includes('shield')}>Shield</option>
+                    <option value="orb" selected={editingAbility()?.offhand_type_requirement?.includes('orb')}>Orb</option>
+                    <option value="tome" selected={editingAbility()?.offhand_type_requirement?.includes('tome')}>Tome</option>
+                    <option value="focus" selected={editingAbility()?.offhand_type_requirement?.includes('focus')}>Focus</option>
+                    <option value="quiver" selected={editingAbility()?.offhand_type_requirement?.includes('quiver')}>Quiver</option>
+                    <option value="dual_dagger" selected={editingAbility()?.offhand_type_requirement?.includes('dual_dagger')}>Dual Daggers</option>
+                    <option value="dual_sword" selected={editingAbility()?.offhand_type_requirement?.includes('dual_sword')}>Dual Swords</option>
                   </select>
                   <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "margin-top": "0.25rem" }}>
                     Selected: {editingAbility()?.offhand_type_requirement || 'None (No Requirement)'}

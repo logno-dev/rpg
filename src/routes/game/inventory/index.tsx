@@ -2,6 +2,7 @@ import { createAsync, useParams, redirect, useNavigate, cache } from "@solidjs/r
 import { createSignal, Show, For, createMemo, createEffect, Suspense } from "solid-js";
 import { GameLayout } from "~/components/GameLayout";
 import { ItemDetailModal } from "~/components/ItemDetailModal";
+import { ToastContainer, type ToastMessage } from "~/components/Toast";
 import { useCharacter } from "~/lib/CharacterContext";
 import { getSelectedCharacterId, useBasicCharacterData } from "~/lib/game-helpers";
 
@@ -75,6 +76,19 @@ export default function InventoryPage() {
   const [showEquipConfirmModal, setShowEquipConfirmModal] = createSignal(false);
   const [equipConfirmData, setEquipConfirmData] = createSignal<{inventoryItemId: number, conflict: {name: string, slot: string}, message: string} | null>(null);
   
+  // Toast notifications
+  const [toasts, setToasts] = createSignal<ToastMessage[]>([]);
+  let toastIdCounter = 0;
+  
+  const addToast = (message: string, type: "success" | "error" | "warning" | "info" = "info", duration = 3000) => {
+    const id = toastIdCounter++;
+    setToasts(prev => [...prev, { id, message, type, duration }]);
+  };
+  
+  const removeToast = (id: number) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
+  
   // Loading states for actions
   const [isSelling, setIsSelling] = createSignal(false);
   const [isSalvaging, setIsSalvaging] = createSignal(false);
@@ -121,8 +135,7 @@ export default function InventoryPage() {
         
         // Show toast notification if something was unequipped
         if (result.unequippedItem) {
-          console.log(`Unequipped ${result.unequippedItem.name} to equip new item`);
-          // TODO: Add toast notification here
+          addToast(`Unequipped ${result.unequippedItem.name}`, "info");
         }
       }
     } catch (error) {
@@ -811,23 +824,48 @@ export default function InventoryPage() {
               const equippedItem = createMemo(() => 
                 currentInventory().find((i: any) => i.slot === slotName && i.equipped === 1)
               );
+              
+              // Check if offhand is blocked by 2H weapon
+              const isOffhandBlocked = createMemo(() => {
+                if (slotName !== 'offhand') return false;
+                const weapon: any = currentInventory().find((i: any) => i.slot === 'weapon' && i.equipped === 1);
+                return weapon?.is_two_handed === 1;
+              });
+              
+              const blockedByWeapon = createMemo(() => {
+                if (slotName !== 'offhand') return null;
+                const weapon: any = currentInventory().find((i: any) => i.slot === 'weapon' && i.equipped === 1 && i.is_two_handed === 1);
+                return weapon;
+              });
+              
               return (
                 <div style={{
                   padding: "1rem",
-                  background: "var(--bg-light)",
+                  background: isOffhandBlocked() ? "var(--bg-dark)" : "var(--bg-light)",
                   "border-radius": "6px",
-                  border: equippedItem() ? "2px solid var(--accent)" : "2px dashed #444",
+                  border: equippedItem() ? "2px solid var(--accent)" : isOffhandBlocked() ? "2px solid #555" : "2px dashed #444",
                   "min-height": "120px",
                   display: "flex",
                   "flex-direction": "column",
-                  "justify-content": "space-between"
+                  "justify-content": "space-between",
+                  opacity: isOffhandBlocked() ? 0.6 : 1
                 }}>
                   <div>
                     <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "text-transform": "uppercase", "font-weight": "bold", "margin-bottom": "0.5rem" }}>
                       {slotName}
                     </div>
-                    <Show when={equippedItem()} fallback={
-                      <div style={{ color: "#666", "font-style": "italic", "font-size": "0.875rem" }}>Empty</div>
+                    <Show when={isOffhandBlocked()}>
+                      <div style={{ color: "#888", "font-style": "italic", "font-size": "0.875rem", "margin-bottom": "0.5rem" }}>
+                        🔒 Blocked by 2H Weapon
+                      </div>
+                      <div style={{ "font-size": "0.75rem", color: "#666" }}>
+                        {blockedByWeapon()?.name}
+                      </div>
+                    </Show>
+                    <Show when={!isOffhandBlocked() && equippedItem()} fallback={
+                      <Show when={!isOffhandBlocked()}>
+                        <div style={{ color: "#666", "font-style": "italic", "font-size": "0.875rem" }}>Empty</div>
+                      </Show>
                     }>
                       {(item) => (
                         <>
@@ -2148,6 +2186,9 @@ export default function InventoryPage() {
           }
         `}</style>
       </Show>
+      
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts()} onRemove={removeToast} />
     </GameLayout>
   );
 }
