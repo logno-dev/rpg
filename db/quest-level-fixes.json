@@ -1,0 +1,74 @@
+[
+  {
+    "id": 486,
+    "oldLevel": 1,
+    "newLevel": 4,
+    "name": "Path to Whirlwind Strike"
+  },
+  {
+    "id": 447,
+    "oldLevel": 8,
+    "newLevel": 13,
+    "name": "Unlock Strike IV"
+  },
+  {
+    "id": 451,
+    "oldLevel": 8,
+    "newLevel": 1,
+    "name": "Path to Cleave III"
+  },
+  {
+    "id": 466,
+    "oldLevel": 9,
+    "newLevel": 1,
+    "name": "Path to Precise Strike III"
+  },
+  {
+    "id": 456,
+    "oldLevel": 10,
+    "newLevel": 1,
+    "name": "Path to War Cry III"
+  },
+  {
+    "id": 471,
+    "oldLevel": 10,
+    "newLevel": 1,
+    "name": "Path to Hamstring III"
+  },
+  {
+    "id": 461,
+    "oldLevel": 12,
+    "newLevel": 1,
+    "name": "Path to Adrenaline Rush III"
+  },
+  {
+    "id": 476,
+    "oldLevel": 12,
+    "newLevel": 1,
+    "name": "Path to Shield Bash III"
+  },
+  {
+    "id": 453,
+    "oldLevel": 16,
+    "newLevel": 20,
+    "name": "Master Cleave V"
+  },
+  {
+    "id": 462,
+    "oldLevel": 16,
+    "newLevel": 20,
+    "name": "Unlock Adrenaline Rush IV"
+  },
+  {
+    "id": 477,
+    "oldLevel": 16,
+    "newLevel": 20,
+    "name": "Unlock Shield Bash IV"
+  },
+  {
+    "id": 468,
+    "oldLevel": 17,
+    "newLevel": 20,
+    "name": "Master Precise Strike V"
+  }
+]
