@@ -1433,7 +1433,7 @@ export default function InventoryPage() {
                 padding: "0.75rem",
                 "margin-bottom": "1rem"
               }}>
-                <For each={currentInventory().filter((i: any) => selectedItems().has(i.id))}>
+                  <For each={currentInventory().filter((i: any) => selectedItems().has(i.id))}>
                   {(item: any) => (
                     <div style={{ 
                       display: "flex", 
@@ -1441,8 +1441,8 @@ export default function InventoryPage() {
                       padding: "0.5rem 0",
                       "border-bottom": "1px solid var(--bg-dark)"
                     }}>
-                      <span>{item.name}</span>
-                      <span style={{ color: "var(--warning)" }}>{Math.floor((item.value || 0) * 0.4)}g</span>
+                      <span>{item.name}{item.quantity > 1 ? ` (x${item.quantity})` : ''}</span>
+                      <span style={{ color: "var(--warning)" }}>{Math.floor((item.value || 0) * 0.4) * item.quantity}g</span>
                     </div>
                   )}
                 </For>
