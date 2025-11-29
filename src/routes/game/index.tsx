@@ -1962,9 +1962,31 @@ export default function GamePage() {
                   </div>
                 </div>
                 <Show when={currentCharacter()?.available_points > 0}>
-                  <div style={{ padding: "0.5rem 1rem", background: "var(--warning)", color: "var(--bg-dark)", "border-radius": "6px", "font-weight": "bold" }}>
-                    {currentCharacter()?.available_points} Stat Points Available!
-                  </div>
+                  <A 
+                    href="/game/stats" 
+                    style={{ 
+                      padding: "0.5rem 1rem", 
+                      background: "var(--warning)", 
+                      color: "var(--bg-dark)", 
+                      "border-radius": "6px", 
+                      "font-weight": "bold",
+                      "text-decoration": "none",
+                      display: "block",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      border: "2px solid transparent"
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "scale(1.02)";
+                      e.currentTarget.style.borderColor = "var(--bg-dark)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "scale(1)";
+                      e.currentTarget.style.borderColor = "transparent";
+                    }}
+                  >
+                    ⚡ {currentCharacter()?.available_points} Stat Points Available! Click to assign →
+                  </A>
                 </Show>
               </div>
 
