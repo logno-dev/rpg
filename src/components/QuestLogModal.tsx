@@ -179,18 +179,20 @@ export function QuestLogModal(props: QuestLogModalProps) {
         
         <div>
           {/* Tab Navigation */}
-          <div class="button-group" style={{ "margin-bottom": "1rem" }}>
+          <div class="button-group" style={{ "margin-bottom": "1rem", "flex-direction": "row" }}>
             <button 
               class={`button ${selectedTab() === 'active' ? '' : 'secondary'}`}
               onClick={() => setSelectedTab('active')}
+              style={{ flex: "1" }}
             >
-              Active Quests
+              Active
             </button>
             <button 
               class={`button ${selectedTab() === 'available' ? '' : 'secondary'}`}
               onClick={() => setSelectedTab('available')}
+              style={{ flex: "1" }}
             >
-              Available Quests
+              Available
             </button>
           </div>
 
