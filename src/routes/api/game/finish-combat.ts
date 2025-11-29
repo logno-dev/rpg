@@ -365,15 +365,16 @@ export async function POST(event: APIEvent) {
         mobHasCurrentRegion: !!mob.current_region
       });
       
+      let hasCompletableQuests = false;
       if (mobId) {
-        await updateQuestProgress(characterId, 'kill', mobId, 1, mobRegionId);
+        hasCompletableQuests = await updateQuestProgress(characterId, 'kill', mobId, 1, mobRegionId);
       } else if (namedMobId) {
         // For named mobs, update quest progress using the named mob's base mob_id if it has one
         // Otherwise just use the namedMobId directly
-        await updateQuestProgress(characterId, 'kill', namedMobId, 1, mobRegionId);
+        hasCompletableQuests = await updateQuestProgress(characterId, 'kill', namedMobId, 1, mobRegionId);
       }
       
-      console.log('[Quest Progress] Quest progress updated');
+      console.log('[Quest Progress] Quest progress updated, hasCompletableQuests:', hasCompletableQuests);
 
       // Close the combat session
       await db.execute({
@@ -391,6 +392,7 @@ export async function POST(event: APIEvent) {
         newLevel: levelUp ? newLevel : undefined,
         character: updatedCharacter,
         inventory: updatedInventory,
+        hasCompletableQuests,
       });
     } else {
       // Defeat - death penalty

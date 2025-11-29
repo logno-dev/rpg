@@ -96,6 +96,7 @@ type CharacterStore = {
   dungeons: Dungeon[];
   dungeonSession: DungeonSession | null;
   isLoading: boolean;
+  hasCompletableQuests: boolean;
 };
 
 type CharacterContextValue = [
@@ -125,6 +126,7 @@ type CharacterContextValue = [
     addAbility: (ability: AbilityWithCooldown) => void;
     removeAbility: (abilityId: number) => void;
     setLoading: (loading: boolean) => void;
+    setHasCompletableQuests: (hasCompletable: boolean) => void;
     reset: () => void;
   },
   computed: {
@@ -156,6 +158,7 @@ export const CharacterProvider: ParentComponent<{ initialData?: Partial<Characte
     dungeons: props.initialData?.dungeons || [],
     dungeonSession: null,
     isLoading: false,
+    hasCompletableQuests: false,
   });
 
   const actions = {
@@ -336,6 +339,10 @@ export const CharacterProvider: ParentComponent<{ initialData?: Partial<Characte
       setStore("isLoading", loading);
     },
 
+    setHasCompletableQuests: (hasCompletable: boolean) => {
+      setStore("hasCompletableQuests", hasCompletable);
+    },
+
     reset: () => {
       setStore({
         character: null,
@@ -349,6 +356,7 @@ export const CharacterProvider: ParentComponent<{ initialData?: Partial<Characte
         dungeons: [],
         dungeonSession: null,
         isLoading: false,
+        hasCompletableQuests: false,
       });
     },
   };

@@ -845,6 +845,11 @@ export default function GamePage() {
           actions.setInventory(responseData.inventory);
         }
 
+        // Update quest completion indicator if any quests are now completable
+        if (responseData.hasCompletableQuests) {
+          actions.setHasCompletableQuests(true);
+        }
+
         // No need to refetch - we already have fresh data from finish-combat response
         // Refetching would pull stale cached data that overwrites our correct values
         setTimeout(() => {

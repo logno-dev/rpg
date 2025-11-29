@@ -2051,7 +2051,7 @@ export async function updateQuestProgress(
   targetId: number,
   count: number = 1,
   regionId?: number
-): Promise<void> {
+): Promise<boolean> {
   console.log('[updateQuestProgress] Called with:', { characterId, type, targetId, count, regionId });
   
   // Get all active quests
@@ -2127,6 +2127,9 @@ export async function updateQuestProgress(
       await advanceQuestObjective(cq.id, cq.quest_id, cq.current_objective);
     }
   }
+  
+  // Check if any quests are now completable
+  return await hasCompletableQuests(characterId);
 }
 
 async function advanceQuestObjective(characterQuestId: number, questId: number, currentObjective: number): Promise<void> {
@@ -2356,5 +2359,29 @@ export async function getActiveQuests(characterId: number): Promise<any[]> {
   });
 
   return result.rows;
+}
+
+export async function hasCompletableQuests(characterId: number): Promise<boolean> {
+  // Check if any active quests have all objectives completed
+  const result = await db.execute({
+    sql: `
+      SELECT COUNT(*) as count
+      FROM character_quests cq
+      WHERE cq.character_id = ? 
+        AND cq.status = 'active'
+        AND NOT EXISTS (
+          SELECT 1 
+          FROM quest_objectives qo
+          LEFT JOIN character_quest_objectives cqo 
+            ON qo.id = cqo.quest_objective_id 
+            AND cqo.character_quest_id = cq.id
+          WHERE qo.quest_id = cq.quest_id 
+            AND COALESCE(cqo.completed, 0) = 0
+        )
+    `,
+    args: [characterId],
+  });
+
+  return (result.rows[0] as any).count > 0;
 }
 
