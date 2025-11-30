@@ -367,6 +367,25 @@ export function HotbarManager(props: Props) {
                             <span style={{ color: "var(--success)" }}>❤️ {ability.healing}</span>
                           </Show>
                         </div>
+                        <Show when={ability.weapon_type_requirement || ability.offhand_type_requirement}>
+                          <div style={{ 
+                            "font-size": "0.75rem", 
+                            "margin-top": "0.5rem",
+                            padding: "0.5rem",
+                            background: "rgba(59, 130, 246, 0.1)",
+                            "border-radius": "4px",
+                            border: "1px solid var(--accent)",
+                            color: "var(--text-secondary)"
+                          }}>
+                            <div style={{ color: "var(--accent)", "font-weight": "bold", "margin-bottom": "0.25rem" }}>⚔️ Equipment Required:</div>
+                            <Show when={ability.weapon_type_requirement}>
+                              <div><strong>Weapon:</strong> {ability.weapon_type_requirement.split(',').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).replace('_', ' ')).join(', ')}</div>
+                            </Show>
+                            <Show when={ability.offhand_type_requirement}>
+                              <div><strong>Offhand:</strong> {ability.offhand_type_requirement.split(',').map((o: string) => o.charAt(0).toUpperCase() + o.slice(1).replace('_', ' ')).join(', ')}</div>
+                            </Show>
+                          </div>
+                        </Show>
                       </div>
                     </div>
                   </div>

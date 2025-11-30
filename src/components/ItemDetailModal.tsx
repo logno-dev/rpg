@@ -205,6 +205,38 @@ export function ItemDetailModal(props: ItemDetailModalProps) {
             </div>
           </div>
         </Show>
+        
+        {/* Weapon Requirements for Scrolls */}
+        <Show when={(item.type === 'scroll' || item.type === 'consumable') && item.teaches_ability_id && (item.weapon_type_requirement || item.offhand_type_requirement)}>
+          <div style={{ 
+            "margin-bottom": "1rem",
+            padding: "1rem",
+            background: "rgba(59, 130, 246, 0.1)",
+            "border-radius": "6px",
+            border: "1px solid var(--accent)"
+          }}>
+            <div style={{ 
+              color: "var(--accent)",
+              "font-weight": "bold",
+              "margin-bottom": "0.5rem",
+              "font-size": "0.95rem"
+            }}>
+              ⚔️ This ability requires specific equipment:
+            </div>
+            <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)", display: "flex", "flex-direction": "column", gap: "0.25rem" }}>
+              <Show when={item.weapon_type_requirement}>
+                <div>
+                  <strong style={{ color: "var(--text)" }}>Weapon:</strong> {item.weapon_type_requirement.split(',').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).replace('_', ' ')).join(', ')}
+                </div>
+              </Show>
+              <Show when={item.offhand_type_requirement}>
+                <div>
+                  <strong style={{ color: "var(--text)" }}>Offhand:</strong> {item.offhand_type_requirement.split(',').map((o: string) => o.charAt(0).toUpperCase() + o.slice(1).replace('_', ' ')).join(', ')}
+                </div>
+              </Show>
+            </div>
+          </div>
+        </Show>
 
         {/* Merchant Price */}
         <Show when={props.isMerchantItem}>

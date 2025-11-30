@@ -838,7 +838,9 @@ export async function getInventory(characterId: number): Promise<Array<Inventory
       abilities.required_dexterity as ability_required_dexterity,
       abilities.required_intelligence as ability_required_intelligence,
       abilities.required_wisdom as ability_required_wisdom,
-      abilities.required_charisma as ability_required_charisma
+      abilities.required_charisma as ability_required_charisma,
+      abilities.weapon_type_requirement,
+      abilities.offhand_type_requirement
       FROM character_inventory 
       JOIN items ON character_inventory.item_id = items.id 
       LEFT JOIN abilities ON items.teaches_ability_id = abilities.id
