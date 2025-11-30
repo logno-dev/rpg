@@ -1,7 +1,7 @@
 import { createSignal, Show, For, onMount } from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
 import { getUser } from "~/lib/auth";
-import { isGM, getAllPlayers, getAllMobs, getAllItems, getAllRegions, getAllAbilities, getAllMerchants, updateMob, deleteMob, createMob, updateItem, deleteItem, createItem, getAllMobLoot, getAllRegionRareLoot, createMobLoot, updateMobLoot, deleteMobLoot, createRegionRareLoot, updateRegionRareLoot, deleteRegionRareLoot, createAbility, updateAbility, deleteAbility, createRegion, updateRegion, deleteRegion, createMerchant, updateMerchant, deleteMerchant, getAllRegionMobs, createRegionMob, updateRegionMob, deleteRegionMob, getAllMerchantInventory, createMerchantInventory, updateMerchantInventory, deleteMerchantInventory, getAbilityEffects, createAbilityEffect, updateAbilityEffect, deleteAbilityEffect } from "~/lib/gm";
+import { isGM, getAllPlayers, getAllMobs, getAllItems, getAllRegions, getAllAbilities, getAllMerchants, updateMob, deleteMob, createMob, updateItem, deleteItem, createItem, getAllMobLoot, getAllRegionRareLoot, createMobLoot, updateMobLoot, deleteMobLoot, createRegionRareLoot, updateRegionRareLoot, deleteRegionRareLoot, createAbility, updateAbility, deleteAbility, createRegion, updateRegion, deleteRegion, createMerchant, updateMerchant, deleteMerchant, getAllRegionMobs, createRegionMob, updateRegionMob, deleteRegionMob, getAllMerchantInventory, createMerchantInventory, updateMerchantInventory, deleteMerchantInventory, getAbilityEffects, createAbilityEffect, updateAbilityEffect, deleteAbilityEffect, getCharacter, updateCharacter, getCharacterInventory, getCharacterAbilities, addItemToCharacter, removeItemFromCharacter, updateCharacterInventoryItem, addAbilityToCharacter, removeAbilityFromCharacter } from "~/lib/gm";
 
 export default function GMPage() {
   const navigate = useNavigate();
@@ -32,6 +32,9 @@ export default function GMPage() {
   const [editingRegionMob, setEditingRegionMob] = createSignal<any | null>(null);
   const [editingMerchantInv, setEditingMerchantInv] = createSignal<any | null>(null);
   const [editingAbilityEffect, setEditingAbilityEffect] = createSignal<any | null>(null);
+  const [editingCharacter, setEditingCharacter] = createSignal<any | null>(null);
+  const [characterInventory, setCharacterInventory] = createSignal<any[]>([]);
+  const [characterAbilities, setCharacterAbilities] = createSignal<any[]>([]);
   const [selectedAbilityForEffects, setSelectedAbilityForEffects] = createSignal<number | null>(null);
   const [showMobModal, setShowMobModal] = createSignal(false);
   const [showItemModal, setShowItemModal] = createSignal(false);
@@ -43,6 +46,15 @@ export default function GMPage() {
   const [showRegionMobModal, setShowRegionMobModal] = createSignal(false);
   const [showMerchantInvModal, setShowMerchantInvModal] = createSignal(false);
   const [showAbilityEffectModal, setShowAbilityEffectModal] = createSignal(false);
+  const [showCharacterModal, setShowCharacterModal] = createSignal(false);
+  const [characterModalTab, setCharacterModalTab] = createSignal<'stats' | 'inventory' | 'abilities'>('stats');
+  const [showAddItemModal, setShowAddItemModal] = createSignal(false);
+  const [showAddAbilityModal, setShowAddAbilityModal] = createSignal(false);
+  const [searchAddItem, setSearchAddItem] = createSignal("");
+  const [searchAddAbility, setSearchAddAbility] = createSignal("");
+  const [selectedItemToAdd, setSelectedItemToAdd] = createSignal<number | null>(null);
+  const [selectedAbilityToAdd, setSelectedAbilityToAdd] = createSignal<number | null>(null);
+  const [itemQuantityToAdd, setItemQuantityToAdd] = createSignal(1);
   const [calcLevel, setCalcLevel] = createSignal(1);
   const [selectedMobForLoot, setSelectedMobForLoot] = createSignal<number | null>(null);
   const [selectedRegionForLoot, setSelectedRegionForLoot] = createSignal<number | null>(null);
@@ -499,6 +511,139 @@ export default function GMPage() {
     }
   };
   
+  // Handle character editing
+  const handleEditCharacter = async (player: any) => {
+    if (!player.character_id) return;
+    
+    try {
+      const charData = await getCharacter(player.character_id);
+      const inventory = await getCharacterInventory(player.character_id);
+      const abilities = await getCharacterAbilities(player.character_id);
+      
+      setEditingCharacter(charData);
+      setCharacterInventory(inventory as any);
+      setCharacterAbilities(abilities as any);
+      setCharacterModalTab('stats');
+      setShowCharacterModal(true);
+    } catch (err) {
+      console.error('Error loading character:', err);
+      alert('Failed to load character');
+    }
+  };
+  
+  const handleSaveCharacter = async (e: Event) => {
+    e.preventDefault();
+    const char = editingCharacter();
+    if (!char) return;
+    
+    try {
+      await updateCharacter(char.id, char);
+      setShowCharacterModal(false);
+      setEditingCharacter(null);
+      
+      // Reload players
+      const playersData = await getAllPlayers();
+      setPlayers(playersData as any);
+    } catch (err) {
+      console.error('Error saving character:', err);
+      alert('Failed to save character');
+    }
+  };
+  
+  const handleAddItemToCharacter = async () => {
+    setSearchAddItem("");
+    setSelectedItemToAdd(null);
+    setItemQuantityToAdd(1);
+    setShowAddItemModal(true);
+  };
+  
+  const handleConfirmAddItem = async () => {
+    const char = editingCharacter();
+    const itemId = selectedItemToAdd();
+    const quantity = itemQuantityToAdd();
+    
+    if (!char || !itemId || quantity <= 0) return;
+    
+    try {
+      await addItemToCharacter(char.id, itemId, quantity);
+      const inventory = await getCharacterInventory(char.id);
+      setCharacterInventory(inventory as any);
+      setShowAddItemModal(false);
+    } catch (err) {
+      console.error('Error adding item:', err);
+      alert('Failed to add item');
+    }
+  };
+  
+  const handleRemoveItemFromCharacter = async (inventoryId: number) => {
+    if (!confirm('Remove this item from inventory?')) return;
+    
+    try {
+      await removeItemFromCharacter(inventoryId);
+      const char = editingCharacter();
+      if (char) {
+        const inventory = await getCharacterInventory(char.id);
+        setCharacterInventory(inventory as any);
+      }
+    } catch (err) {
+      console.error('Error removing item:', err);
+      alert('Failed to remove item');
+    }
+  };
+  
+  const handleUpdateInventoryItem = async (inventoryId: number, quantity: number, equipped: number) => {
+    try {
+      await updateCharacterInventoryItem(inventoryId, quantity, equipped);
+      const char = editingCharacter();
+      if (char) {
+        const inventory = await getCharacterInventory(char.id);
+        setCharacterInventory(inventory as any);
+      }
+    } catch (err) {
+      console.error('Error updating item:', err);
+      alert('Failed to update item');
+    }
+  };
+  
+  const handleAddAbilityToCharacter = async () => {
+    setSearchAddAbility("");
+    setSelectedAbilityToAdd(null);
+    setShowAddAbilityModal(true);
+  };
+  
+  const handleConfirmAddAbility = async () => {
+    const char = editingCharacter();
+    const abilityId = selectedAbilityToAdd();
+    
+    if (!char || !abilityId) return;
+    
+    try {
+      await addAbilityToCharacter(char.id, abilityId);
+      const charAbilities = await getCharacterAbilities(char.id);
+      setCharacterAbilities(charAbilities as any);
+      setShowAddAbilityModal(false);
+    } catch (err) {
+      console.error('Error adding ability:', err);
+      alert('Failed to add ability');
+    }
+  };
+  
+  const handleRemoveAbilityFromCharacter = async (characterAbilityId: number) => {
+    if (!confirm('Remove this ability?')) return;
+    
+    try {
+      await removeAbilityFromCharacter(characterAbilityId);
+      const char = editingCharacter();
+      if (char) {
+        const charAbilities = await getCharacterAbilities(char.id);
+        setCharacterAbilities(charAbilities as any);
+      }
+    } catch (err) {
+      console.error('Error removing ability:', err);
+      alert('Failed to remove ability');
+    }
+  };
+  
   onMount(async () => {
     try {
       // Check if user is logged in
@@ -631,7 +776,7 @@ export default function GMPage() {
           {/* Players Tab */}
           <Show when={activeTab() === "players"}>
             <div class="card">
-              <h2>Players</h2>
+              <h2>Players & Characters</h2>
               <div style={{ "margin-bottom": "1rem" }}>
                 <input 
                   type="text" 
@@ -649,11 +794,13 @@ export default function GMPage() {
                         <th style={{ padding: "0.5rem", "text-align": "left" }}>User</th>
                         <th style={{ padding: "0.5rem", "text-align": "left" }}>Character</th>
                         <th style={{ padding: "0.5rem", "text-align": "center" }}>Level</th>
+                        <th style={{ padding: "0.5rem", "text-align": "center" }}>XP</th>
                         <th style={{ padding: "0.5rem", "text-align": "right" }}>Gold</th>
                         <th style={{ padding: "0.5rem", "text-align": "center" }}>HP</th>
                         <th style={{ padding: "0.5rem", "text-align": "center" }}>Mana</th>
                         <th style={{ padding: "0.5rem", "text-align": "left" }}>Region</th>
                         <th style={{ padding: "0.5rem", "text-align": "center" }}>GM</th>
+                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -671,7 +818,8 @@ export default function GMPage() {
                             <td style={{ padding: "0.5rem" }}>{player.username}</td>
                             <td style={{ padding: "0.5rem" }}>{player.character_name || "-"}</td>
                             <td style={{ padding: "0.5rem", "text-align": "center" }}>{player.level || "-"}</td>
-                            <td style={{ padding: "0.5rem", "text-align": "right" }}>{player.gold || "-"}</td>
+                            <td style={{ padding: "0.5rem", "text-align": "center" }}>{player.experience || "0"}</td>
+                            <td style={{ padding: "0.5rem", "text-align": "right" }}>{player.gold || "0"}</td>
                             <td style={{ padding: "0.5rem", "text-align": "center" }}>
                               {player.current_health ? `${player.current_health}/${player.max_health}` : "-"}
                             </td>
@@ -681,6 +829,17 @@ export default function GMPage() {
                             <td style={{ padding: "0.5rem" }}>{player.current_region || "-"}</td>
                             <td style={{ padding: "0.5rem", "text-align": "center" }}>
                               {player.is_gm ? "✓" : ""}
+                            </td>
+                            <td style={{ padding: "0.5rem", "text-align": "center" }}>
+                              <Show when={player.character_id}>
+                                <button 
+                                  class="button secondary" 
+                                  style={{ padding: "0.25rem 0.5rem", "font-size": "0.8rem" }}
+                                  onClick={() => handleEditCharacter(player)}
+                                >
+                                  Edit
+                                </button>
+                              </Show>
                             </td>
                           </tr>
                         )}
@@ -872,7 +1031,7 @@ export default function GMPage() {
               <div style={{ "margin-bottom": "1rem" }}>
                 <input 
                   type="text" 
-                  placeholder="Search by name or type..." 
+                  placeholder="Search by ID, name, or type..." 
                   value={searchItems()}
                   onInput={(e) => setSearchItems(e.currentTarget.value)}
                   style={{ width: "100%", padding: "0.5rem" }}
@@ -883,6 +1042,7 @@ export default function GMPage() {
                   <table style={{ width: "100%", "border-collapse": "collapse", "font-size": "0.85rem" }}>
                     <thead style={{ position: "sticky", top: 0, background: "var(--bg-dark)" }}>
                       <tr style={{ "border-bottom": "2px solid var(--bg-light)" }}>
+                        <th style={{ padding: "0.5rem", "text-align": "center" }}>ID</th>
                         <th style={{ padding: "0.5rem", "text-align": "left" }}>Name</th>
                         <th style={{ padding: "0.5rem", "text-align": "center" }}>Type</th>
                         <th style={{ padding: "0.5rem", "text-align": "center" }}>Lvl</th>
@@ -899,11 +1059,13 @@ export default function GMPage() {
                         if (!search) return true;
                         return (
                           i.name?.toLowerCase().includes(search) ||
-                          i.type?.toLowerCase().includes(search)
+                          i.type?.toLowerCase().includes(search) ||
+                          i.id?.toString().includes(search)
                         );
                       })}>
                         {(item: any) => (
                           <tr style={{ "border-bottom": "1px solid var(--bg-light)" }}>
+                            <td style={{ padding: "0.5rem", "text-align": "center", "font-weight": "bold", color: "var(--accent)" }}>{item.id}</td>
                             <td style={{ padding: "0.5rem" }}>{item.name}</td>
                             <td style={{ padding: "0.5rem", "text-align": "center" }}>{item.type}</td>
                             <td style={{ padding: "0.5rem", "text-align": "center" }}>{item.level}</td>
@@ -967,7 +1129,7 @@ export default function GMPage() {
               <div style={{ "margin-bottom": "1rem" }}>
                 <input 
                   type="text" 
-                  placeholder="Search by name, type, or category..." 
+                  placeholder="Search by ID, name, type, or category..." 
                   value={searchAbilities()}
                   onInput={(e) => setSearchAbilities(e.currentTarget.value)}
                   style={{ width: "100%", padding: "0.5rem" }}
@@ -978,6 +1140,7 @@ export default function GMPage() {
                   <table style={{ width: "100%", "border-collapse": "collapse", "font-size": "0.9rem" }}>
                     <thead style={{ position: "sticky", top: 0, background: "var(--bg-dark)" }}>
                       <tr style={{ "border-bottom": "2px solid var(--bg-light)" }}>
+                        <th style={{ padding: "0.5rem", "text-align": "center" }}>ID</th>
                         <th style={{ padding: "0.5rem", "text-align": "left" }}>Name</th>
                         <th style={{ padding: "0.5rem", "text-align": "center" }}>Type</th>
                         <th style={{ padding: "0.5rem", "text-align": "center" }}>Category</th>
@@ -997,11 +1160,13 @@ export default function GMPage() {
                         return (
                           a.name?.toLowerCase().includes(search) ||
                           a.type?.toLowerCase().includes(search) ||
-                          a.category?.toLowerCase().includes(search)
+                          a.category?.toLowerCase().includes(search) ||
+                          a.id?.toString().includes(search)
                         );
                       })}>
                         {(ability: any) => (
                           <tr style={{ "border-bottom": "1px solid var(--bg-light)" }}>
+                            <td style={{ padding: "0.5rem", "text-align": "center", "font-weight": "bold", color: "var(--accent)" }}>{ability.id}</td>
                             <td style={{ padding: "0.5rem" }}>{ability.name}</td>
                             <td style={{ padding: "0.5rem", "text-align": "center" }}>{ability.type}</td>
                             <td style={{ padding: "0.5rem", "text-align": "center" }}>{ability.category}</td>
@@ -2874,6 +3039,506 @@ export default function GMPage() {
                 <button type="button" class="button secondary" style={{ flex: 1 }} onClick={() => setShowMerchantInvModal(false)}>Cancel</button>
               </div>
             </form>
+          </div>
+        </div>
+      </Show>
+      
+      {/* Character Edit Modal */}
+      <Show when={showCharacterModal()}>
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.7)", display: "flex",
+          "align-items": "center", "justify-content": "center", "z-index": 1000
+        }} onClick={() => setShowCharacterModal(false)}>
+          <div class="card" style={{ "max-width": "900px", width: "90%", "max-height": "90vh", overflow: "auto" }} 
+               onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center", "margin-bottom": "1rem" }}>
+              <h2>Edit Character: {editingCharacter()?.name}</h2>
+              <button onClick={() => setShowCharacterModal(false)} style={{ background: "none", border: "none", "font-size": "1.5rem", cursor: "pointer" }}>×</button>
+            </div>
+            
+            {/* Sub-tabs */}
+            <div style={{ display: "flex", gap: "0.5rem", "margin-bottom": "1rem", "border-bottom": "2px solid var(--bg-light)", "padding-bottom": "0.5rem" }}>
+              <button
+                class={characterModalTab() === "stats" ? "button primary" : "button secondary"}
+                onClick={() => setCharacterModalTab("stats")}
+                style={{ padding: "0.5rem 1rem" }}
+              >
+                Stats & Gold
+              </button>
+              <button
+                class={characterModalTab() === "inventory" ? "button primary" : "button secondary"}
+                onClick={() => setCharacterModalTab("inventory")}
+                style={{ padding: "0.5rem 1rem" }}
+              >
+                Inventory ({characterInventory().length})
+              </button>
+              <button
+                class={characterModalTab() === "abilities" ? "button primary" : "button secondary"}
+                onClick={() => setCharacterModalTab("abilities")}
+                style={{ padding: "0.5rem 1rem" }}
+              >
+                Abilities ({characterAbilities().length})
+              </button>
+            </div>
+            
+            {/* Stats Tab */}
+            <Show when={characterModalTab() === "stats"}>
+              <form onSubmit={handleSaveCharacter}>
+                <div style={{ display: "grid", gap: "1rem", "grid-template-columns": "1fr 1fr 1fr" }}>
+                  <div style={{ "grid-column": "1 / -1" }}>
+                    <label>Character Name</label>
+                    <input type="text" value={editingCharacter()?.name || ''} 
+                           onInput={(e) => setEditingCharacter({...editingCharacter()!, name: e.currentTarget.value})} required />
+                  </div>
+                  
+                  <div style={{ "grid-column": "1 / -1", "margin-top": "1rem" }}>
+                    <h3 style={{ "font-size": "1.1rem", color: "var(--accent)" }}>Level & Resources</h3>
+                  </div>
+                  
+                  <div>
+                    <label>Level</label>
+                    <input type="number" min="1" value={editingCharacter()?.level || 1} 
+                           onInput={(e) => setEditingCharacter({...editingCharacter()!, level: parseInt(e.currentTarget.value)})} required />
+                  </div>
+                  <div>
+                    <label>Experience</label>
+                    <input type="number" min="0" value={editingCharacter()?.experience || 0} 
+                           onInput={(e) => setEditingCharacter({...editingCharacter()!, experience: parseInt(e.currentTarget.value)})} required />
+                  </div>
+                  <div>
+                    <label>Gold</label>
+                    <input type="number" min="0" value={editingCharacter()?.gold || 0} 
+                           onInput={(e) => setEditingCharacter({...editingCharacter()!, gold: parseInt(e.currentTarget.value)})} required />
+                  </div>
+                  <div>
+                    <label>Available Stat Points</label>
+                    <input type="number" min="0" value={editingCharacter()?.available_points || 0} 
+                           onInput={(e) => setEditingCharacter({...editingCharacter()!, available_points: parseInt(e.currentTarget.value)})} required />
+                  </div>
+                  
+                  <div style={{ "grid-column": "1 / -1", "margin-top": "1rem" }}>
+                    <h3 style={{ "font-size": "1.1rem", color: "var(--accent)" }}>Health & Mana</h3>
+                  </div>
+                  
+                  <div>
+                    <label>Current Health</label>
+                    <input type="number" min="0" value={editingCharacter()?.current_health || 100} 
+                           onInput={(e) => setEditingCharacter({...editingCharacter()!, current_health: parseInt(e.currentTarget.value)})} required />
+                  </div>
+                  <div>
+                    <label>Max Health</label>
+                    <input type="number" min="1" value={editingCharacter()?.max_health || 100} 
+                           onInput={(e) => setEditingCharacter({...editingCharacter()!, max_health: parseInt(e.currentTarget.value)})} required />
+                  </div>
+                  <div></div>
+                  <div>
+                    <label>Current Mana</label>
+                    <input type="number" min="0" value={editingCharacter()?.current_mana || 100} 
+                           onInput={(e) => setEditingCharacter({...editingCharacter()!, current_mana: parseInt(e.currentTarget.value)})} required />
+                  </div>
+                  <div>
+                    <label>Max Mana</label>
+                    <input type="number" min="1" value={editingCharacter()?.max_mana || 100} 
+                           onInput={(e) => setEditingCharacter({...editingCharacter()!, max_mana: parseInt(e.currentTarget.value)})} required />
+                  </div>
+                  
+                  <div style={{ "grid-column": "1 / -1", "margin-top": "1rem" }}>
+                    <h3 style={{ "font-size": "1.1rem", color: "var(--accent)" }}>Attributes</h3>
+                  </div>
+                  
+                  <div>
+                    <label>Strength</label>
+                    <input type="number" min="1" value={editingCharacter()?.strength || 10} 
+                           onInput={(e) => setEditingCharacter({...editingCharacter()!, strength: parseInt(e.currentTarget.value)})} required />
+                  </div>
+                  <div>
+                    <label>Dexterity</label>
+                    <input type="number" min="1" value={editingCharacter()?.dexterity || 10} 
+                           onInput={(e) => setEditingCharacter({...editingCharacter()!, dexterity: parseInt(e.currentTarget.value)})} required />
+                  </div>
+                  <div>
+                    <label>Constitution</label>
+                    <input type="number" min="1" value={editingCharacter()?.constitution || 10} 
+                           onInput={(e) => setEditingCharacter({...editingCharacter()!, constitution: parseInt(e.currentTarget.value)})} required />
+                  </div>
+                  <div>
+                    <label>Intelligence</label>
+                    <input type="number" min="1" value={editingCharacter()?.intelligence || 10} 
+                           onInput={(e) => setEditingCharacter({...editingCharacter()!, intelligence: parseInt(e.currentTarget.value)})} required />
+                  </div>
+                  <div>
+                    <label>Wisdom</label>
+                    <input type="number" min="1" value={editingCharacter()?.wisdom || 10} 
+                           onInput={(e) => setEditingCharacter({...editingCharacter()!, wisdom: parseInt(e.currentTarget.value)})} required />
+                  </div>
+                  <div>
+                    <label>Charisma</label>
+                    <input type="number" min="1" value={editingCharacter()?.charisma || 10} 
+                           onInput={(e) => setEditingCharacter({...editingCharacter()!, charisma: parseInt(e.currentTarget.value)})} required />
+                  </div>
+                  
+                  <div style={{ "grid-column": "1 / -1", "margin-top": "1rem" }}>
+                    <h3 style={{ "font-size": "1.1rem", color: "var(--accent)" }}>Location</h3>
+                  </div>
+                  
+                  <div>
+                    <label>Current Region</label>
+                    <select value={editingCharacter()?.current_region || 1} 
+                            onChange={(e) => setEditingCharacter({...editingCharacter()!, current_region: parseInt(e.currentTarget.value)})}>
+                      <For each={regions()}>
+                        {(region: any) => <option value={region.id}>{region.name}</option>}
+                      </For>
+                    </select>
+                  </div>
+                  <div>
+                    <label>Current Sub-Area (nullable)</label>
+                    <input type="number" min="0" value={editingCharacter()?.current_sub_area || ''} 
+                           onInput={(e) => setEditingCharacter({...editingCharacter()!, current_sub_area: e.currentTarget.value ? parseInt(e.currentTarget.value) : null})} 
+                           placeholder="Leave empty for none" />
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: "1rem", "margin-top": "1.5rem" }}>
+                  <button type="submit" class="button primary" style={{ flex: 1 }}>Save Character</button>
+                  <button type="button" class="button secondary" style={{ flex: 1 }} onClick={() => setShowCharacterModal(false)}>Cancel</button>
+                </div>
+              </form>
+            </Show>
+            
+            {/* Inventory Tab */}
+            <Show when={characterModalTab() === "inventory"}>
+              <div>
+                <div style={{ "margin-bottom": "1rem" }}>
+                  <button class="button primary" onClick={handleAddItemToCharacter}>Add Item</button>
+                </div>
+                <div style={{ overflow: "auto", "max-height": "500px" }}>
+                  <table style={{ width: "100%", "border-collapse": "collapse", "font-size": "0.9rem" }}>
+                    <thead style={{ position: "sticky", top: 0, background: "var(--bg-dark)" }}>
+                      <tr style={{ "border-bottom": "2px solid var(--bg-light)" }}>
+                        <th style={{ padding: "0.5rem", "text-align": "left" }}>Item</th>
+                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Type</th>
+                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Rarity</th>
+                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Quantity</th>
+                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Equipped</th>
+                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <For each={characterInventory()}>
+                        {(invItem: any) => (
+                          <tr style={{ "border-bottom": "1px solid var(--bg-light)" }}>
+                            <td style={{ padding: "0.5rem" }}>{invItem.name}</td>
+                            <td style={{ padding: "0.5rem", "text-align": "center" }}>{invItem.type}</td>
+                            <td style={{ padding: "0.5rem", "text-align": "center" }}>{invItem.rarity}</td>
+                            <td style={{ padding: "0.5rem", "text-align": "center" }}>
+                              <input 
+                                type="number" 
+                                min="1" 
+                                value={invItem.quantity} 
+                                style={{ width: "60px", padding: "0.25rem", "text-align": "center" }}
+                                onChange={(e) => handleUpdateInventoryItem(invItem.inventory_id, parseInt(e.currentTarget.value), invItem.equipped)}
+                              />
+                            </td>
+                            <td style={{ padding: "0.5rem", "text-align": "center" }}>
+                              <input 
+                                type="checkbox" 
+                                checked={invItem.equipped === 1}
+                                onChange={(e) => handleUpdateInventoryItem(invItem.inventory_id, invItem.quantity, e.currentTarget.checked ? 1 : 0)}
+                              />
+                            </td>
+                            <td style={{ padding: "0.5rem", "text-align": "center" }}>
+                              <button 
+                                class="button" 
+                                style={{ padding: "0.25rem 0.5rem", "font-size": "0.8rem", background: "var(--danger)" }}
+                                onClick={() => handleRemoveItemFromCharacter(invItem.inventory_id)}
+                              >
+                                Remove
+                              </button>
+                            </td>
+                          </tr>
+                        )}
+                      </For>
+                    </tbody>
+                  </table>
+                  <Show when={characterInventory().length === 0}>
+                    <div style={{ padding: "2rem", "text-align": "center", color: "var(--text-secondary)" }}>
+                      No items in inventory
+                    </div>
+                  </Show>
+                </div>
+              </div>
+            </Show>
+            
+            {/* Abilities Tab */}
+            <Show when={characterModalTab() === "abilities"}>
+              <div>
+                <div style={{ "margin-bottom": "1rem" }}>
+                  <button class="button primary" onClick={handleAddAbilityToCharacter}>Add Ability</button>
+                </div>
+                <div style={{ overflow: "auto", "max-height": "500px" }}>
+                  <table style={{ width: "100%", "border-collapse": "collapse", "font-size": "0.9rem" }}>
+                    <thead style={{ position: "sticky", top: 0, background: "var(--bg-dark)" }}>
+                      <tr style={{ "border-bottom": "2px solid var(--bg-light)" }}>
+                        <th style={{ padding: "0.5rem", "text-align": "left" }}>Ability</th>
+                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Type</th>
+                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Category</th>
+                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Required Level</th>
+                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <For each={characterAbilities()}>
+                        {(ability: any) => (
+                          <tr style={{ "border-bottom": "1px solid var(--bg-light)" }}>
+                            <td style={{ padding: "0.5rem" }}>{ability.name}</td>
+                            <td style={{ padding: "0.5rem", "text-align": "center" }}>{ability.type}</td>
+                            <td style={{ padding: "0.5rem", "text-align": "center" }}>{ability.category}</td>
+                            <td style={{ padding: "0.5rem", "text-align": "center" }}>{ability.required_level}</td>
+                            <td style={{ padding: "0.5rem", "text-align": "center" }}>
+                              <button 
+                                class="button" 
+                                style={{ padding: "0.25rem 0.5rem", "font-size": "0.8rem", background: "var(--danger)" }}
+                                onClick={() => handleRemoveAbilityFromCharacter(ability.character_ability_id)}
+                              >
+                                Remove
+                              </button>
+                            </td>
+                          </tr>
+                        )}
+                      </For>
+                    </tbody>
+                  </table>
+                  <Show when={characterAbilities().length === 0}>
+                    <div style={{ padding: "2rem", "text-align": "center", color: "var(--text-secondary)" }}>
+                      No abilities learned
+                    </div>
+                  </Show>
+                </div>
+              </div>
+            </Show>
+          </div>
+        </div>
+      </Show>
+      
+      {/* Add Item Modal */}
+      <Show when={showAddItemModal()}>
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.8)", display: "flex",
+          "align-items": "center", "justify-content": "center", "z-index": 1001
+        }} onClick={() => setShowAddItemModal(false)}>
+          <div class="card" style={{ "max-width": "700px", width: "90%", "max-height": "80vh", overflow: "hidden", display: "flex", "flex-direction": "column" }} 
+               onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center", "margin-bottom": "1rem" }}>
+              <h2>Add Item to Inventory</h2>
+              <button onClick={() => setShowAddItemModal(false)} style={{ background: "none", border: "none", "font-size": "1.5rem", cursor: "pointer" }}>×</button>
+            </div>
+            
+            <div style={{ "margin-bottom": "1rem" }}>
+              <input 
+                type="text" 
+                placeholder="Search items by ID, name, or type..." 
+                value={searchAddItem()}
+                onInput={(e) => setSearchAddItem(e.currentTarget.value)}
+                style={{ width: "100%", padding: "0.75rem", "font-size": "1rem" }}
+                autofocus
+              />
+            </div>
+            
+            <div style={{ flex: 1, overflow: "auto", "margin-bottom": "1rem" }}>
+              <table style={{ width: "100%", "border-collapse": "collapse", "font-size": "0.9rem" }}>
+                <thead style={{ position: "sticky", top: 0, background: "var(--bg-dark)" }}>
+                  <tr style={{ "border-bottom": "2px solid var(--bg-light)" }}>
+                    <th style={{ padding: "0.5rem", "text-align": "center" }}>Select</th>
+                    <th style={{ padding: "0.5rem", "text-align": "center" }}>ID</th>
+                    <th style={{ padding: "0.5rem", "text-align": "left" }}>Name</th>
+                    <th style={{ padding: "0.5rem", "text-align": "center" }}>Type</th>
+                    <th style={{ padding: "0.5rem", "text-align": "center" }}>Rarity</th>
+                    <th style={{ padding: "0.5rem", "text-align": "center" }}>Lvl</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <For each={items().filter((i: any) => {
+                    const search = searchAddItem().toLowerCase();
+                    if (!search) return true;
+                    return (
+                      i.id?.toString().includes(search) ||
+                      i.name?.toLowerCase().includes(search) ||
+                      i.type?.toLowerCase().includes(search)
+                    );
+                  })}>
+                    {(item: any) => (
+                      <tr 
+                        style={{ 
+                          "border-bottom": "1px solid var(--bg-light)",
+                          background: selectedItemToAdd() === item.id ? "var(--bg-light)" : "transparent",
+                          cursor: "pointer"
+                        }}
+                        onClick={() => setSelectedItemToAdd(item.id)}
+                      >
+                        <td style={{ padding: "0.5rem", "text-align": "center" }}>
+                          <input 
+                            type="radio" 
+                            checked={selectedItemToAdd() === item.id}
+                            onChange={() => setSelectedItemToAdd(item.id)}
+                          />
+                        </td>
+                        <td style={{ padding: "0.5rem", "text-align": "center", "font-weight": "bold", color: "var(--accent)" }}>{item.id}</td>
+                        <td style={{ padding: "0.5rem" }}>{item.name}</td>
+                        <td style={{ padding: "0.5rem", "text-align": "center" }}>{item.type}</td>
+                        <td style={{ padding: "0.5rem", "text-align": "center" }}>
+                          <span style={{ 
+                            padding: "0.2rem 0.4rem", 
+                            "border-radius": "3px",
+                            background: item.rarity === 'legendary' ? 'var(--legendary)' :
+                                       item.rarity === 'epic' ? 'var(--epic)' :
+                                       item.rarity === 'rare' ? 'var(--rare)' :
+                                       item.rarity === 'uncommon' ? 'var(--uncommon)' :
+                                       'var(--common)',
+                            color: '#fff',
+                            "font-size": "0.75rem"
+                          }}>
+                            {item.rarity}
+                          </span>
+                        </td>
+                        <td style={{ padding: "0.5rem", "text-align": "center" }}>{item.level}</td>
+                      </tr>
+                    )}
+                  </For>
+                </tbody>
+              </table>
+            </div>
+            
+            <div style={{ display: "flex", gap: "1rem", "align-items": "end" }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: "block", "margin-bottom": "0.25rem" }}>Quantity</label>
+                <input 
+                  type="number" 
+                  min="1" 
+                  value={itemQuantityToAdd()} 
+                  onInput={(e) => setItemQuantityToAdd(parseInt(e.currentTarget.value) || 1)}
+                  style={{ width: "100%", padding: "0.5rem" }}
+                />
+              </div>
+              <button 
+                type="button" 
+                class="button primary" 
+                style={{ flex: 1 }}
+                onClick={handleConfirmAddItem}
+                disabled={!selectedItemToAdd()}
+              >
+                Add Item
+              </button>
+              <button 
+                type="button" 
+                class="button secondary" 
+                style={{ flex: 1 }}
+                onClick={() => setShowAddItemModal(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
+      
+      {/* Add Ability Modal */}
+      <Show when={showAddAbilityModal()}>
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.8)", display: "flex",
+          "align-items": "center", "justify-content": "center", "z-index": 1001
+        }} onClick={() => setShowAddAbilityModal(false)}>
+          <div class="card" style={{ "max-width": "800px", width: "90%", "max-height": "80vh", overflow: "hidden", display: "flex", "flex-direction": "column" }} 
+               onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center", "margin-bottom": "1rem" }}>
+              <h2>Add Ability to Character</h2>
+              <button onClick={() => setShowAddAbilityModal(false)} style={{ background: "none", border: "none", "font-size": "1.5rem", cursor: "pointer" }}>×</button>
+            </div>
+            
+            <div style={{ "margin-bottom": "1rem" }}>
+              <input 
+                type="text" 
+                placeholder="Search abilities by ID, name, type, or category..." 
+                value={searchAddAbility()}
+                onInput={(e) => setSearchAddAbility(e.currentTarget.value)}
+                style={{ width: "100%", padding: "0.75rem", "font-size": "1rem" }}
+                autofocus
+              />
+            </div>
+            
+            <div style={{ flex: 1, overflow: "auto", "margin-bottom": "1rem" }}>
+              <table style={{ width: "100%", "border-collapse": "collapse", "font-size": "0.9rem" }}>
+                <thead style={{ position: "sticky", top: 0, background: "var(--bg-dark)" }}>
+                  <tr style={{ "border-bottom": "2px solid var(--bg-light)" }}>
+                    <th style={{ padding: "0.5rem", "text-align": "center" }}>Select</th>
+                    <th style={{ padding: "0.5rem", "text-align": "center" }}>ID</th>
+                    <th style={{ padding: "0.5rem", "text-align": "left" }}>Name</th>
+                    <th style={{ padding: "0.5rem", "text-align": "center" }}>Type</th>
+                    <th style={{ padding: "0.5rem", "text-align": "center" }}>Category</th>
+                    <th style={{ padding: "0.5rem", "text-align": "center" }}>Lvl Req</th>
+                    <th style={{ padding: "0.5rem", "text-align": "right" }}>Mana</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <For each={abilities().filter((a: any) => {
+                    const search = searchAddAbility().toLowerCase();
+                    if (!search) return true;
+                    return (
+                      a.id?.toString().includes(search) ||
+                      a.name?.toLowerCase().includes(search) ||
+                      a.type?.toLowerCase().includes(search) ||
+                      a.category?.toLowerCase().includes(search)
+                    );
+                  })}>
+                    {(ability: any) => (
+                      <tr 
+                        style={{ 
+                          "border-bottom": "1px solid var(--bg-light)",
+                          background: selectedAbilityToAdd() === ability.id ? "var(--bg-light)" : "transparent",
+                          cursor: "pointer"
+                        }}
+                        onClick={() => setSelectedAbilityToAdd(ability.id)}
+                      >
+                        <td style={{ padding: "0.5rem", "text-align": "center" }}>
+                          <input 
+                            type="radio" 
+                            checked={selectedAbilityToAdd() === ability.id}
+                            onChange={() => setSelectedAbilityToAdd(ability.id)}
+                          />
+                        </td>
+                        <td style={{ padding: "0.5rem", "text-align": "center", "font-weight": "bold", color: "var(--accent)" }}>{ability.id}</td>
+                        <td style={{ padding: "0.5rem" }}>{ability.name}</td>
+                        <td style={{ padding: "0.5rem", "text-align": "center" }}>{ability.type}</td>
+                        <td style={{ padding: "0.5rem", "text-align": "center" }}>{ability.category}</td>
+                        <td style={{ padding: "0.5rem", "text-align": "center" }}>{ability.required_level}</td>
+                        <td style={{ padding: "0.5rem", "text-align": "right" }}>{ability.mana_cost || 0}</td>
+                      </tr>
+                    )}
+                  </For>
+                </tbody>
+              </table>
+            </div>
+            
+            <div style={{ display: "flex", gap: "1rem" }}>
+              <button 
+                type="button" 
+                class="button primary" 
+                style={{ flex: 1 }}
+                onClick={handleConfirmAddAbility}
+                disabled={!selectedAbilityToAdd()}
+              >
+                Add Ability
+              </button>
+              <button 
+                type="button" 
+                class="button secondary" 
+                style={{ flex: 1 }}
+                onClick={() => setShowAddAbilityModal(false)}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       </Show>

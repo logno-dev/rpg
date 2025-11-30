@@ -195,6 +195,33 @@ async function giveStartingEquipment(characterId: number) {
     sql: 'INSERT INTO character_inventory (character_id, item_id, quantity) VALUES (?, ?, 3)',
     args: [characterId, 13], // Health Potions
   });
+
+  // Give starter ability scrolls to all new characters
+  // This helps players get their bearings with different class types
+  
+  // Fireball I - Spell/Caster (Intelligence-based)
+  await db.execute({
+    sql: 'INSERT INTO character_inventory (character_id, item_id, quantity) VALUES (?, ?, 1)',
+    args: [characterId, 315], // Scroll: Fireball I
+  });
+
+  // Song of Courage I - Bard/Support (Charisma-based)
+  await db.execute({
+    sql: 'INSERT INTO character_inventory (character_id, item_id, quantity) VALUES (?, ?, 1)',
+    args: [characterId, 1769], // Scroll of Song of Courage I
+  });
+
+  // Strike I - Strength-based melee damage
+  await db.execute({
+    sql: 'INSERT INTO character_inventory (character_id, item_id, quantity) VALUES (?, ?, 1)',
+    args: [characterId, 1814], // Scroll: Strike I
+  });
+
+  // Precise Strike I - Dexterity-based melee damage
+  await db.execute({
+    sql: 'INSERT INTO character_inventory (character_id, item_id, quantity) VALUES (?, ?, 1)',
+    args: [characterId, 1834], // Scroll: Precise Strike I
+  });
 }
 
 export async function getCharacter(characterId: number): Promise<Character | null> {

@@ -778,6 +778,166 @@ export async function getAllMerchantInventory() {
   return result.rows;
 }
 
+// Character Management
+export async function getCharacter(characterId: number) {
+  await requireGM();
+  
+  const result = await db.execute({
+    sql: 'SELECT * FROM characters WHERE id = ?',
+    args: [characterId],
+  });
+  
+  return result.rows[0];
+}
+
+export async function updateCharacter(characterId: number, characterData: any) {
+  await requireGM();
+  
+  await db.execute({
+    sql: `UPDATE characters SET
+            name = ?, level = ?, experience = ?, gold = ?,
+            current_health = ?, max_health = ?,
+            current_mana = ?, max_mana = ?,
+            strength = ?, dexterity = ?, constitution = ?,
+            intelligence = ?, wisdom = ?, charisma = ?,
+            available_points = ?,
+            current_region = ?, current_sub_area = ?
+          WHERE id = ?`,
+    args: [
+      characterData.name,
+      characterData.level,
+      characterData.experience,
+      characterData.gold,
+      characterData.current_health,
+      characterData.max_health,
+      characterData.current_mana,
+      characterData.max_mana,
+      characterData.strength,
+      characterData.dexterity,
+      characterData.constitution,
+      characterData.intelligence,
+      characterData.wisdom,
+      characterData.charisma,
+      characterData.available_points,
+      characterData.current_region,
+      characterData.current_sub_area,
+      characterId,
+    ],
+  });
+}
+
+export async function getCharacterInventory(characterId: number) {
+  await requireGM();
+  
+  const result = await db.execute({
+    sql: `SELECT 
+            ci.id as inventory_id,
+            ci.item_id,
+            ci.quantity,
+            ci.equipped,
+            i.name,
+            i.type,
+            i.slot,
+            i.rarity
+          FROM character_inventory ci
+          JOIN items i ON ci.item_id = i.id
+          WHERE ci.character_id = ?
+          ORDER BY i.type, i.name`,
+    args: [characterId],
+  });
+  
+  return result.rows;
+}
+
+export async function addItemToCharacter(characterId: number, itemId: number, quantity: number) {
+  await requireGM();
+  
+  // Check if item exists in inventory
+  const existing = await db.execute({
+    sql: 'SELECT id, quantity FROM character_inventory WHERE character_id = ? AND item_id = ?',
+    args: [characterId, itemId],
+  });
+  
+  if (existing.rows.length > 0) {
+    // Update quantity
+    await db.execute({
+      sql: 'UPDATE character_inventory SET quantity = quantity + ? WHERE id = ?',
+      args: [quantity, existing.rows[0].id],
+    });
+  } else {
+    // Insert new
+    await db.execute({
+      sql: 'INSERT INTO character_inventory (character_id, item_id, quantity) VALUES (?, ?, ?)',
+      args: [characterId, itemId, quantity],
+    });
+  }
+}
+
+export async function removeItemFromCharacter(inventoryId: number) {
+  await requireGM();
+  
+  await db.execute({
+    sql: 'DELETE FROM character_inventory WHERE id = ?',
+    args: [inventoryId],
+  });
+}
+
+export async function updateCharacterInventoryItem(inventoryId: number, quantity: number, equipped: number) {
+  await requireGM();
+  
+  await db.execute({
+    sql: 'UPDATE character_inventory SET quantity = ?, equipped = ? WHERE id = ?',
+    args: [quantity, equipped, inventoryId],
+  });
+}
+
+export async function getCharacterAbilities(characterId: number) {
+  await requireGM();
+  
+  const result = await db.execute({
+    sql: `SELECT 
+            ca.id as character_ability_id,
+            ca.ability_id,
+            a.name,
+            a.type,
+            a.category,
+            a.required_level
+          FROM character_abilities ca
+          JOIN abilities a ON ca.ability_id = a.id
+          WHERE ca.character_id = ?
+          ORDER BY a.type, a.name`,
+    args: [characterId],
+  });
+  
+  return result.rows;
+}
+
+export async function addAbilityToCharacter(characterId: number, abilityId: number) {
+  await requireGM();
+  
+  // Check if already has ability
+  const existing = await db.execute({
+    sql: 'SELECT id FROM character_abilities WHERE character_id = ? AND ability_id = ?',
+    args: [characterId, abilityId],
+  });
+  
+  if (existing.rows.length === 0) {
+    await db.execute({
+      sql: 'INSERT INTO character_abilities (character_id, ability_id) VALUES (?, ?)',
+      args: [characterId, abilityId],
+    });
+  }
+}
+
+export async function removeAbilityFromCharacter(characterAbilityId: number) {
+  await requireGM();
+  
+  await db.execute({
+    sql: 'DELETE FROM character_abilities WHERE id = ?',
+    args: [characterAbilityId],
+  });
+}
+
 export async function createMerchantInventory(data: any) {
   await requireGM();
   
