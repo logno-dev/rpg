@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Morthvale Favicon Generator</title>
+    <style>
+        @font-face {
+            font-family: 'New Rocker';
+            src: url('http://localhost:3000/NewRocker-Regular.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #2d2d2d;
+            font-family: sans-serif;
+            color: white;
+        }
+        
+        .instructions {
+            max-width: 600px;
+            margin: 0 auto 20px;
+            padding: 20px;
+            background: #1a1a1a;
+            border-radius: 8px;
+        }
+        
+        .favicon-preview {
+            display: flex;
+            gap: 40px;
+            justify-content: center;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+        
+        .size-option {
+            text-align: center;
+        }
+        
+        .favicon-container {
+            position: relative;
+            display: inline-block;
+            margin: 10px;
+        }
+        
+        canvas {
+            border: 2px solid #8b5cf6;
+            image-rendering: crisp-edges;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: pixelated;
+        }
+        
+        .size-label {
+            margin-top: 10px;
+            color: #8b5cf6;
+            font-weight: bold;
+        }
+        
+        button {
+            background: #8b5cf6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        button:hover {
+            background: #7c3aed;
+        }
+    </style>
+</head>
+<body>
+    <div class="instructions">
+        <h1>Morthvale Favicon Generator</h1>
+        <p>This page generates favicon images using the New Rocker font.</p>
+        <p><strong>Instructions:</strong></p>
+        <ol>
+            <li>Wait for the font to load (the M should appear in the New Rocker style)</li>
+            <li>Click "Download" under each size to save the favicon</li>
+            <li>Replace the favicon.ico file in your public folder</li>
+        </ol>
+        <p><strong>Note:</strong> Make sure your dev server is running so the font can load from localhost:3000</p>
+    </div>
+    
+    <div class="favicon-preview">
+        <div class="size-option">
+            <div class="favicon-container">
+                <canvas id="favicon16" width="16" height="16"></canvas>
+            </div>
+            <div class="size-label">16x16</div>
+            <button onclick="downloadCanvas('favicon16', 'favicon-16x16.png')">Download</button>
+        </div>
+        
+        <div class="size-option">
+            <div class="favicon-container">
+                <canvas id="favicon32" width="32" height="32"></canvas>
+            </div>
+            <div class="size-label">32x32</div>
+            <button onclick="downloadCanvas('favicon32', 'favicon-32x32.png')">Download</button>
+        </div>
+        
+        <div class="size-option">
+            <div class="favicon-container">
+                <canvas id="favicon64" width="64" height="64"></canvas>
+            </div>
+            <div class="size-label">64x64 (Preview)</div>
+            <button onclick="downloadCanvas('favicon64', 'favicon-64x64.png')">Download</button>
+        </div>
+    </div>
+
+    <script>
+        function drawFavicon(canvasId, size) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            
+            // Dark background
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0, 0, size, size);
+            
+            // White M in New Rocker font
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${size * 0.85}px 'New Rocker', serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // Draw the M
+            ctx.fillText('M', size / 2, size / 2);
+        }
+        
+        function downloadCanvas(canvasId, filename) {
+            const canvas = document.getElementById(canvasId);
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+        
+        // Wait for font to load
+        document.fonts.ready.then(() => {
+            console.log('Font loaded, drawing favicons...');
+            drawFavicon('favicon16', 16);
+            drawFavicon('favicon32', 32);
+            drawFavicon('favicon64', 64);
+        });
+        
+        // Fallback: also try after a delay
+        setTimeout(() => {
+            drawFavicon('favicon16', 16);
+            drawFavicon('favicon32', 32);
+            drawFavicon('favicon64', 64);
+        }, 1000);
+    </script>
+</body>
+</html>
