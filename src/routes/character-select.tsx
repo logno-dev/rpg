@@ -44,7 +44,7 @@ export default function CharacterSelect() {
     <div>
       <div class="header">
         <div class="header-content">
-          <h1 class="title">Fantasy RPG</h1>
+          <h1 class="title">Morthvale</h1>
           <button class="button secondary" onClick={handleLogout}>
             Logout
           </button>

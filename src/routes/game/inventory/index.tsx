@@ -757,7 +757,7 @@ export default function InventoryPage() {
     if (item.attack_speed && item.attack_speed !== 1 || equippedItem.attack_speed && equippedItem.attack_speed !== 1) {
       const currentSpeed = equippedItem.attack_speed || 1;
       const newSpeed = item.attack_speed || 1;
-      const diff = currentSpeed - newSpeed;
+      const diff = newSpeed - currentSpeed; // Higher is better
       comparisons.push({
         stat: 'Attack Speed',
         current: currentSpeed,

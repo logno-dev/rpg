@@ -71,7 +71,7 @@ export default function Home() {
     <div class="container">
       <div style={{ "max-width": "400px", margin: "4rem auto" }}>
         <h1 class="title" style={{ "text-align": "center", "margin-bottom": "2rem" }}>
-          Fantasy RPG
+          Morthvale
         </h1>
 
         <div class="card">

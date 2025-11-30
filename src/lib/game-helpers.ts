@@ -103,12 +103,11 @@ export function getEquipmentComparison(item: any, currentInventory: any[]) {
     });
   }
   
-  // Compare attack speed (lower is better - inverted for display)
+  // Compare attack speed (higher is better)
   if (item.attack_speed && item.attack_speed !== 1 || equippedItem.attack_speed && equippedItem.attack_speed !== 1) {
     const currentSpeed = equippedItem.attack_speed || 1;
     const newSpeed = item.attack_speed || 1;
-    // Invert the diff since lower attack speed is better
-    const diff = currentSpeed - newSpeed; // Positive means improvement
+    const diff = newSpeed - currentSpeed; // Positive means improvement
     comparisons.push({
       stat: 'Attack Speed',
       current: currentSpeed,

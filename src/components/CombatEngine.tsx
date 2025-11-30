@@ -257,7 +257,8 @@ export function CombatEngine(props: CombatEngineProps) {
     // Dexterity is the primary factor, weapon speed is secondary
     // Higher dexterity = faster attacks
     const dexModifier = 1 + ((dexterity - 10) * 0.05); // +5% per point above 10, -5% per point below
-    const weaponModifier = baseSpeed || 1.0; // Weapon speed multiplier
+    // Higher attack_speed values = faster attacks (2.0 = 2x faster, 0.5 = half speed)
+    const weaponModifier = baseSpeed || 1.0;
     const attacksPerSecond = dexModifier * weaponModifier;
     const ticksPerAttack = BASE_ATTACK_TICKS / attacksPerSecond;
     

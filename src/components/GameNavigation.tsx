@@ -21,7 +21,7 @@ export function GameNavigation() {
       {/* Desktop Navigation */}
       <div class="header desktop-nav">
         <div class="header-content">
-          <h1 class="title">Fantasy RPG</h1>
+          <h1 class="title">Morthvale</h1>
           <div class="button-group">
             <A href="/game" class="button" activeClass="active" end>
               <Swords size={18} style={{ "margin-right": "0.5rem" }} />
