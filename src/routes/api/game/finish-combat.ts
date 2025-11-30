@@ -36,15 +36,47 @@ export async function POST(event: APIEvent) {
         mob = mobResult.rows[0] as any;
       }
 
-      const goldGained = Math.floor(Math.random() * (mob.gold_max - mob.gold_min + 1)) + mob.gold_min;
-      const expGained = mob.experience_reward;
-
       // Get character to check for level up
       const charResult = await db.execute({
         sql: 'SELECT * FROM characters WHERE id = ?',
         args: [characterId],
       });
       const character = charResult.rows[0] as any;
+
+      const goldGained = Math.floor(Math.random() * (mob.gold_max - mob.gold_min + 1)) + mob.gold_min;
+      
+      // Calculate XP with level-based scaling
+      // Players get reduced XP for killing mobs below their level
+      const levelDifference = character.level - mob.level;
+      let xpMultiplier = 1.0;
+      
+      if (levelDifference > 0) {
+        // Reduce XP for lower level mobs
+        // 0-2 levels below: 100% XP
+        // 3 levels below: 75% XP
+        // 4 levels below: 50% XP
+        // 5 levels below: 25% XP
+        // 6+ levels below: 10% XP
+        // 10+ levels below: 1% XP
+        if (levelDifference <= 2) {
+          xpMultiplier = 1.0;
+        } else if (levelDifference === 3) {
+          xpMultiplier = 0.75;
+        } else if (levelDifference === 4) {
+          xpMultiplier = 0.50;
+        } else if (levelDifference === 5) {
+          xpMultiplier = 0.25;
+        } else if (levelDifference < 10) {
+          xpMultiplier = 0.10;
+        } else {
+          xpMultiplier = 0.01;
+        }
+      } else if (levelDifference < 0) {
+        // Bonus XP for higher level mobs (5% per level above)
+        xpMultiplier = 1.0 + (Math.abs(levelDifference) * 0.05);
+      }
+      
+      const expGained = Math.max(1, Math.floor(mob.experience_reward * xpMultiplier));
 
       const EXPERIENCE_PER_LEVEL = 125;
       const POINTS_PER_LEVEL = 3;

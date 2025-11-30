@@ -600,7 +600,31 @@ export async function processCombatRound(
     log.push(`You defeated ${mobDisplayName}!`);
 
     // Award experience and gold
-    const expGained = mob.experience_reward;
+    // Calculate XP with level-based scaling
+    const levelDifference = character.level - mob.level;
+    let xpMultiplier = 1.0;
+    
+    if (levelDifference > 0) {
+      // Reduce XP for lower level mobs
+      if (levelDifference <= 2) {
+        xpMultiplier = 1.0;
+      } else if (levelDifference === 3) {
+        xpMultiplier = 0.75;
+      } else if (levelDifference === 4) {
+        xpMultiplier = 0.50;
+      } else if (levelDifference === 5) {
+        xpMultiplier = 0.25;
+      } else if (levelDifference < 10) {
+        xpMultiplier = 0.10;
+      } else {
+        xpMultiplier = 0.01;
+      }
+    } else if (levelDifference < 0) {
+      // Bonus XP for higher level mobs (5% per level above)
+      xpMultiplier = 1.0 + (Math.abs(levelDifference) * 0.05);
+    }
+    
+    const expGained = Math.max(1, Math.floor(mob.experience_reward * xpMultiplier));
     const goldGained = Math.floor(Math.random() * (mob.gold_max - mob.gold_min + 1)) + mob.gold_min;
 
     await db.execute({
