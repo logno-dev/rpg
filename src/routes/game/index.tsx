@@ -1929,7 +1929,7 @@ export default function GamePage() {
         <GameNavigation />
 
         {/* Sticky Character Stats Header */}
-        <Show when={isScrolled() && data()}>
+        <Show when={isScrolled() && data() && store.character}>
           <div style={{
           position: "fixed",
           top: 0,
@@ -2050,7 +2050,7 @@ export default function GamePage() {
         </div>
       </Show>
 
-      <Show when={data()} fallback={<LoadingSkeleton />}>
+      <Show when={data() && store.character} fallback={<LoadingSkeleton />}>
         <div class="container" style={{ "padding-bottom": "calc(5rem + env(safe-area-inset-bottom, 0px))" }}>
           {/* Passive Health/Mana Regeneration */}
           <HealthRegen
