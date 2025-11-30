@@ -254,23 +254,9 @@ export function QuestLogModal(props: QuestLogModalProps) {
                               e.currentTarget.parentElement!.style.borderColor = "var(--border)";
                             }}
                           >
-                            <div style={{ display: "flex", "justify-content": "space-between", "align-items": "start" }}>
-                              <div>
-                                <h3 style={{ margin: "0 0 0.5rem 0", color: "var(--accent)" }}>{quest.name}</h3>
-                                <p style={{ margin: "0 0 0.5rem 0", "font-size": "0.875rem", color: "var(--text-secondary)" }}>
-                                  {quest.description}
-                                </p>
-                                <div style={{ 
-                                  display: "flex", 
-                                  gap: "1rem", 
-                                  "font-size": "0.75rem", 
-                                  color: "var(--text-secondary)",
-                                  "margin-top": "0.5rem"
-                                }}>
-                                  <span>Level {quest.min_level}+</span>
-                                  <span>{isExpanded() ? '▼ Hide details' : '▶ Show details'}</span>
-                                </div>
-                              </div>
+                            {/* Quest header with title and badge */}
+                            <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center", "margin-bottom": "0.75rem" }}>
+                              <h3 style={{ margin: 0, color: "var(--accent)" }}>{quest.name}</h3>
                               <div style={{ 
                                 padding: "0.25rem 0.75rem", 
                                 background: "rgba(34, 197, 94, 0.15)",
@@ -283,6 +269,46 @@ export function QuestLogModal(props: QuestLogModalProps) {
                                 In Progress
                               </div>
                             </div>
+                            
+                            {/* Objectives spanning full width */}
+                            <div style={{ "margin-bottom": "0.75rem" }}>
+                              <For each={quest.objectives}>
+                                {(objective: QuestObjective) => (
+                                  <div style={{ 
+                                    padding: "0.5rem",
+                                    background: objective.completed ? "rgba(34, 197, 94, 0.1)" : "var(--bg-medium)",
+                                    border: `1px solid ${objective.completed ? 'var(--success)' : 'var(--border)'}`,
+                                    "border-radius": "0.375rem",
+                                    "margin-bottom": "0.375rem",
+                                    "font-size": "0.875rem"
+                                  }}>
+                                    <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center" }}>
+                                      <div style={{ flex: 1 }}>
+                                        {objective.description}
+                                      </div>
+                                      <div style={{ 
+                                        "font-weight": "bold",
+                                        "margin-left": "0.75rem",
+                                        color: objective.completed ? "var(--success)" : "var(--text-primary)"
+                                      }}>
+                                        {objective.current_count}/{objective.required_count}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </For>
+                            </div>
+                            
+                            {/* Footer info */}
+                            <div style={{ 
+                              display: "flex", 
+                              gap: "1rem", 
+                              "font-size": "0.75rem", 
+                              color: "var(--text-secondary)"
+                            }}>
+                              <span>Level {quest.min_level}+</span>
+                              <span>{isExpanded() ? '▼ Hide details' : '▶ Show details'}</span>
+                            </div>
                           </div>
                           
                           {/* Expanded Details */}
@@ -292,41 +318,16 @@ export function QuestLogModal(props: QuestLogModalProps) {
                               "padding-top": "1rem",
                               "border-top": "1px solid var(--border)"
                             }}>
-                              <h4 style={{ "margin-bottom": "0.75rem", "font-size": "1rem" }}>Objectives:</h4>
-                              <div style={{ "margin-bottom": "1rem" }}>
-                                <For each={quest.objectives}>
-                                  {(objective: QuestObjective) => (
-                                    <div style={{ 
-                                      padding: "0.75rem",
-                                      background: objective.completed ? "rgba(34, 197, 94, 0.1)" : "var(--bg-medium)",
-                                      border: `1px solid ${objective.completed ? 'var(--success)' : 'var(--border)'}`,
-                                      "border-radius": "0.5rem",
-                                      "margin-bottom": "0.5rem"
-                                    }}>
-                                      <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center" }}>
-                                        <div>
-                                          <div style={{ "font-size": "0.875rem", "margin-bottom": "0.25rem" }}>
-                                            {objective.description}
-                                          </div>
-                                          <Show when={objective.type === 'kill'}>
-                                            <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)" }}>
-                                              Kill {objective.mob_name} 
-                                              <Show when={objective.sub_area_name}>
-                                                {" "}in {objective.sub_area_name}
-                                              </Show>
-                                            </div>
-                                          </Show>
-                                        </div>
-                                        <div style={{ 
-                                          "font-weight": "bold",
-                                          color: objective.completed ? "var(--success)" : "var(--text-primary)"
-                                        }}>
-                                          {objective.current_count}/{objective.required_count}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-                                </For>
+                              {/* Show description in expanded details */}
+                              <div style={{ 
+                                "margin-bottom": "1rem",
+                                padding: "0.75rem",
+                                background: "var(--bg-medium)",
+                                "border-radius": "0.5rem",
+                                "font-size": "0.875rem",
+                                color: "var(--text-secondary)"
+                              }}>
+                                {quest.description}
                               </div>
                               
                                <Show when={quest.rewards && quest.rewards.length > 0}>
