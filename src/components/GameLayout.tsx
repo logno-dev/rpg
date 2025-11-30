@@ -171,6 +171,15 @@ export function GameLayout(props: GameLayoutProps) {
             onRegenTick={handleRegenTick}
           />
           
+          {/* Mobile Title */}
+          <h1 class="title mobile-title" style={{ 
+            "text-align": "center", 
+            "margin-bottom": "1rem",
+            "font-size": "2rem"
+          }}>
+            Morthvale
+          </h1>
+          
           {/* Character Info Panel */}
           <div class="card">
             <div style={{ display: "flex", "justify-content": "space-between", "align-items": "start", "flex-wrap": "wrap", gap: "1rem" }}>

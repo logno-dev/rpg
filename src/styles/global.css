@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'New Rocker';
+  src: url('/NewRocker-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -265,9 +273,21 @@ label {
 }
 
 .title {
+  font-family: 'New Rocker', serif;
   font-size: 1.5rem;
   font-weight: bold;
-  color: var(--accent);
+  color: #ffffff;
+  letter-spacing: 0.05em;
+}
+
+.mobile-title {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-title {
+    display: block;
+  }
 }
 
 /* Sticky header animation */
