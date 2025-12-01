@@ -19,20 +19,22 @@ export function GameLayout(props: GameLayoutProps) {
   const currentCharacter = () => store.character;
   const currentGold = () => store.character?.gold || 0;
 
-  // Check for saved combat state periodically
-  const checkPausedState = () => {
-    setIsRegenPaused(hasSavedCombatState());
-  };
-  
-  // Check immediately
-  checkPausedState();
-  
-  // Check every 2 seconds in case combat state changes
-  const pauseCheckInterval = setInterval(checkPausedState, 2000);
-  
-  // Clean up interval on unmount
-  onCleanup(() => {
-    clearInterval(pauseCheckInterval);
+  // Check for saved combat state periodically (client-side only)
+  onMount(() => {
+    const checkPausedState = () => {
+      setIsRegenPaused(hasSavedCombatState());
+    };
+    
+    // Check immediately
+    checkPausedState();
+    
+    // Check every 2 seconds in case combat state changes
+    const pauseCheckInterval = setInterval(checkPausedState, 2000);
+    
+    // Clean up interval on unmount
+    onCleanup(() => {
+      clearInterval(pauseCheckInterval);
+    });
   });
 
   // Calculate current health/mana from character or dungeon session

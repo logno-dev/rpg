@@ -2627,7 +2627,7 @@ export default function GMPage() {
                       <div style={{ display: "flex", "justify-content": "space-between", "align-items": "start" }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ "font-weight": "bold", "margin-bottom": "0.5rem" }}>
-                            Effect #{effect.effect_order}: {effect.effect_type.toUpperCase()} → {effect.target}
+                            Effect #{effect.effect_order}: {effect.effect_type?.toUpperCase() || 'UNKNOWN'} → {effect.target || 'N/A'}
                           </div>
                           <div style={{ "font-size": "0.9rem", color: "var(--text-secondary)" }}>
                             <Show when={effect.effect_type === 'damage' || effect.effect_type === 'heal'}>

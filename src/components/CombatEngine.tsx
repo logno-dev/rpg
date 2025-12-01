@@ -1351,9 +1351,9 @@ export function CombatEngine(props: CombatEngineProps) {
                       <Show when={cooldown() > 0} fallback={
                         <div style={{ 
                           "font-size": "0.65rem", 
-                          color: "var(--text-secondary)",
+                          color: "white",
                           "line-height": "1",
-                          opacity: "0.9"
+                          "font-weight": "600"
                         }}>
                           <Show when={action.type === 'ability' && action.ability?.mana_cost && action.ability.mana_cost > 0}>
                             {action.ability?.mana_cost}mp
