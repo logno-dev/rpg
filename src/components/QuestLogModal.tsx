@@ -172,7 +172,7 @@ export function QuestLogModal(props: QuestLogModalProps) {
           }}
           onClick={props.onClose}
         >
-          ✕
+          ×
         </button>
 
         <h2 style={{ "margin-bottom": "1.5rem", "padding-right": "2.5rem" }}>Quest Log</h2>
@@ -214,7 +214,7 @@ export function QuestLogModal(props: QuestLogModalProps) {
                       "align-items": "center",
                       gap: "1rem"
                     }}>
-                      <div style={{ "font-size": "3rem" }}>📜</div>
+                      <div style={{ "font-size": "3rem" }}></div>
                       <div>
                         <div style={{ "font-size": "1.125rem", "font-weight": "600", "margin-bottom": "0.5rem", color: "var(--text-primary)" }}>
                           No Active Quests
@@ -403,7 +403,7 @@ export function QuestLogModal(props: QuestLogModalProps) {
                                        }
                                      }}
                                    >
-                                     ✓ Turn In Quest
+                                     Turn In Quest
                                    </button>
                                  </Show>
                                  
@@ -415,7 +415,7 @@ export function QuestLogModal(props: QuestLogModalProps) {
                                      setAbandonConfirm({ questId: quest.id, questName: quest.name });
                                    }}
                                  >
-                                   ✕ Abandon Quest
+                                   × Abandon Quest
                                  </button>
                                </div>
                              </div>
@@ -444,7 +444,7 @@ export function QuestLogModal(props: QuestLogModalProps) {
                       "align-items": "center",
                       gap: "1rem"
                     }}>
-                      <div style={{ "font-size": "3rem" }}>🗺️</div>
+                      <div style={{ "font-size": "3rem" }}></div>
                       <div>
                         <div style={{ "font-size": "1.125rem", "font-weight": "600", "margin-bottom": "0.5rem", color: "var(--text-primary)" }}>
                           No Available Quests
@@ -652,7 +652,7 @@ export function QuestLogModal(props: QuestLogModalProps) {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ "font-size": "3rem", "margin-bottom": "1rem" }}>✨</div>
+            <div style={{ "font-size": "3rem", "margin-bottom": "1rem" }}></div>
             <h2 style={{ "margin-bottom": "0.5rem", color: "var(--success)" }}>Quest Complete!</h2>
             <h3 style={{ "margin-bottom": "1.5rem", color: "var(--text-secondary)", "font-weight": "normal" }}>
               {completionData()?.questName}
@@ -763,7 +763,7 @@ export function QuestLogModal(props: QuestLogModalProps) {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ "font-size": "3rem", "text-align": "center", "margin-bottom": "1rem" }}>⚠️</div>
+            <div style={{ "font-size": "3rem", "text-align": "center", "margin-bottom": "1rem" }}></div>
             <h2 style={{ "margin-bottom": "0.5rem", color: "var(--warning)", "text-align": "center" }}>
               Abandon Quest?
             </h2>

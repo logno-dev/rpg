@@ -355,16 +355,16 @@ export function HotbarManager(props: Props) {
                         </Show>
                         <div style={{ "font-size": "0.875rem", display: "flex", gap: "1rem", "flex-wrap": "wrap" }}>
                           <Show when={ability.mana_cost}>
-                            <span style={{ color: "var(--accent)" }}>💧 {ability.mana_cost} Mana</span>
+                            <span style={{ color: "var(--accent)" }}>{ability.mana_cost} Mana</span>
                           </Show>
                           <Show when={ability.cooldown}>
-                            <span style={{ color: "var(--warning)" }}>⏱️ {ability.cooldown}s</span>
+                            <span style={{ color: "var(--warning)" }}>{ability.cooldown}s</span>
                           </Show>
                           <Show when={ability.damage_min && ability.damage_max}>
-                            <span style={{ color: "var(--danger)" }}>⚔️ {ability.damage_min}-{ability.damage_max}</span>
+                            <span style={{ color: "var(--danger)" }}>{ability.damage_min}-{ability.damage_max}</span>
                           </Show>
                           <Show when={ability.healing}>
-                            <span style={{ color: "var(--success)" }}>❤️ {ability.healing}</span>
+                            <span style={{ color: "var(--success)" }}>{ability.healing}</span>
                           </Show>
                         </div>
                         <Show when={ability.weapon_type_requirement || ability.offhand_type_requirement}>
@@ -377,7 +377,7 @@ export function HotbarManager(props: Props) {
                             border: "1px solid var(--accent)",
                             color: "var(--text-secondary)"
                           }}>
-                            <div style={{ color: "var(--accent)", "font-weight": "bold", "margin-bottom": "0.25rem" }}>⚔️ Equipment Required:</div>
+                            <div style={{ color: "var(--accent)", "font-weight": "bold", "margin-bottom": "0.25rem" }}>Equipment Required:</div>
                             <Show when={ability.weapon_type_requirement}>
                               <div><strong>Weapon:</strong> {ability.weapon_type_requirement.split(',').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).replace('_', ' ')).join(', ')}</div>
                             </Show>
@@ -435,10 +435,10 @@ export function HotbarManager(props: Props) {
                         </Show>
                         <div style={{ "font-size": "0.875rem", display: "flex", gap: "1rem" }}>
                           <Show when={item.health_restore}>
-                            <span style={{ color: "var(--danger)" }}>❤️ +{item.health_restore} HP</span>
+                            <span style={{ color: "var(--danger)" }}>+{item.health_restore} HP</span>
                           </Show>
                           <Show when={item.mana_restore}>
-                            <span style={{ color: "var(--accent)" }}>💧 +{item.mana_restore} MP</span>
+                            <span style={{ color: "var(--accent)" }}>+{item.mana_restore} MP</span>
                           </Show>
                         </div>
                       </div>

@@ -3,6 +3,7 @@ import { useNavigate } from "@solidjs/router";
 import { useCharacter } from "~/lib/CharacterContext";
 import { HealthRegen } from "~/components/HealthRegen";
 import { GameNavigation } from "~/components/GameNavigation";
+import { Coins } from "lucide-solid";
 
 type GameLayoutProps = {
   children: any;
@@ -149,9 +150,13 @@ export function GameLayout(props: GameLayoutProps) {
             <div style={{ 
               "white-space": "nowrap",
               "font-weight": "bold",
-              color: "var(--warning)"
+              color: "var(--warning)",
+              display: "flex",
+              "align-items": "center",
+              gap: "0.5rem"
             }}>
-              💰 {currentGold()}
+              <Coins size={18} />
+              {currentGold()}
             </div>
           </div>
         </div>
@@ -185,8 +190,12 @@ export function GameLayout(props: GameLayoutProps) {
             <div style={{ display: "flex", "justify-content": "space-between", "align-items": "start", "flex-wrap": "wrap", gap: "1rem" }}>
               <div style={{ flex: 1, "min-width": "250px" }}>
                 <h2>{currentCharacter()?.name}</h2>
-                <p style={{ color: "var(--text-secondary)", "margin-bottom": "0.5rem" }}>
-                  Level {currentCharacter()!.level} | {currentGold()} Gold
+                <p style={{ color: "var(--text-secondary)", "margin-bottom": "0.5rem", display: "flex", "align-items": "center", gap: "0.5rem" }}>
+                  <span>Level {currentCharacter()!.level}</span>
+                  <span>|</span>
+                  <span style={{ display: "flex", "align-items": "center", gap: "0.25rem" }}>
+                    <Coins size={16} /> {currentGold()} Gold
+                  </span>
                 </p>
                 {/* XP Progress Bar */}
                 <div>

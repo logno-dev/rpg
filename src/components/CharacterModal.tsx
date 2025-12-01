@@ -78,7 +78,7 @@ export function CharacterModal(props: CharacterModalProps) {
           }}
           onClick={props.onClose}
         >
-          ✕
+          ×
         </button>
 
         <h2 style={{ "margin-bottom": "1.5rem", "padding-right": "2.5rem" }}>Character Menu</h2>

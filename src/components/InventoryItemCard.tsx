@@ -39,34 +39,34 @@ export function InventoryItemCard(props: InventoryItemCardProps) {
       {/* Item Stats */}
       <div style={{ "font-size": "0.875rem", "margin-bottom": "0.5rem" }}>
         <Show when={invItem.damage_min && invItem.damage_max}>
-          <div style={{ color: "var(--danger)" }}>⚔️ {invItem.damage_min}-{invItem.damage_max} Damage</div>
+          <div style={{ color: "var(--danger)" }}>{invItem.damage_min}-{invItem.damage_max} Damage</div>
         </Show>
         <Show when={invItem.armor}>
-          <div style={{ color: "var(--accent)" }}>🛡️ {invItem.armor} Armor</div>
+          <div style={{ color: "var(--accent)" }}>{invItem.armor} Armor</div>
         </Show>
         <Show when={invItem.attack_speed && invItem.attack_speed !== 1}>
-          <div style={{ color: "var(--success)" }}>⚡ {invItem.attack_speed}x Attack Speed</div>
+          <div style={{ color: "var(--success)" }}>{invItem.attack_speed}x Attack Speed</div>
         </Show>
         <Show when={invItem.strength_bonus}>
-          <div>💪 +{invItem.strength_bonus} Strength</div>
+          <div>+{invItem.strength_bonus} Strength</div>
         </Show>
         <Show when={invItem.dexterity_bonus}>
-          <div>🏃 +{invItem.dexterity_bonus} Dexterity</div>
+          <div>+{invItem.dexterity_bonus} Dexterity</div>
         </Show>
         <Show when={invItem.constitution_bonus}>
-          <div>❤️ +{invItem.constitution_bonus} Constitution</div>
+          <div>+{invItem.constitution_bonus} Constitution</div>
         </Show>
         <Show when={invItem.intelligence_bonus}>
-          <div>🧠 +{invItem.intelligence_bonus} Intelligence</div>
+          <div>+{invItem.intelligence_bonus} Intelligence</div>
         </Show>
         <Show when={invItem.wisdom_bonus}>
-          <div>✨ +{invItem.wisdom_bonus} Wisdom</div>
+          <div>+{invItem.wisdom_bonus} Wisdom</div>
         </Show>
         <Show when={invItem.charisma_bonus}>
-          <div>💫 +{invItem.charisma_bonus} Charisma</div>
+          <div>+{invItem.charisma_bonus} Charisma</div>
         </Show>
         <Show when={invItem.value}>
-          <div style={{ color: "var(--warning)" }}>💰 {invItem.value} Gold</div>
+          <div style={{ color: "var(--warning)" }}>{invItem.value} Gold</div>
         </Show>
       </div>
 
@@ -87,7 +87,7 @@ export function InventoryItemCard(props: InventoryItemCardProps) {
                 "font-weight": "bold",
                 "margin-bottom": "0.25rem"
               }}>
-                ⚖️ Compared to {comparison().equippedItem.name}:
+                Compared to {comparison().equippedItem.name}:
               </div>
               <div style={{ display: "flex", "flex-direction": "column", gap: "0.15rem" }}>
                 <For each={comparison().comparisons}>
@@ -130,7 +130,7 @@ export function InventoryItemCard(props: InventoryItemCardProps) {
             "font-weight": "bold",
             "margin-bottom": "0.25rem"
           }}>
-            {props.meetsRequirements(invItem) ? "✓ Requirements Met" : "✗ Requirements Not Met"}
+            {props.meetsRequirements(invItem) ? "Requirements Met" : "Requirements Not Met"}
           </div>
           <div style={{ color: "var(--text-secondary)" }}>
             Requires: {props.formatRequirements(invItem).join(', ')}
@@ -154,7 +154,7 @@ export function InventoryItemCard(props: InventoryItemCardProps) {
                     "margin-bottom": "0.25rem",
                     "font-weight": "500"
                   }}>
-                    ✓ Already Learned
+                    Already Learned
                   </div>
                 </Show>
                 <Show when={scrollStatus.hasBetter}>
@@ -164,7 +164,7 @@ export function InventoryItemCard(props: InventoryItemCardProps) {
                     "margin-bottom": "0.25rem",
                     "font-weight": "500"
                   }}>
-                    ⚠ You have a better version
+                    You have a better version
                   </div>
                 </Show>
                 

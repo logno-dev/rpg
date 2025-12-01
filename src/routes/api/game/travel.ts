@@ -1,6 +1,7 @@
 import { json } from '@solidjs/router';
 import type { APIEvent } from '@solidjs/start/server';
 import { db } from '~/lib/db';
+import { hasUnlockedRegion, unlockRegion, getAllRegions } from '~/lib/game';
 
 export async function POST(event: APIEvent) {
   try {
@@ -31,29 +32,34 @@ export async function POST(event: APIEvent) {
 
     const region = regionResult.rows[0] as any;
 
-    // Check if region is locked
-    if (region.locked === 1) {
-      // Check unlock conditions based on requirement text
-      if (region.unlock_requirement && region.unlock_requirement.includes('level')) {
-        // Parse level requirement (e.g., "Reach level 4" -> 4)
+    // Check if character has unlocked this region
+    const isUnlocked = await hasUnlockedRegion(characterId, regionId);
+    
+    if (!isUnlocked) {
+      // Region is locked for this character - check if they can unlock it now
+      if (region.unlock_requirement) {
+        // Check level-based unlock
         const levelMatch = region.unlock_requirement.match(/level (\d+)/i);
         if (levelMatch) {
           const requiredLevel = parseInt(levelMatch[1]);
           if (character.level >= requiredLevel) {
-            // Unlock the region
-            await db.execute({
-              sql: 'UPDATE regions SET locked = 0 WHERE id = ?',
-              args: [regionId],
-            });
+            // Unlock the region for this character
+            await unlockRegion(characterId, regionId);
           } else {
             return json({ 
-              error: `This region is locked. ${region.unlock_requirement}` 
+              error: `This region is locked. Requirement: ${region.unlock_requirement}` 
             }, { status: 403 });
           }
+        } else {
+          // Other unlock requirements (boss defeat, dungeon completion, etc.)
+          return json({ 
+            error: `This region is locked. Requirement: ${region.unlock_requirement}` 
+          }, { status: 403 });
         }
       } else {
+        // Locked but no requirement specified
         return json({ 
-          error: `This region is locked. ${region.unlock_requirement || 'Complete the required quest to unlock.'}` 
+          error: 'This region is locked.' 
         }, { status: 403 });
       }
     }
@@ -70,17 +76,14 @@ export async function POST(event: APIEvent) {
       args: [characterId],
     });
 
-    // Get all regions (in case one was unlocked)
-    const regionsResult = await db.execute({
-      sql: 'SELECT * FROM regions ORDER BY min_level, id',
-      args: [],
-    });
+    // Get all regions with character-specific unlock status
+    const regions = await getAllRegions(character.level, characterId);
 
     return json({ 
       success: true, 
       region: regionResult.rows[0],
       character: updatedCharResult.rows[0],
-      regions: regionsResult.rows
+      regions: regions
     });
   } catch (error: any) {
     console.error('Travel error:', error);

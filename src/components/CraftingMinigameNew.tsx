@@ -247,7 +247,7 @@ export function CraftingMinigameNew(props: CraftingMinigameProps) {
                 "margin-bottom": "0.5rem",
                 color: craftResult()?.craftSuccess ? "var(--success)" : "var(--danger)"
               }}>
-                {craftResult()?.craftSuccess ? "✓" : "✗"}
+                {craftResult()?.craftSuccess ? "Success" : "Failed"}
               </div>
               <h2 style={{ "margin-bottom": "0.25rem" }}>
                 {craftResult()?.craftSuccess ? "Crafting Success!" : "Crafting Failed"}
@@ -262,8 +262,8 @@ export function CraftingMinigameNew(props: CraftingMinigameProps) {
                          "var(--rare)"
                 }}>
                   {craftResult()?.quality === "masterwork" && "⭐ Masterwork Quality ⭐"}
-                  {craftResult()?.quality === "superior" && "✨ Superior Quality"}
-                  {craftResult()?.quality === "fine" && "💎 Fine Quality"}
+                  {craftResult()?.quality === "superior" && "Superior Quality"}
+                  {craftResult()?.quality === "fine" && "Fine Quality"}
                 </div>
               )}
             </div>
@@ -306,28 +306,28 @@ export function CraftingMinigameNew(props: CraftingMinigameProps) {
                   "font-size": "0.9rem"
                 }}>
                   <Show when={craftResult()?.fullItem?.damage_min && craftResult()?.fullItem?.damage_max}>
-                    <div>⚔️ Damage: {craftResult()?.fullItem?.damage_min}-{craftResult()?.fullItem?.damage_max}</div>
+                    <div>Damage: {craftResult()?.fullItem?.damage_min}-{craftResult()?.fullItem?.damage_max}</div>
                   </Show>
                   <Show when={craftResult()?.fullItem?.armor}>
-                    <div>🛡️ Armor: {craftResult()?.fullItem?.armor}</div>
+                    <div>Armor: {craftResult()?.fullItem?.armor}</div>
                   </Show>
                   <Show when={craftResult()?.fullItem?.strength_bonus}>
-                    <div>💪 Strength: +{craftResult()?.fullItem?.strength_bonus}</div>
+                    <div>Strength: +{craftResult()?.fullItem?.strength_bonus}</div>
                   </Show>
                   <Show when={craftResult()?.fullItem?.dexterity_bonus}>
-                    <div>🎯 Dexterity: +{craftResult()?.fullItem?.dexterity_bonus}</div>
+                    <div>Dexterity: +{craftResult()?.fullItem?.dexterity_bonus}</div>
                   </Show>
                   <Show when={craftResult()?.fullItem?.constitution_bonus}>
-                    <div>❤️ Constitution: +{craftResult()?.fullItem?.constitution_bonus}</div>
+                    <div>Constitution: +{craftResult()?.fullItem?.constitution_bonus}</div>
                   </Show>
                   <Show when={craftResult()?.fullItem?.intelligence_bonus}>
-                    <div>🧠 Intelligence: +{craftResult()?.fullItem?.intelligence_bonus}</div>
+                    <div>Intelligence: +{craftResult()?.fullItem?.intelligence_bonus}</div>
                   </Show>
                   <Show when={craftResult()?.fullItem?.wisdom_bonus}>
-                    <div>🔮 Wisdom: +{craftResult()?.fullItem?.wisdom_bonus}</div>
+                    <div>Wisdom: +{craftResult()?.fullItem?.wisdom_bonus}</div>
                   </Show>
                   <Show when={craftResult()?.fullItem?.charisma_bonus}>
-                    <div>✨ Charisma: +{craftResult()?.fullItem?.charisma_bonus}</div>
+                    <div>Charisma: +{craftResult()?.fullItem?.charisma_bonus}</div>
                   </Show>
                 </div>
               </div>

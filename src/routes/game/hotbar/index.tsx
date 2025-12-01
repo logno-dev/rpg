@@ -59,7 +59,7 @@ export default function HotbarPage() {
   const LoadingSkeleton = () => (
     <div class="card">
       <div style={{ height: "400px", display: "flex", "align-items": "center", "justify-content": "center", "flex-direction": "column", gap: "1rem", animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite" }}>
-        <div style={{ "font-size": "3rem" }}>🎮</div>
+        <div style={{ "font-size": "3rem" }}></div>
         <div style={{ "font-size": "1.25rem", color: "var(--text-secondary)" }}>Loading hotbar...</div>
       </div>
       <style>{`

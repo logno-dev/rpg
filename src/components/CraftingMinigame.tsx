@@ -379,7 +379,7 @@ export function CraftingMinigame(props: CraftingMinigameProps) {
               "font-size": "4rem", 
               "margin-bottom": "1rem" 
             }}>
-              {craftResult()?.craftSuccess ? "✓" : "✗"}
+              {craftResult()?.craftSuccess ? "Success" : "Failed"}
             </div>
             <h2 style={{ 
               color: craftResult()?.craftSuccess ? "#22c55e" : "#ef4444",

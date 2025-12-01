@@ -207,7 +207,6 @@ export default function StatsRoute() {
   const LoadingSkeleton = () => (
     <div class="card">
       <div style={{ height: "400px", display: "flex", "align-items": "center", "justify-content": "center", "flex-direction": "column", gap: "1rem", animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite" }}>
-        <div style={{ "font-size": "3rem" }}>📊</div>
         <div style={{ "font-size": "1.25rem", color: "var(--text-secondary)" }}>Loading stats...</div>
       </div>
       <style>{`
@@ -261,12 +260,12 @@ export default function StatsRoute() {
 
         <div style={{ display: "grid", gap: "1rem" }}>
           <For each={[
-            { key: 'strength', name: 'Strength', emoji: '💪', desc: 'Increases melee damage' },
-            { key: 'dexterity', name: 'Dexterity', emoji: '🏃', desc: 'Increases attack speed' },
-            { key: 'constitution', name: 'Constitution', emoji: '❤️', desc: 'Increases max health & HP regen' },
-            { key: 'intelligence', name: 'Intelligence', emoji: '🧠', desc: 'Increases max mana & spell power' },
-            { key: 'wisdom', name: 'Wisdom', emoji: '✨', desc: 'Increases mana regen & healing' },
-            { key: 'charisma', name: 'Charisma', emoji: '💫', desc: 'Affects luck & fortune' },
+            { key: 'strength', name: 'Strength', desc: 'Increases melee damage' },
+            { key: 'dexterity', name: 'Dexterity', desc: 'Increases attack speed' },
+            { key: 'constitution', name: 'Constitution', desc: 'Increases max health & HP regen' },
+            { key: 'intelligence', name: 'Intelligence', desc: 'Increases max mana & spell power' },
+            { key: 'wisdom', name: 'Wisdom', desc: 'Increases mana regen & healing' },
+            { key: 'charisma', name: 'Charisma', desc: 'Affects luck & fortune' },
           ]}>
             {(stat) => {
               const character = currentCharacter();
@@ -290,7 +289,7 @@ export default function StatsRoute() {
                     "align-items": "center"
                   }}>
                     <div>
-                      <div style={{ "font-weight": "bold", "font-size": "1.1rem" }}>{stat.emoji} {stat.name}</div>
+                      <div style={{ "font-weight": "bold", "font-size": "1.1rem" }}>{stat.name}</div>
                       <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
                         {stat.desc}
                       </div>

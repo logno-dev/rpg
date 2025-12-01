@@ -101,40 +101,40 @@ export function ItemDetailModal(props: ItemDetailModalProps) {
             <h4 style={{ "margin-bottom": "0.5rem", "font-size": "1rem", color: "var(--accent)" }}>Stats</h4>
             <div style={{ "font-size": "0.95rem", display: "flex", "flex-direction": "column", gap: "0.25rem" }}>
               <Show when={item.damage_min && item.damage_max}>
-                <div style={{ color: "var(--danger)" }}>⚔️ {item.damage_min}-{item.damage_max} Damage</div>
+                <div style={{ color: "var(--danger)" }}>{item.damage_min}-{item.damage_max} Damage</div>
               </Show>
               <Show when={item.armor}>
-                <div style={{ color: "var(--accent)" }}>🛡️ {item.armor} Armor</div>
+                <div style={{ color: "var(--accent)" }}>{item.armor} Armor</div>
               </Show>
               <Show when={item.attack_speed && item.attack_speed !== 1}>
-                <div style={{ color: "var(--success)" }}>⚡ {item.attack_speed}x Attack Speed</div>
+                <div style={{ color: "var(--success)" }}>{item.attack_speed}x Attack Speed</div>
               </Show>
               <Show when={item.strength_bonus}>
-                <div>💪 +{item.strength_bonus} Strength</div>
+                <div>+{item.strength_bonus} Strength</div>
               </Show>
               <Show when={item.dexterity_bonus}>
-                <div>🏃 +{item.dexterity_bonus} Dexterity</div>
+                <div>+{item.dexterity_bonus} Dexterity</div>
               </Show>
               <Show when={item.constitution_bonus}>
-                <div>❤️ +{item.constitution_bonus} Constitution</div>
+                <div>+{item.constitution_bonus} Constitution</div>
               </Show>
               <Show when={item.intelligence_bonus}>
-                <div>🧠 +{item.intelligence_bonus} Intelligence</div>
+                <div>+{item.intelligence_bonus} Intelligence</div>
               </Show>
               <Show when={item.wisdom_bonus}>
-                <div>✨ +{item.wisdom_bonus} Wisdom</div>
+                <div>+{item.wisdom_bonus} Wisdom</div>
               </Show>
               <Show when={item.charisma_bonus}>
-                <div>💫 +{item.charisma_bonus} Charisma</div>
+                <div>+{item.charisma_bonus} Charisma</div>
               </Show>
               <Show when={item.health_restore}>
-                <div style={{ color: "var(--success)" }}>❤️ Restores {item.health_restore} Health</div>
+                <div style={{ color: "var(--success)" }}>Restores {item.health_restore} Health</div>
               </Show>
               <Show when={item.mana_restore}>
-                <div style={{ color: "var(--accent)" }}>✨ Restores {item.mana_restore} Mana</div>
+                <div style={{ color: "var(--accent)" }}>Restores {item.mana_restore} Mana</div>
               </Show>
               <Show when={item.value && !props.isMerchantItem}>
-                <div style={{ color: "var(--warning)" }}>💰 {item.value} Gold</div>
+                <div style={{ color: "var(--warning)" }}>{item.value} Gold</div>
               </Show>
             </div>
           </div>
@@ -157,7 +157,7 @@ export function ItemDetailModal(props: ItemDetailModalProps) {
                   "margin-bottom": "0.5rem",
                   "font-size": "1rem"
                 }}>
-                  ⚖️ Compared to {comparison().equippedItem.name}
+                  Compared to {comparison().equippedItem.name}
                 </h4>
                 <div style={{ display: "flex", "flex-direction": "column", gap: "0.25rem", "font-size": "0.95rem" }}>
                   <For each={comparison().comparisons}>
@@ -198,7 +198,7 @@ export function ItemDetailModal(props: ItemDetailModalProps) {
               "font-weight": "bold",
               "margin-bottom": "0.25rem"
             }}>
-              {props.meetsRequirements(item) ? "✓ Requirements Met" : "✗ Requirements Not Met"}
+              {props.meetsRequirements(item) ? "Requirements Met" : "Requirements Not Met"}
             </div>
             <div style={{ color: "var(--text-secondary)", "font-size": "0.875rem" }}>
               Requires: {props.formatRequirements(item).join(', ')}
@@ -221,7 +221,7 @@ export function ItemDetailModal(props: ItemDetailModalProps) {
               "margin-bottom": "0.5rem",
               "font-size": "0.95rem"
             }}>
-              ⚔️ This ability requires specific equipment:
+              This ability requires specific equipment:
             </div>
             <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)", display: "flex", "flex-direction": "column", gap: "0.25rem" }}>
               <Show when={item.weapon_type_requirement}>
@@ -313,7 +313,7 @@ export function ItemDetailModal(props: ItemDetailModalProps) {
                         "text-align": "center",
                         "font-weight": "500"
                       }}>
-                        {scrollStatus.alreadyLearned ? "✓ Already Learned" : "⚠ You have a better version"}
+                        {scrollStatus.alreadyLearned ? "Already Learned" : "You have a better version"}
                       </div>
                     </Show>
                     
@@ -413,7 +413,7 @@ export function ItemDetailModal(props: ItemDetailModalProps) {
                   props.onClose();
                 }}
               >
-                ⚙️ Salvage for Materials
+                Salvage for Materials
               </button>
             </Show>
 

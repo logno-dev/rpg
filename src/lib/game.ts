@@ -129,6 +129,9 @@ export async function createCharacter(
   // Give starting equipment
   await giveStartingEquipment(character.id);
 
+  // Unlock the starting region (Greenfield Plains, region 1)
+  await unlockRegion(character.id, 1);
+
   return character;
 }
 
@@ -1278,6 +1281,84 @@ export async function restCharacter(characterId: number): Promise<Character> {
 }
 
 // Regions
+// Check if a character has unlocked a specific region
+export async function hasUnlockedRegion(characterId: number, regionId: number): Promise<boolean> {
+  const result = await db.execute({
+    sql: 'SELECT COUNT(*) as count FROM character_region_unlocks WHERE character_id = ? AND region_id = ?',
+    args: [characterId, regionId],
+  });
+  return (result.rows[0] as any).count > 0;
+}
+
+// Unlock a region for a character
+export async function unlockRegion(characterId: number, regionId: number): Promise<void> {
+  await db.execute({
+    sql: 'INSERT OR IGNORE INTO character_region_unlocks (character_id, region_id) VALUES (?, ?)',
+    args: [characterId, regionId],
+  });
+}
+
+// Check if a character meets the requirements to unlock a region
+async function checkRegionUnlockRequirements(
+  characterId: number, 
+  characterLevel: number, 
+  region: Region
+): Promise<boolean> {
+  if (!region.unlock_requirement) {
+    return false;
+  }
+
+  // Check level-based unlock
+  const levelMatch = region.unlock_requirement.match(/level (\d+)/i);
+  if (levelMatch) {
+    const requiredLevel = parseInt(levelMatch[1]);
+    return characterLevel >= requiredLevel;
+  }
+
+  // Check boss defeat requirement
+  if (region.unlock_requirement.toLowerCase().includes('defeat')) {
+    const namedMobsResult = await db.execute('SELECT * FROM named_mobs');
+    const namedMobs = namedMobsResult.rows as any[];
+    
+    for (const namedMob of namedMobs) {
+      const requirementLower = region.unlock_requirement.toLowerCase();
+      const mobNameLower = namedMob.name.toLowerCase();
+      
+      // Check if requirement mentions this boss
+      if (requirementLower.includes(mobNameLower)) {
+        const hasDefeated = await hasDefeatedNamedMob(characterId, namedMob.id);
+        if (hasDefeated) {
+          return true;
+        }
+      }
+    }
+  }
+
+  // Check dungeon completion requirement
+  if (region.unlock_requirement.toLowerCase().includes('complete') && 
+      region.unlock_requirement.toLowerCase().includes('dungeon')) {
+    // Get dungeon name from requirement
+    const dungeonResult = await db.execute('SELECT * FROM dungeons');
+    const dungeons = dungeonResult.rows as any[];
+    
+    for (const dungeon of dungeons) {
+      if (region.unlock_requirement.toLowerCase().includes(dungeon.name.toLowerCase())) {
+        // Check if character has completed this dungeon
+        const progressResult = await db.execute({
+          sql: 'SELECT completed FROM character_dungeon_progress WHERE character_id = ? AND dungeon_id = ?',
+          args: [characterId, dungeon.id],
+        });
+        
+        if (progressResult.rows.length > 0 && (progressResult.rows[0] as any).completed === 1) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
 export async function getAllRegions(characterLevel?: number, characterId?: number): Promise<Region[]> {
   const result = await db.execute({
     sql: 'SELECT * FROM regions ORDER BY min_level, id',
@@ -1286,56 +1367,30 @@ export async function getAllRegions(characterLevel?: number, characterId?: numbe
 
   const regions = result.rows as Region[];
 
-  // Auto-unlock regions based on character level or named mob defeats
+  // Auto-unlock regions based on character level or achievements
   if (characterLevel !== undefined && characterId !== undefined) {
     for (const region of regions) {
-      if (region.locked === 1 && region.unlock_requirement) {
-        // Check if it's a level-based unlock
-        const levelMatch = region.unlock_requirement.match(/level (\d+)/i);
-        if (levelMatch) {
-          const requiredLevel = parseInt(levelMatch[1]);
-          if (characterLevel >= requiredLevel) {
-            // Unlock the region
-            await db.execute({
-              sql: 'UPDATE regions SET locked = 0 WHERE id = ?',
-              args: [region.id],
-            });
-            region.locked = 0; // Update in-memory as well
-          }
-        }
+      // Skip if already unlocked
+      const isUnlocked = await hasUnlockedRegion(characterId, region.id);
+      if (isUnlocked) {
+        region.locked = 0; // Mark as unlocked in the returned data
+        continue;
+      }
+
+      // Check if requirements are met
+      if (region.unlock_requirement) {
+        const meetsRequirements = await checkRegionUnlockRequirements(characterId, characterLevel, region);
         
-        // Check if it's a boss defeat requirement (e.g., "Defeat the Orc Chieftain")
-        // Instead of hardcoding IDs, look up the boss by name match
-        if (region.unlock_requirement && region.unlock_requirement.toLowerCase().includes('defeat')) {
-          console.log(`[UNLOCK] Checking boss defeat requirement for region ${region.id}: ${region.unlock_requirement}`);
-          
-          // Get all named mobs and check if character has defeated any that match
-          const namedMobsResult = await db.execute('SELECT * FROM named_mobs');
-          const namedMobs = namedMobsResult.rows as any[];
-          
-          for (const namedMob of namedMobs) {
-            // Check if the requirement mentions this boss
-            const requirementLower = region.unlock_requirement.toLowerCase();
-            
-            // Match various patterns
-            if (requirementLower.includes(namedMob.name.toLowerCase()) || 
-                (requirementLower.includes('orc chieftain') && namedMob.name.toLowerCase().includes('gorak'))) {
-              console.log(`[UNLOCK] Checking if defeated boss: ${namedMob.name} (ID: ${namedMob.id})`);
-              const hasDefeated = await hasDefeatedNamedMob(characterId, namedMob.id);
-              console.log(`[UNLOCK] Has defeated: ${hasDefeated}`);
-              
-              if (hasDefeated) {
-                console.log(`[UNLOCK] Unlocking region ${region.id}: ${region.name}`);
-                await db.execute({
-                  sql: 'UPDATE regions SET locked = 0 WHERE id = ?',
-                  args: [region.id],
-                });
-                region.locked = 0;
-                break;
-              }
-            }
-          }
+        if (meetsRequirements) {
+          console.log(`[UNLOCK] Auto-unlocking region ${region.id}: ${region.name} for character ${characterId}`);
+          await unlockRegion(characterId, region.id);
+          region.locked = 0;
+        } else {
+          region.locked = 1; // Still locked for this character
         }
+      } else {
+        // No unlock requirement, so it stays at its default state
+        region.locked = region.locked || 0;
       }
     }
   }

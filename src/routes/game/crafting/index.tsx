@@ -38,28 +38,23 @@ type Recipe = {
 const PROFESSION_INFO = {
   blacksmithing: {
     name: "Blacksmithing",
-    description: "Forge weapons, plate armor, and chain mail",
-    icon: "⚒️"
+    description: "Forge weapons, plate armor, and chain mail"
   },
   leatherworking: {
     name: "Leatherworking",
-    description: "Craft leather armor and accessories",
-    icon: "🦌"
+    description: "Craft leather armor and accessories"
   },
   tailoring: {
     name: "Tailoring",
-    description: "Weave cloth armor and robes",
-    icon: "🧵"
+    description: "Weave cloth armor and robes"
   },
   fletching: {
     name: "Fletching",
-    description: "Create bows and ranged weapons",
-    icon: "🏹"
+    description: "Create bows and ranged weapons"
   },
   alchemy: {
     name: "Alchemy",
-    description: "Brew potions and elixirs",
-    icon: "⚗️"
+    description: "Brew potions and elixirs"
   }
 };
 
@@ -446,9 +441,6 @@ export default function CraftingPage() {
                         onClick={() => setSelectedProfession(profession)}
                         style={{ cursor: "pointer" }}
                       >
-                        <div style={{ "font-size": "2rem", "margin-bottom": "0.5rem" }}>
-                          {info.icon}
-                        </div>
                         <h3>{info.name}</h3>
                         <p style={{ color: "var(--text-secondary)", "font-size": "0.9rem", "margin": "0.5rem 0" }}>
                           {info.description}
@@ -488,7 +480,6 @@ export default function CraftingPage() {
                     {/* Profession Header */}
                     <div class="card" style={{ "margin-bottom": "1rem" }}>
                       <div style={{ display: "flex", "align-items": "center", gap: "1rem" }}>
-                        <div style={{ "font-size": "3rem" }}>{info.icon}</div>
                         <div style={{ flex: 1 }}>
                           <h2 style={{ margin: 0 }}>{info.name}</h2>
                           <p style={{ color: "var(--text-secondary)", margin: "0.25rem 0" }}>
@@ -538,7 +529,6 @@ export default function CraftingPage() {
                       <h3>Recipes</h3>
                       <Suspense fallback={
                         <div style={{ padding: "2rem", "text-align": "center" }}>
-                          <div style={{ "font-size": "1.5rem", "margin-bottom": "0.5rem" }}>📜</div>
                           <p style={{ color: "var(--text-secondary)" }}>Loading recipes...</p>
                         </div>
                       }>

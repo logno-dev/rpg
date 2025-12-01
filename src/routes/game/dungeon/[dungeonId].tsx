@@ -571,7 +571,7 @@ export default function DungeonRoute() {
               
               {/* Dungeon Progress */}
               <div style={{ "white-space": "nowrap", "font-weight": "bold", color: "var(--accent)" }}>
-                🏰 {progress()?.current_encounter}/{dungeon()?.total_encounters}
+                {progress()?.current_encounter}/{dungeon()?.total_encounters}
               </div>
             </div>
             
@@ -592,7 +592,7 @@ export default function DungeonRoute() {
                       "justify-content": "space-between"
                     }}>
                       <span style={{ color: "var(--danger)", "font-weight": "600" }}>
-                        ⚔️ {mob().name}
+                        {mob().name}
                       </span>
                       <span>{enemyCurrentHealth()}/{enemyMaxHealth()} ({Math.round(healthPercent())}%)</span>
                     </div>
@@ -618,7 +618,7 @@ export default function DungeonRoute() {
           "min-height": "60vh" 
         }}>
           <div style={{ "text-align": "center" }}>
-            <div style={{ "font-size": "3rem", "margin-bottom": "1rem" }}>🏰</div>
+            
             <div>Loading dungeon...</div>
           </div>
         </div>
@@ -717,7 +717,7 @@ export default function DungeonRoute() {
                   }}>
                     <div style={{ "text-align": "center" }}>
                       <div style={{ "font-size": "1.3rem" }}>
-                        {isBoss() ? '👑' : isComplete() ? '✓' : encounterNum}
+                        {isBoss() ? 'BOSS' : isComplete() ? 'Complete' : encounterNum}
                       </div>
                       <div style={{ "font-size": "0.65rem", color: "var(--text-secondary)" }}>
                         {isBoss() ? 'Boss' : `Enc ${encounterNum}`}
@@ -735,7 +735,7 @@ export default function DungeonRoute() {
           when={activeMob()} 
           fallback={
             <div class="card" style={{ "text-align": "center", padding: "2rem 1rem" }}>
-              <div style={{ "font-size": "3rem", "margin-bottom": "0.75rem" }}>⚔️</div>
+              
               <h2 style={{ "margin-bottom": "0.5rem", "font-size": "1.3rem" }}>
                 Ready for Encounter {progress()?.current_encounter}
               </h2>
@@ -750,8 +750,8 @@ export default function DungeonRoute() {
                 onClick={handleStartEncounter}
               >
                 {progress()?.current_encounter === dungeon()?.total_encounters 
-                  ? "⚔️ Face the Boss" 
-                  : "⚔️ Start Encounter"}
+                  ? "Face the Boss" 
+                  : "Start Encounter"}
               </button>
             </div>
           }
@@ -845,7 +845,7 @@ export default function DungeonRoute() {
                 "font-size": "1.5rem",
                 "margin-bottom": "0.75rem"
               }}>
-                ⚔️ VICTORY! ⚔️
+                VICTORY!
               </h2>
               
               <div style={{ 
@@ -894,7 +894,7 @@ export default function DungeonRoute() {
                     "font-weight": "bold",
                     color: "var(--warning)"
                   }}>
-                    💰 {data().goldGained}
+                    {data().goldGained}
                   </div>
                 </div>
 
@@ -920,7 +920,7 @@ export default function DungeonRoute() {
                           color: getLootColor(item),
                           "margin-bottom": "0.25rem"
                         }}>
-                          📦 {item.name} {item.quantity > 1 ? `x${item.quantity}` : ''}
+                          {item.name} {item.quantity > 1 ? `x${item.quantity}` : ''}
                         </div>
                       )}
                     </For>
@@ -984,7 +984,7 @@ export default function DungeonRoute() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ "font-size": "2.5rem", "margin-bottom": "0.75rem" }}>⚠️</div>
+            <div style={{ "font-size": "2.5rem", "margin-bottom": "0.75rem" }}></div>
             <h2 style={{ "margin-bottom": "0.75rem", color: "var(--danger)", "font-size": "1.5rem" }}>
               Abandon Dungeon?
             </h2>
@@ -1047,7 +1047,7 @@ export default function DungeonRoute() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ "font-size": "3rem", "margin-bottom": "0.75rem" }}>🎉</div>
+            <div style={{ "font-size": "3rem", "margin-bottom": "0.75rem" }}></div>
             <h2 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", "font-size": "1.5rem" }}>
               Dungeon Complete!
             </h2>
@@ -1085,7 +1085,7 @@ export default function DungeonRoute() {
               }}>
                 <span style={{ color: "var(--text-secondary)" }}>Total Gold:</span>
                 <span style={{ "font-weight": "bold", color: "var(--warning)" }}>
-                  💰 {dungeonRewards().totalGold}
+                  {dungeonRewards().totalGold}
                 </span>
               </div>
               

@@ -28,7 +28,7 @@ export function ActiveEffectsDisplay(props: ActiveEffectsDisplayProps = {}) {
   return (
     <div class="card" style={{ "margin-bottom": "1rem" }}>
       <h4 style={{ "margin-bottom": "0.5rem", "font-size": "0.8rem", color: "var(--text-secondary)" }}>
-        🛡️ Active Effects
+        Active Effects
       </h4>
       <div style={{ 
         display: "flex", 
@@ -146,7 +146,7 @@ export function ActiveEffectsDisplay(props: ActiveEffectsDisplayProps = {}) {
                   {/* Content */}
                   <div style={{ position: "relative", "z-index": 1, "line-height": "1.2" }}>
                     <div style={{ "white-space": "nowrap", overflow: "hidden", "text-overflow": "ellipsis" }}>
-                      💚 {hot.name}
+                      {hot.name}
                     </div>
                     <div style={{ "font-size": "0.65rem", opacity: 0.9, "margin-top": "0.1rem" }}>
                       {hot.ticks_remaining} tick{hot.ticks_remaining !== 1 ? 's' : ''} · {timeRemaining()}s
@@ -192,7 +192,7 @@ export function ActiveEffectsDisplay(props: ActiveEffectsDisplayProps = {}) {
               {/* Content */}
               <div style={{ position: "relative", "z-index": 1, "line-height": "1.2" }}>
                 <div style={{ "white-space": "nowrap", overflow: "hidden", "text-overflow": "ellipsis" }}>
-                  ⚡ {props.combatThorns!.name}
+                  {props.combatThorns!.name}
                 </div>
                 <div style={{ "font-size": "0.65rem", opacity: 0.9, "margin-top": "0.1rem" }}>
                   {props.combatThorns!.reflectPercent}% · {Math.max(0, Math.ceil((props.combatThorns!.expiresAt - currentTime()) / 1000))}s

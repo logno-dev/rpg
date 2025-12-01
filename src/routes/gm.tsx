@@ -1,7 +1,7 @@
 import { createSignal, Show, For, onMount } from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
 import { getUser } from "~/lib/auth";
-import { isGM, getAllPlayers, getAllMobs, getAllItems, getAllRegions, getAllAbilities, getAllMerchants, updateMob, deleteMob, createMob, updateItem, deleteItem, createItem, getAllMobLoot, getAllRegionRareLoot, createMobLoot, updateMobLoot, deleteMobLoot, createRegionRareLoot, updateRegionRareLoot, deleteRegionRareLoot, createAbility, updateAbility, deleteAbility, createRegion, updateRegion, deleteRegion, createMerchant, updateMerchant, deleteMerchant, getAllRegionMobs, createRegionMob, updateRegionMob, deleteRegionMob, getAllMerchantInventory, createMerchantInventory, updateMerchantInventory, deleteMerchantInventory, getAbilityEffects, createAbilityEffect, updateAbilityEffect, deleteAbilityEffect, getCharacter, updateCharacter, getCharacterInventory, getCharacterAbilities, addItemToCharacter, removeItemFromCharacter, updateCharacterInventoryItem, addAbilityToCharacter, removeAbilityFromCharacter } from "~/lib/gm";
+import { isGM, getAllPlayers, getAllMobs, getAllItems, getAllRegions, getAllAbilities, getAllMerchants, updateMob, deleteMob, createMob, updateItem, deleteItem, createItem, getAllMobLoot, getAllRegionRareLoot, createMobLoot, updateMobLoot, deleteMobLoot, createRegionRareLoot, updateRegionRareLoot, deleteRegionRareLoot, createAbility, updateAbility, deleteAbility, createRegion, updateRegion, deleteRegion, createMerchant, updateMerchant, deleteMerchant, getAllRegionMobs, createRegionMob, updateRegionMob, deleteRegionMob, getAllMerchantInventory, createMerchantInventory, updateMerchantInventory, deleteMerchantInventory, getAbilityEffects, createAbilityEffect, updateAbilityEffect, deleteAbilityEffect, getCharacter, updateCharacter, getCharacterInventory, getCharacterAbilities, addItemToCharacter, removeItemFromCharacter, updateCharacterInventoryItem, addAbilityToCharacter, removeAbilityFromCharacter, getCharacterRegionUnlocks, unlockRegionForCharacter, lockRegionForCharacter } from "~/lib/gm";
 
 export default function GMPage() {
   const navigate = useNavigate();
@@ -35,6 +35,7 @@ export default function GMPage() {
   const [editingCharacter, setEditingCharacter] = createSignal<any | null>(null);
   const [characterInventory, setCharacterInventory] = createSignal<any[]>([]);
   const [characterAbilities, setCharacterAbilities] = createSignal<any[]>([]);
+  const [characterRegionUnlocks, setCharacterRegionUnlocks] = createSignal<any[]>([]);
   const [selectedAbilityForEffects, setSelectedAbilityForEffects] = createSignal<number | null>(null);
   const [showMobModal, setShowMobModal] = createSignal(false);
   const [showItemModal, setShowItemModal] = createSignal(false);
@@ -47,7 +48,7 @@ export default function GMPage() {
   const [showMerchantInvModal, setShowMerchantInvModal] = createSignal(false);
   const [showAbilityEffectModal, setShowAbilityEffectModal] = createSignal(false);
   const [showCharacterModal, setShowCharacterModal] = createSignal(false);
-  const [characterModalTab, setCharacterModalTab] = createSignal<'stats' | 'inventory' | 'abilities'>('stats');
+  const [characterModalTab, setCharacterModalTab] = createSignal<'stats' | 'inventory' | 'abilities' | 'regions'>('stats');
   const [showAddItemModal, setShowAddItemModal] = createSignal(false);
   const [showAddAbilityModal, setShowAddAbilityModal] = createSignal(false);
   const [searchAddItem, setSearchAddItem] = createSignal("");
@@ -519,10 +520,12 @@ export default function GMPage() {
       const charData = await getCharacter(player.character_id);
       const inventory = await getCharacterInventory(player.character_id);
       const abilities = await getCharacterAbilities(player.character_id);
+      const regionUnlocks = await getCharacterRegionUnlocks(player.character_id);
       
       setEditingCharacter(charData);
       setCharacterInventory(inventory as any);
       setCharacterAbilities(abilities as any);
+      setCharacterRegionUnlocks(regionUnlocks as any);
       setCharacterModalTab('stats');
       setShowCharacterModal(true);
     } catch (err) {
@@ -644,6 +647,26 @@ export default function GMPage() {
     }
   };
   
+  const handleToggleRegionUnlock = async (regionId: number, currentlyUnlocked: boolean) => {
+    const char = editingCharacter();
+    if (!char) return;
+    
+    try {
+      if (currentlyUnlocked) {
+        await lockRegionForCharacter(char.id, regionId);
+      } else {
+        await unlockRegionForCharacter(char.id, regionId);
+      }
+      
+      // Reload region unlocks
+      const regionUnlocks = await getCharacterRegionUnlocks(char.id);
+      setCharacterRegionUnlocks(regionUnlocks as any);
+    } catch (err) {
+      console.error('Error toggling region unlock:', err);
+      alert('Failed to toggle region unlock');
+    }
+  };
+
   onMount(async () => {
     try {
       // Check if user is logged in
@@ -828,7 +851,7 @@ export default function GMPage() {
                             </td>
                             <td style={{ padding: "0.5rem" }}>{player.current_region || "-"}</td>
                             <td style={{ padding: "0.5rem", "text-align": "center" }}>
-                              {player.is_gm ? "✓" : ""}
+                              {player.is_gm ? "Yes" : ""}
                             </td>
                             <td style={{ padding: "0.5rem", "text-align": "center" }}>
                               <Show when={player.character_id}>
@@ -976,7 +999,7 @@ export default function GMPage() {
                                   color: "#fff"
                                 }} title={getXPStatus(mob.level, mob.experience).text}>
                                   {getXPStatus(mob.level, mob.experience).status === 'low' ? '↓' : 
-                                   getXPStatus(mob.level, mob.experience).status === 'high' ? '↑' : '✓'}
+                                   getXPStatus(mob.level, mob.experience).status === 'high' ? 'High' : 'Yes'}
                                 </span>
                               </div>
                             </td>
@@ -1298,7 +1321,7 @@ export default function GMPage() {
                           <div style={{ flex: 1 }}>
                             <h3 style={{ margin: "0 0 0.5rem 0" }}>
                               {region.name}
-                              {region.locked === 1 && <span style={{ "margin-left": "0.5rem", "font-size": "0.8rem", color: "var(--warning)" }}>🔒 Locked</span>}
+                              {region.locked === 1 && <span style={{ "margin-left": "0.5rem", "font-size": "0.8rem", color: "var(--warning)" }}>Locked</span>}
                             </h3>
                             <p style={{ margin: "0 0 0.5rem 0", color: "var(--text-secondary)" }}>
                               {region.description}
@@ -2398,7 +2421,7 @@ export default function GMPage() {
                 
                 <div style={{ "grid-column": "1 / -1", padding: "0.5rem", background: "var(--bg-light)", "border-radius": "4px" }}>
                   <p style={{ margin: 0, "font-size": "0.875rem", color: "var(--text-secondary)" }}>
-                    ℹ️ Damage, healing, and stat scaling are now configured in the <strong>Ability Effects</strong> system below. The old damage_min, damage_max, healing, and stat_scaling fields have been removed.
+                    INFO: Damage, healing, and stat scaling are now configured in the <strong>Ability Effects</strong> system below. The old damage_min, damage_max, healing, and stat_scaling fields have been removed.
                   </p>
                 </div>
                 
@@ -2408,7 +2431,7 @@ export default function GMPage() {
                 
                 <div style={{ "grid-column": "1 / -1", padding: "0.5rem", background: "var(--bg-light)", "border-radius": "4px" }}>
                   <p style={{ margin: 0, "font-size": "0.875rem", color: "var(--text-secondary)" }}>
-                    ℹ️ Buff abilities now use the <strong>Ability Effects</strong> system below. The old buff_stat, buff_amount, and buff_duration fields are deprecated.
+                    INFO: Buff abilities now use the <strong>Ability Effects</strong> system below. The old buff_stat, buff_amount, and buff_duration fields are deprecated.
                   </p>
                 </div>
                 
@@ -3080,6 +3103,13 @@ export default function GMPage() {
               >
                 Abilities ({characterAbilities().length})
               </button>
+              <button
+                class={characterModalTab() === "regions" ? "button primary" : "button secondary"}
+                onClick={() => setCharacterModalTab("regions")}
+                style={{ padding: "0.5rem 1rem" }}
+              >
+                Region Unlocks
+              </button>
             </div>
             
             {/* Stats Tab */}
@@ -3313,6 +3343,57 @@ export default function GMPage() {
                       No abilities learned
                     </div>
                   </Show>
+                </div>
+              </div>
+            </Show>
+            
+            {/* Regions Tab */}
+            <Show when={characterModalTab() === "regions"}>
+              <div>
+                <div style={{ "margin-bottom": "1rem" }}>
+                  <p style={{ color: "var(--text-secondary)" }}>
+                    Manage which regions this character has unlocked. Unlocked regions can be traveled to.
+                  </p>
+                </div>
+                <div style={{ overflow: "auto", "max-height": "500px" }}>
+                  <table style={{ width: "100%", "border-collapse": "collapse", "font-size": "0.9rem" }}>
+                    <thead style={{ position: "sticky", top: 0, background: "var(--bg-dark)" }}>
+                      <tr style={{ "border-bottom": "2px solid var(--bg-light)" }}>
+                        <th style={{ padding: "0.5rem", "text-align": "left" }}>Region</th>
+                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Status</th>
+                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <For each={characterRegionUnlocks()}>
+                        {(regionUnlock: any) => (
+                          <tr style={{ "border-bottom": "1px solid var(--bg-light)" }}>
+                            <td style={{ padding: "0.5rem" }}>{regionUnlock.region_name}</td>
+                            <td style={{ padding: "0.5rem", "text-align": "center" }}>
+                              {regionUnlock.unlocked === 1 ? (
+                                <span style={{ color: "var(--success)" }}>Yes Unlocked</span>
+                              ) : (
+                                <span style={{ color: "var(--text-secondary)" }}>Locked</span>
+                              )}
+                            </td>
+                            <td style={{ padding: "0.5rem", "text-align": "center" }}>
+                              <button 
+                                class="button" 
+                                style={{ 
+                                  padding: "0.25rem 0.75rem", 
+                                  "font-size": "0.8rem", 
+                                  background: regionUnlock.unlocked === 1 ? "var(--danger)" : "var(--success)" 
+                                }}
+                                onClick={() => handleToggleRegionUnlock(regionUnlock.region_id, regionUnlock.unlocked === 1)}
+                              >
+                                {regionUnlock.unlocked === 1 ? "Lock" : "Unlock"}
+                              </button>
+                            </td>
+                          </tr>
+                        )}
+                      </For>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </Show>

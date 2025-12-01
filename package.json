@@ -10,12 +10,16 @@
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",
+    "@mdx-js/mdx": "^3.1.1",
+    "@mdx-js/rollup": "^3.1.1",
     "@solidjs/meta": "^0.29.4",
     "@solidjs/router": "^0.15.2",
     "@solidjs/start": "^1.0.11",
     "bcryptjs": "^2.4.3",
     "dotenv": "^16.4.5",
     "lucide-solid": "^0.554.0",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1",
     "solid-js": "^1.9.3",
     "vinxi": "^0.5.7"
   },

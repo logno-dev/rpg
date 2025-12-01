@@ -716,7 +716,7 @@ export default function GamePage() {
         const title = result.namedMob.title ? ` ${result.namedMob.title}` : '';
         setCombatLog([
           ...combatLog(),
-          `⚠️ A legendary creature appears: ${result.namedMob.name}${title}!`,
+          `WARNING: A legendary creature appears: ${result.namedMob.name}${title}!`,
           `The creature watches you but does not attack...`
         ]);
       } else {
@@ -2010,7 +2010,7 @@ export default function GamePage() {
                 "font-weight": "bold",
                 color: "var(--warning)"
               }}>
-                💰 {currentGold()}
+                {currentGold()}
               </div>
             </div>
             
@@ -2032,7 +2032,7 @@ export default function GamePage() {
                       "justify-content": "space-between"
                     }}>
                       <span style={{ color: difficulty.color, "font-weight": "600" }}>
-                        ⚔️ {mob().name}
+                        {mob().name}
                       </span>
                       <span>{enemyCurrentHealth()}/{enemyMaxHealth()} ({Math.round(healthPercent())}%)</span>
                     </div>
@@ -2126,7 +2126,7 @@ export default function GamePage() {
                       e.currentTarget.style.borderColor = "transparent";
                     }}
                   >
-                    ⚡ {currentCharacter()?.available_points} Stat Points Available! Click to assign →
+                    {currentCharacter()?.available_points} Stat Points Available! Click to assign →
                   </A>
                 </Show>
               </div>
@@ -2299,7 +2299,7 @@ export default function GamePage() {
                                   "font-size": "0.95rem",
                                   color: difficulty.color
                                 }}>
-                                  {mob.aggressive === 1 ? '⚔️ ' : ''}{mob.name}
+                                  {mob.aggressive === 1 ? '' : ''}{mob.name}
                                 </div>
                                 <div style={{ 
                                   "font-size": "0.75rem", 
@@ -2337,7 +2337,7 @@ export default function GamePage() {
                           "margin-bottom": "0.5rem",
                           "font-size": "1.25rem"
                         }}>
-                          ⚔️ Legendary Encounter!
+                          Legendary Encounter!
                         </h4>
                         <div style={{ "margin-bottom": "0.75rem" }}>
                           <div style={{ 
@@ -2528,7 +2528,7 @@ export default function GamePage() {
                       "font-size": "2rem",
                       "margin-bottom": "1rem"
                     }}>
-                      {data().levelUp ? "🎉 LEVEL UP! 🎉" : "⚔️ VICTORY! ⚔️"}
+                      {data().levelUp ? "LEVEL UP!" : "VICTORY!"}
                     </h2>
                     
                     <Show when={data().levelUp}>
@@ -2600,7 +2600,7 @@ export default function GamePage() {
                           "font-weight": "bold",
                           color: "var(--warning)"
                         }}>
-                          💰 {data().goldGained}
+                          {data().goldGained}
                         </div>
                       </div>
 
@@ -2626,7 +2626,7 @@ export default function GamePage() {
                                 color: getLootColor(item),
                                 "margin-bottom": "0.25rem"
                               }}>
-                                📦 {item.name} {item.quantity > 1 ? `x${item.quantity}` : ''}
+                                {item.name} {item.quantity > 1 ? `x${item.quantity}` : ''}
                               </div>
                             )}
                           </For>
@@ -2843,7 +2843,7 @@ export default function GamePage() {
                       "font-size": "3rem",
                       "margin-bottom": "0.5rem"
                     }}>
-                      🏰
+                      
                     </div>
                     <h2 style={{ 
                       "font-size": "1.5rem",
@@ -2942,7 +2942,7 @@ export default function GamePage() {
                     "text-align": "center",
                     "font-size": "0.875rem"
                   }}>
-                    ⚠️ You must complete or abandon this dungeon before taking other actions
+                    WARNING: You must complete or abandon this dungeon before taking other actions
                   </div>
 
                   <div style={{ 
@@ -3035,7 +3035,7 @@ export default function GamePage() {
                       }}
                       onClick={() => setShowSubAreaModal(false)}
                     >
-                      ✕
+                      ×
                     </button>
                     
                     <h2 style={{ margin: 0, "padding-right": "2.5rem", "font-size": "1.25rem" }}>Select Hunting Area</h2>
@@ -3260,7 +3260,7 @@ export default function GamePage() {
                       }}
                       onClick={() => setShowTravelModal(false)}
                     >
-                      ✕
+                      ×
                     </button>
                     
                     {/* Title spans full width */}
@@ -3300,7 +3300,7 @@ export default function GamePage() {
                                 "font-size": "0.75rem",
                                 "font-weight": "bold"
                               }}>
-                                🔒 LOCKED
+                                LOCKED
                               </div>
                             </Show>
                             
@@ -3333,7 +3333,7 @@ export default function GamePage() {
                                 "margin-bottom": "0.75rem",
                                 color: "var(--warning)"
                               }}>
-                                🔑 Unlock Requirement: {region.unlock_requirement}
+                                Unlock Requirement: {region.unlock_requirement}
                               </div>
                             </Show>
 
@@ -3496,7 +3496,7 @@ export default function GamePage() {
                           "font-weight": "bold",
                           color: "var(--warning)"
                         }}>
-                          💰 {Math.floor(data().value * 0.4) * sellQuantity()}
+                          {Math.floor(data().value * 0.4) * sellQuantity()}
                         </div>
                         <div style={{ 
                           "font-size": "1rem",
@@ -3645,7 +3645,7 @@ export default function GamePage() {
                           color: "var(--danger)",
                           "font-weight": "bold"
                         }}>
-                          ⚠️ This item will be permanently destroyed
+                          WARNING: This item will be permanently destroyed
                         </div>
                       </div>
                     </div>
@@ -3713,7 +3713,7 @@ export default function GamePage() {
                       "font-size": "2rem",
                       "margin-bottom": "1rem"
                     }}>
-                      ✨ Ability Learned! ✨
+                      Ability Learned!
                     </h2>
                     
                     <div style={{ 
@@ -3841,7 +3841,7 @@ export default function GamePage() {
                           setMerchantInventory([]);
                         }}
                       >
-                        ✕
+                        ×
                       </button>
                       
                       {/* Content spans full width */}
@@ -3870,7 +3870,7 @@ export default function GamePage() {
                             "font-size": "0.875rem",
                             color: "var(--success)"
                           }}>
-                            💫 {merchantDiscountPercent()}% Charisma Discount Active!
+                            {merchantDiscountPercent()}% Charisma Discount Active!
                           </div>
                         </Show>
                         <div style={{ 
@@ -3879,7 +3879,7 @@ export default function GamePage() {
                           "font-weight": "bold",
                           color: "var(--warning)"
                         }}>
-                          💰 {currentGold()} Gold
+                          {currentGold()} Gold
                         </div>
                       </div>
                     </div>
@@ -3923,10 +3923,10 @@ export default function GamePage() {
                                 <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
                                   {item.type}
                                   <Show when={item.slot}> • {item.slot}</Show>
-                                  <Show when={item.damage_min}> • ⚔️ {item.damage_min}-{item.damage_max} Dmg</Show>
-                                  <Show when={item.armor}> • 🛡️ {item.armor} Armor</Show>
-                                  <Show when={item.health_restore}> • ❤️ +{item.health_restore} HP</Show>
-                                  <Show when={item.mana_restore}> • ✨ +{item.mana_restore} MP</Show>
+                                  <Show when={item.damage_min}> • {item.damage_min}-{item.damage_max} Dmg</Show>
+                                  <Show when={item.armor}> • {item.armor} Armor</Show>
+                                  <Show when={item.health_restore}> • +{item.health_restore} HP</Show>
+                                  <Show when={item.mana_restore}> • +{item.mana_restore} MP</Show>
                                 </div>
                               </div>
                               <div style={{ "text-align": "right" }}>
@@ -3978,37 +3978,37 @@ export default function GamePage() {
                             {/* Item Stats */}
                             <div style={{ "font-size": "0.875rem", "margin-bottom": "0.5rem" }}>
                               <Show when={item.damage_min && item.damage_max}>
-                                <div style={{ color: "var(--danger)" }}>⚔️ {item.damage_min}-{item.damage_max} Damage</div>
+                                <div style={{ color: "var(--danger)" }}>{item.damage_min}-{item.damage_max} Damage</div>
                               </Show>
                               <Show when={item.armor}>
-                                <div style={{ color: "var(--accent)" }}>🛡️ {item.armor} Armor</div>
+                                <div style={{ color: "var(--accent)" }}>{item.armor} Armor</div>
                               </Show>
                               <Show when={item.attack_speed && item.attack_speed !== 1}>
-                                <div style={{ color: "var(--success)" }}>⚡ {item.attack_speed}x Attack Speed</div>
+                                <div style={{ color: "var(--success)" }}>{item.attack_speed}x Attack Speed</div>
                               </Show>
                               <Show when={item.strength_bonus}>
-                                <div>💪 +{item.strength_bonus} Strength</div>
+                                <div>+{item.strength_bonus} Strength</div>
                               </Show>
                               <Show when={item.dexterity_bonus}>
-                                <div>🏃 +{item.dexterity_bonus} Dexterity</div>
+                                <div>+{item.dexterity_bonus} Dexterity</div>
                               </Show>
                               <Show when={item.constitution_bonus}>
-                                <div>❤️ +{item.constitution_bonus} Constitution</div>
+                                <div>+{item.constitution_bonus} Constitution</div>
                               </Show>
                               <Show when={item.intelligence_bonus}>
-                                <div>🧠 +{item.intelligence_bonus} Intelligence</div>
+                                <div>+{item.intelligence_bonus} Intelligence</div>
                               </Show>
                               <Show when={item.wisdom_bonus}>
-                                <div>✨ +{item.wisdom_bonus} Wisdom</div>
+                                <div>+{item.wisdom_bonus} Wisdom</div>
                               </Show>
                               <Show when={item.charisma_bonus}>
-                                <div>💫 +{item.charisma_bonus} Charisma</div>
+                                <div>+{item.charisma_bonus} Charisma</div>
                               </Show>
                               <Show when={item.health_restore}>
-                                <div style={{ color: "var(--success)" }}>❤️ Restores {item.health_restore} Health</div>
+                                <div style={{ color: "var(--success)" }}>Restores {item.health_restore} Health</div>
                               </Show>
                               <Show when={item.mana_restore}>
-                                <div style={{ color: "var(--accent)" }}>✨ Restores {item.mana_restore} Mana</div>
+                                <div style={{ color: "var(--accent)" }}>Restores {item.mana_restore} Mana</div>
                               </Show>
                             </div>
 
@@ -4029,7 +4029,7 @@ export default function GamePage() {
                                       "font-weight": "bold",
                                       "margin-bottom": "0.25rem"
                                     }}>
-                                      ⚖️ Compared to {comparison().equippedItem.name}:
+                                      Compared to {comparison().equippedItem.name}:
                                     </div>
                                     <div style={{ display: "flex", "flex-direction": "column", gap: "0.15rem" }}>
                                       <For each={comparison().comparisons}>
@@ -4072,7 +4072,7 @@ export default function GamePage() {
                                   "font-weight": "bold",
                                   "margin-bottom": "0.25rem"
                                 }}>
-                                  {meetsRequirements(item) ? "✓ Can Use" : "✗ Cannot Use"}
+                                  {meetsRequirements(item) ? "Can Use" : "Cannot Use"}
                                 </div>
                                 <div style={{ color: "var(--text-secondary)" }}>
                                   Requires: {formatRequirements(item).join(', ')}
@@ -4231,7 +4231,7 @@ export default function GamePage() {
                         "font-weight": "bold",
                         color: "var(--warning)"
                       }}>
-                        💰 {calculateBulkSellValue()}
+                        {calculateBulkSellValue()}
                       </div>
                       <div style={{ 
                         "font-size": "1rem",

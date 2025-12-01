@@ -980,3 +980,40 @@ export async function deleteMerchantInventory(id: number) {
     args: [id],
   });
 }
+
+// Character Region Unlocks Management
+export async function getCharacterRegionUnlocks(characterId: number) {
+  await requireGM();
+  
+  const result = await db.execute({
+    sql: `SELECT 
+            r.id as region_id,
+            r.name as region_name,
+            cru.unlocked_at,
+            CASE WHEN cru.id IS NOT NULL THEN 1 ELSE 0 END as unlocked
+          FROM regions r
+          LEFT JOIN character_region_unlocks cru ON r.id = cru.region_id AND cru.character_id = ?
+          ORDER BY r.min_level, r.id`,
+    args: [characterId],
+  });
+  
+  return result.rows;
+}
+
+export async function unlockRegionForCharacter(characterId: number, regionId: number) {
+  await requireGM();
+  
+  await db.execute({
+    sql: 'INSERT OR IGNORE INTO character_region_unlocks (character_id, region_id) VALUES (?, ?)',
+    args: [characterId, regionId],
+  });
+}
+
+export async function lockRegionForCharacter(characterId: number, regionId: number) {
+  await requireGM();
+  
+  await db.execute({
+    sql: 'DELETE FROM character_region_unlocks WHERE character_id = ? AND region_id = ?',
+    args: [characterId, regionId],
+  });
+}

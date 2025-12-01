@@ -797,7 +797,7 @@ export function CombatEngine(props: CombatEngineProps) {
           // Apply DOT tick damage to mob
           const actualDamage = Math.max(1, tickDamage);
           newState.mobHealth = Math.max(0, newState.mobHealth - actualDamage);
-          newState.log = [...newState.log, `🔥 ${effect.name} deals ${actualDamage} damage!`];
+          newState.log = [...newState.log, `${effect.name} deals ${actualDamage} damage!`];
           
           // Check if mob died from DOT
           if (newState.mobHealth <= 0) {
@@ -819,7 +819,7 @@ export function CombatEngine(props: CombatEngineProps) {
           
           if (healingApplied > 0) {
             newState.characterHealth = newHealth;
-            newState.log = [...newState.log, `💚 ${effect.name} restores ${healingApplied} HP!`];
+            newState.log = [...newState.log, `${effect.name} restores ${healingApplied} HP!`];
             props.onHealthChange(newHealth, currentMana());
           }
         });
@@ -915,7 +915,7 @@ export function CombatEngine(props: CombatEngineProps) {
               const reflectedDamage = Math.floor(damage * (currentThorns.reflectPercent / 100));
               if (reflectedDamage > 0) {
                 newState.mobHealth = Math.max(0, newState.mobHealth - reflectedDamage);
-                newState.log = [...newState.log, `⚡ ${currentThorns.name} reflects ${reflectedDamage} damage!`];
+                newState.log = [...newState.log, `${currentThorns.name} reflects ${reflectedDamage} damage!`];
                 
                 // Check if mob died from reflected damage
                 if (newState.mobHealth <= 0) {
@@ -1004,7 +1004,7 @@ export function CombatEngine(props: CombatEngineProps) {
   return (
     <div class="card" style={{ padding: "0.75rem" }}>
       <h3 style={{ "margin-bottom": "0.5rem", "font-size": "1.1rem" }}>
-        Combat vs <span style={{ color: getDifficultyColor(props.mob.level, props.character.level) }}>{props.mob.name}</span>! {state().isActive ? "" : state().result === 'victory' ? "🎉" : "💀"}
+        Combat vs <span style={{ color: getDifficultyColor(props.mob.level, props.character.level) }}>{props.mob.name}</span>! {state().isActive ? "" : state().result === 'victory' ? "Victory!" : "Defeat"}
       </h3>
 
       {/* Mob Health */}
@@ -1042,7 +1042,7 @@ export function CombatEngine(props: CombatEngineProps) {
                 display: "inline-block",
                 "flex-shrink": 0
               }}>
-                🔥 {dot.name} ({dot.ticks_remaining})
+                {dot.name} ({dot.ticks_remaining})
               </span>
             )}
           </For>
@@ -1070,7 +1070,7 @@ export function CombatEngine(props: CombatEngineProps) {
                   "font-size": "0.85rem",
                   color: "var(--accent)"
                 }}>
-                  ⚡ {effect().name}
+                  {effect().name}
                 </span>
                 <span style={{ 
                   "font-size": "0.75rem",

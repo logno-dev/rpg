@@ -926,7 +926,7 @@ export default function InventoryPage() {
                     </div>
                     <Show when={isOffhandBlocked()}>
                       <div style={{ color: "#888", "font-style": "italic", "font-size": "0.875rem", "margin-bottom": "0.5rem" }}>
-                        🔒 Blocked by 2H Weapon
+                        Blocked by 2H Weapon
                       </div>
                       <div style={{ "font-size": "0.75rem", color: "#666" }}>
                         {blockedByWeapon()?.name}
@@ -945,31 +945,31 @@ export default function InventoryPage() {
                           </div>
                           <div style={{ "font-size": "0.75rem", "margin-bottom": "0.5rem" }}>
                             <Show when={item().damage_min && item().damage_max}>
-                              <div style={{ color: "var(--danger)" }}>⚔️ {item().damage_min}-{item().damage_max} Damage</div>
+                              <div style={{ color: "var(--danger)" }}>{item().damage_min}-{item().damage_max} Damage</div>
                             </Show>
                             <Show when={item().armor}>
-                              <div style={{ color: "var(--accent)" }}>🛡️ {item().armor} Armor</div>
+                              <div style={{ color: "var(--accent)" }}>{item().armor} Armor</div>
                             </Show>
                             <Show when={item().attack_speed && item().attack_speed !== 1}>
-                              <div style={{ color: "var(--success)" }}>⚡ {item().attack_speed}x Speed</div>
+                              <div style={{ color: "var(--success)" }}>{item().attack_speed}x Speed</div>
                             </Show>
                             <Show when={item().strength_bonus}>
-                              <div>💪 +{item().strength_bonus} STR</div>
+                              <div>+{item().strength_bonus} STR</div>
                             </Show>
                             <Show when={item().dexterity_bonus}>
-                              <div>🏃 +{item().dexterity_bonus} DEX</div>
+                              <div>+{item().dexterity_bonus} DEX</div>
                             </Show>
                             <Show when={item().constitution_bonus}>
-                              <div>❤️ +{item().constitution_bonus} CON</div>
+                              <div>+{item().constitution_bonus} CON</div>
                             </Show>
                             <Show when={item().intelligence_bonus}>
-                              <div>🧠 +{item().intelligence_bonus} INT</div>
+                              <div>+{item().intelligence_bonus} INT</div>
                             </Show>
                             <Show when={item().wisdom_bonus}>
-                              <div>✨ +{item().wisdom_bonus} WIS</div>
+                              <div>+{item().wisdom_bonus} WIS</div>
                             </Show>
                             <Show when={item().charisma_bonus}>
-                              <div>💫 +{item().charisma_bonus} CHA</div>
+                              <div>+{item().charisma_bonus} CHA</div>
                             </Show>
                           </div>
                           <button
@@ -1065,7 +1065,7 @@ export default function InventoryPage() {
                   cursor: countSalvageableItems() === 0 ? "not-allowed" : "pointer"
                 }}
               >
-                ⚙️ Salvage {countSalvageableItems() > 0 ? `(${countSalvageableItems()})` : ""}
+                Salvage {countSalvageableItems() > 0 ? `(${countSalvageableItems()})` : ""}
               </button>
             </div>
           </div>
@@ -1090,35 +1090,35 @@ export default function InventoryPage() {
             onClick={() => setInventoryFilter("weapons")}
             style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
           >
-            ⚔️ Weapons
+            Weapons
           </button>
           <button 
             class={inventoryFilter() === "armor" ? "button" : "button secondary"}
             onClick={() => setInventoryFilter("armor")}
             style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
           >
-            🛡️ Armor
+            Armor
           </button>
           <button 
             class={inventoryFilter() === "offhand" ? "button" : "button secondary"}
             onClick={() => setInventoryFilter("offhand")}
             style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
           >
-            🔮 Offhand
+            Offhand
           </button>
           <button 
             class={inventoryFilter() === "scrolls" ? "button" : "button secondary"}
             onClick={() => setInventoryFilter("scrolls")}
             style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
           >
-            📜 Scrolls
+            Scrolls
           </button>
           <button 
             class={inventoryFilter() === "consumables" ? "button" : "button secondary"}
             onClick={() => setInventoryFilter("consumables")}
             style={{ "font-size": "0.875rem", padding: "0.5rem 1rem" }}
           >
-            🧪 Consumables
+            Consumables
           </button>
         </div>
         
@@ -1126,7 +1126,7 @@ export default function InventoryPage() {
         <Show when={inventoryFilter() === "all"}>
           <Show when={currentInventory().filter((i: any) => !i.equipped && i.slot === "weapon").length > 0}>
             <h4 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", display: "flex", "align-items": "center", gap: "0.5rem", "font-size": "1.1rem" }}>
-              ⚔️ Weapons ({currentInventory().filter((i: any) => !i.equipped && i.slot === "weapon").length})
+              Weapons ({currentInventory().filter((i: any) => !i.equipped && i.slot === "weapon").length})
             </h4>
             <div style={{ "margin-bottom": "2rem" }}>
               <For each={currentInventory().filter((i: any) => !i.equipped && i.slot === "weapon")}>
@@ -1152,7 +1152,7 @@ export default function InventoryPage() {
                           <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
                             {invItem.slot && `${invItem.slot} • `}
                             <Show when={invItem.damage_min && invItem.damage_max}>
-                              ⚔️ {invItem.damage_min}-{invItem.damage_max} Dmg
+                              {invItem.damage_min}-{invItem.damage_max} Dmg
                             </Show>
                             <Show when={selectionMode() && invItem.value}>
                                • {Math.floor(invItem.value * 0.4 * invItem.quantity)}g
@@ -1175,7 +1175,7 @@ export default function InventoryPage() {
           
           <Show when={currentInventory().filter((i: any) => !i.equipped && i.slot === "offhand").length > 0}>
             <h4 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", display: "flex", "align-items": "center", gap: "0.5rem", "font-size": "1.1rem" }}>
-              🔮 Offhand ({currentInventory().filter((i: any) => !i.equipped && i.slot === "offhand").length})
+              Offhand ({currentInventory().filter((i: any) => !i.equipped && i.slot === "offhand").length})
             </h4>
             <div style={{ "margin-bottom": "2rem" }}>
                <For each={currentInventory().filter((i: any) => !i.equipped && i.slot === "offhand")}>
@@ -1201,10 +1201,10 @@ export default function InventoryPage() {
                           <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
                             {invItem.slot && `${invItem.slot} • `}
                             <Show when={invItem.intelligence_bonus}>
-                              🧠 +{invItem.intelligence_bonus} INT
+                              +{invItem.intelligence_bonus} INT
                             </Show>
                             <Show when={invItem.wisdom_bonus}>
-                              • 🦉 +{invItem.wisdom_bonus} WIS
+                              • +{invItem.wisdom_bonus} WIS
                             </Show>
                             <Show when={selectionMode() && invItem.value}>
                                • {Math.floor(invItem.value * 0.4 * invItem.quantity)}g
@@ -1227,7 +1227,7 @@ export default function InventoryPage() {
           
           <Show when={currentInventory().filter((i: any) => !i.equipped && i.type === "armor" && i.slot !== "offhand").length > 0}>
             <h4 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", display: "flex", "align-items": "center", gap: "0.5rem", "font-size": "1.1rem" }}>
-              🛡️ Armor ({currentInventory().filter((i: any) => !i.equipped && i.type === "armor" && i.slot !== "offhand").length})
+              Armor ({currentInventory().filter((i: any) => !i.equipped && i.type === "armor" && i.slot !== "offhand").length})
             </h4>
             <div style={{ "margin-bottom": "2rem" }}>
               <For each={currentInventory().filter((i: any) => !i.equipped && i.type === "armor" && i.slot !== "offhand")}>
@@ -1252,7 +1252,7 @@ export default function InventoryPage() {
                           <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{getItemDisplayName(invItem)}</div>
                           <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
                             {invItem.slot && `${invItem.slot} • `}
-                            <Show when={invItem.armor}>🛡️ {invItem.armor} Armor</Show>
+                            <Show when={invItem.armor}>{invItem.armor} Armor</Show>
                             <Show when={selectionMode() && invItem.value}>
                                • {Math.floor(invItem.value * 0.4 * invItem.quantity)}g
                             </Show>
@@ -1274,7 +1274,7 @@ export default function InventoryPage() {
           
           <Show when={currentInventory().filter((i: any) => !i.equipped && i.type === "scroll").length > 0}>
             <h4 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", display: "flex", "align-items": "center", gap: "0.5rem", "font-size": "1.1rem" }}>
-              📜 Scrolls ({currentInventory().filter((i: any) => !i.equipped && i.type === "scroll").length})
+              Scrolls ({currentInventory().filter((i: any) => !i.equipped && i.type === "scroll").length})
             </h4>
             <div style={{ "margin-bottom": "2rem" }}>
               <For each={currentInventory().filter((i: any) => !i.equipped && i.type === "scroll")}>
@@ -1299,7 +1299,7 @@ export default function InventoryPage() {
                         <div style={{ flex: 1 }}>
                           <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{getItemDisplayName(invItem)}</div>
                           <div style={{ "font-size": "0.875rem", color: scrollStatus.alreadyLearned ? "var(--success)" : scrollStatus.hasBetter ? "var(--warning)" : "var(--text-secondary)" }}>
-                            {scrollStatus.alreadyLearned ? "✓ Already Learned" : scrollStatus.hasBetter ? "⚠ You have better" : "Ability Scroll"}
+                            {scrollStatus.alreadyLearned ? "Already Learned" : scrollStatus.hasBetter ? "You have better" : "Ability Scroll"}
                             <Show when={selectionMode() && invItem.value}>
                                • {Math.floor(invItem.value * 0.4 * invItem.quantity)}g
                             </Show>
@@ -1321,7 +1321,7 @@ export default function InventoryPage() {
           
           <Show when={currentInventory().filter((i: any) => !i.equipped && i.type === "consumable").length > 0}>
             <h4 style={{ "margin-bottom": "0.75rem", color: "var(--accent)", display: "flex", "align-items": "center", gap: "0.5rem", "font-size": "1.1rem" }}>
-              🧪 Consumables ({currentInventory().filter((i: any) => !i.equipped && i.type === "consumable").length})
+              Consumables ({currentInventory().filter((i: any) => !i.equipped && i.type === "consumable").length})
             </h4>
             <div style={{ "margin-bottom": "2rem" }}>
               <For each={currentInventory().filter((i: any) => !i.equipped && i.type === "consumable")}>
@@ -1345,9 +1345,9 @@ export default function InventoryPage() {
                         <div style={{ flex: 1 }}>
                           <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{getItemDisplayName(invItem)}</div>
                           <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
-                            <Show when={invItem.health_restore}>❤️ +{invItem.health_restore} HP</Show>
+                            <Show when={invItem.health_restore}>+{invItem.health_restore} HP</Show>
                             <Show when={invItem.health_restore && invItem.mana_restore}> • </Show>
-                            <Show when={invItem.mana_restore}>✨ +{invItem.mana_restore} MP</Show>
+                            <Show when={invItem.mana_restore}>+{invItem.mana_restore} MP</Show>
                             <Show when={selectionMode() && invItem.value}>
                                • {Math.floor(invItem.value * 0.4 * invItem.quantity)}g
                             </Show>
@@ -1403,18 +1403,18 @@ export default function InventoryPage() {
                         <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
                           <Show when={invItem.slot}>
                             {invItem.slot}
-                            <Show when={invItem.damage_min}> • ⚔️ {invItem.damage_min}-{invItem.damage_max} Dmg</Show>
-                            <Show when={invItem.armor}> • 🛡️ {invItem.armor} Armor</Show>
+                            <Show when={invItem.damage_min}> • {invItem.damage_min}-{invItem.damage_max} Dmg</Show>
+                            <Show when={invItem.armor}> • {invItem.armor} Armor</Show>
                           </Show>
                           <Show when={invItem.type === "scroll"}>
                             <span style={{ color: scrollStatus.alreadyLearned ? "var(--success)" : scrollStatus.hasBetter ? "var(--warning)" : "var(--text-secondary)" }}>
-                              {scrollStatus.alreadyLearned ? "✓ Already Learned" : scrollStatus.hasBetter ? "⚠ You have better" : "Ability Scroll"}
+                              {scrollStatus.alreadyLearned ? "Already Learned" : scrollStatus.hasBetter ? "You have better" : "Ability Scroll"}
                             </span>
                           </Show>
                           <Show when={invItem.type === "consumable"}>
-                            <Show when={invItem.health_restore}>❤️ +{invItem.health_restore} HP</Show>
+                            <Show when={invItem.health_restore}>+{invItem.health_restore} HP</Show>
                             <Show when={invItem.health_restore && invItem.mana_restore}> • </Show>
-                            <Show when={invItem.mana_restore}>✨ +{invItem.mana_restore} MP</Show>
+                            <Show when={invItem.mana_restore}>+{invItem.mana_restore} MP</Show>
                           </Show>
                           <Show when={selectionMode() && invItem.value}>
                              • {Math.floor(invItem.value * 0.4 * invItem.quantity)}g
@@ -1660,7 +1660,7 @@ export default function InventoryPage() {
                     "font-weight": "bold",
                     color: "var(--warning)"
                   }}>
-                    💰 {Math.floor(data().value * 0.4) * sellQuantity()}
+                    {Math.floor(data().value * 0.4) * sellQuantity()}
                   </div>
                   <div style={{ 
                     "font-size": "1rem",
@@ -1735,7 +1735,7 @@ export default function InventoryPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <h2 style={{ "margin-bottom": "1rem", color: "var(--accent)" }}>
-                ⚔️ Confirm Equipment Change
+                Confirm Equipment Change
               </h2>
               
               <p style={{ 
@@ -1802,7 +1802,7 @@ export default function InventoryPage() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ "margin-bottom": "1rem", color: "var(--danger)" }}>⚠️ Drop Item</h2>
+            <h2 style={{ "margin-bottom": "1rem", color: "var(--danger)" }}>Drop Item</h2>
             
             <div style={{ "margin-bottom": "1.5rem" }}>
               <p style={{ color: "var(--text-secondary)", "margin-bottom": "1rem" }}>
@@ -1900,7 +1900,7 @@ export default function InventoryPage() {
               "font-size": "4rem", 
               "margin-bottom": "1rem" 
             }}>
-              {learnResultData()?.success ? "✓" : "✗"}
+              {learnResultData()?.success ? "Success" : "Failed"}
             </div>
             
             <h2 style={{ 
@@ -1985,7 +1985,7 @@ export default function InventoryPage() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ "margin-bottom": "1rem", color: "var(--warning)" }}>⚙️ Bulk Salvage</h2>
+            <h2 style={{ "margin-bottom": "1rem", color: "var(--warning)" }}>Bulk Salvage</h2>
             
             <div style={{ "margin-bottom": "1.5rem" }}>
               <p style={{ "margin-bottom": "1rem" }}>
@@ -2000,7 +2000,7 @@ export default function InventoryPage() {
                 "margin-bottom": "1rem"
               }}>
                 <p style={{ color: "var(--warning)", "font-weight": "500" }}>
-                  ⚠️ This action cannot be undone
+                  This action cannot be undone
                 </p>
                 <p style={{ "font-size": "0.875rem", color: "var(--text-secondary)", "margin-top": "0.5rem" }}>
                   Each item will be broken down into crafting materials based on its recipe or rarity. Equipped items and non-equipment will be skipped.
@@ -2060,7 +2060,7 @@ export default function InventoryPage() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ "margin-bottom": "1rem", color: "var(--warning)" }}>⚙️ Salvage Item</h2>
+            <h2 style={{ "margin-bottom": "1rem", color: "var(--warning)" }}>Salvage Item</h2>
             
             <div style={{ "margin-bottom": "1.5rem" }}>
               <p style={{ "margin-bottom": "1rem" }}>
@@ -2073,7 +2073,7 @@ export default function InventoryPage() {
                 "border-left": "4px solid var(--warning)"
               }}>
                 <p style={{ color: "var(--warning)", "font-weight": "500" }}>
-                  ⚠️ This action cannot be undone
+                  This action cannot be undone
                 </p>
                 <p style={{ "font-size": "0.875rem", color: "var(--text-secondary)", "margin-top": "0.5rem" }}>
                   You will receive crafting materials based on the item's recipe or rarity.
@@ -2141,7 +2141,7 @@ export default function InventoryPage() {
               "font-size": "4rem", 
               "margin-bottom": "1rem" 
             }}>
-              {salvageResultData()?.materials.length ? "⚙️" : "✗"}
+              {salvageResultData()?.materials.length ? "Salvaged" : "Failed"}
             </div>
             
             <h2 style={{ 
