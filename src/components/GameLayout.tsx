@@ -1,8 +1,9 @@
-import { createSignal, createMemo, onMount, Show } from "solid-js";
+import { createSignal, createMemo, onMount, onCleanup, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { useCharacter } from "~/lib/CharacterContext";
 import { HealthRegen } from "~/components/HealthRegen";
 import { GameNavigation } from "~/components/GameNavigation";
+import { hasSavedCombatState } from "~/lib/combatStorage";
 import { Coins } from "lucide-solid";
 
 type GameLayoutProps = {
@@ -12,10 +13,27 @@ type GameLayoutProps = {
 export function GameLayout(props: GameLayoutProps) {
   const [store, actions, computed] = useCharacter();
   const [isScrolled, setIsScrolled] = createSignal(false);
+  const [isRegenPaused, setIsRegenPaused] = createSignal(false);
   const navigate = useNavigate();
 
   const currentCharacter = () => store.character;
   const currentGold = () => store.character?.gold || 0;
+
+  // Check for saved combat state periodically
+  const checkPausedState = () => {
+    setIsRegenPaused(hasSavedCombatState());
+  };
+  
+  // Check immediately
+  checkPausedState();
+  
+  // Check every 2 seconds in case combat state changes
+  const pauseCheckInterval = setInterval(checkPausedState, 2000);
+  
+  // Clean up interval on unmount
+  onCleanup(() => {
+    clearInterval(pauseCheckInterval);
+  });
 
   // Calculate current health/mana from character or dungeon session
   const currentHealth = createMemo(() => {
@@ -174,6 +192,7 @@ export function GameLayout(props: GameLayoutProps) {
               constitution={() => totalStats().constitution}
               wisdom={() => totalStats().wisdom}
               isInCombat={() => false}
+              isPaused={isRegenPaused}
               onRegenTick={handleRegenTick}
             />
             

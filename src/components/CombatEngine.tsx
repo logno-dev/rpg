@@ -1,7 +1,8 @@
-import { createSignal, onMount, onCleanup, For, Show, createEffect, onCleanup as onCleanupEffect, untrack } from "solid-js";
+import { createSignal, onMount, onCleanup, For, Show, createEffect, untrack } from "solid-js";
 import type { Character, Mob, Item, Ability, AbilityEffect, ActiveEffect } from "~/lib/db";
 import { useActiveEffects } from "~/lib/ActiveEffectsContext";
 import { EffectProcessor } from "~/lib/EffectProcessor";
+import { saveCombatState, type StoredCombatState } from "~/lib/combatStorage";
 
 type CombatState = {
   characterHealth: number;
@@ -49,6 +50,7 @@ type CombatEngineProps = {
   onActiveHotsChange?: (hots: ActiveEffect[]) => void;
   onThornsChange?: (thorns: { name: string; reflectPercent: number; duration: number; expiresAt: number } | null) => void;
   onMobHealthChange?: (currentHealth: number, maxHealth: number) => void;
+  initialState?: StoredCombatState; // Optional restored state from localStorage
 };
 
 const TICK_INTERVAL = 100; // 100ms per tick
@@ -274,17 +276,31 @@ export function CombatEngine(props: CombatEngineProps) {
 
 
 
-  const [state, setState] = createSignal<CombatState>({
-    characterHealth: props.currentHealth,
-    characterMana: props.currentMana,
-    mobHealth: props.mob.max_health,
-    characterTicks: 0,
-    mobTicks: 0,
-    characterAttackTicks: initialCharacterAttackTicks,
-    mobAttackTicks: initialMobAttackTicks,
-    log: [`Combat started against ${props.mob.name}!`],
-    isActive: true,
-  });
+  const [state, setState] = createSignal<CombatState>(
+    props.initialState ? {
+      // Restore from saved state
+      characterHealth: props.initialState.characterHealth,
+      characterMana: props.initialState.characterMana,
+      mobHealth: props.initialState.mobHealth,
+      characterTicks: props.initialState.characterTicks,
+      mobTicks: props.initialState.mobTicks,
+      characterAttackTicks: props.initialState.characterAttackTicks,
+      mobAttackTicks: props.initialState.mobAttackTicks,
+      log: props.initialState.log,
+      isActive: true,
+    } : {
+      // Start new combat
+      characterHealth: props.currentHealth,
+      characterMana: props.currentMana,
+      mobHealth: props.mob.max_health,
+      characterTicks: 0,
+      mobTicks: 0,
+      characterAttackTicks: initialCharacterAttackTicks,
+      mobAttackTicks: initialMobAttackTicks,
+      log: [`Combat started against ${props.mob.name}!`],
+      isActive: true,
+    }
+  );
   
   // Notify parent of mob health changes
   createEffect(() => {
@@ -294,16 +310,28 @@ export function CombatEngine(props: CombatEngineProps) {
   });
 
   // Track ability cooldowns in combat (in seconds)
-  const [abilityCooldowns, setAbilityCooldowns] = createSignal<Map<number, number>>(new Map());
-  const [currentMana, setCurrentMana] = createSignal(props.currentMana);
+  const [abilityCooldowns, setAbilityCooldowns] = createSignal<Map<number, number>>(
+    props.initialState?.abilityCooldowns 
+      ? new Map(Object.entries(props.initialState.abilityCooldowns).map(([k, v]) => [Number(k), v]))
+      : new Map()
+  );
+  const [currentMana, setCurrentMana] = createSignal(
+    props.initialState?.characterMana ?? props.currentMana
+  );
   
   // Toggle for attack timers visibility
   const [showAttackTimers, setShowAttackTimers] = createSignal(false);
   
   // Track active combat effects (DOTs, HOTs, debuffs on enemy)
-  const [activeDots, setActiveDots] = createSignal<ActiveEffect[]>([]);
-  const [activeHots, setActiveHots] = createSignal<ActiveEffect[]>([]);
-  const [activeDebuffs, setActiveDebuffs] = createSignal<ActiveEffect[]>([]);
+  const [activeDots, setActiveDots] = createSignal<ActiveEffect[]>(
+    props.initialState?.activeDots ?? []
+  );
+  const [activeHots, setActiveHots] = createSignal<ActiveEffect[]>(
+    props.initialState?.activeHots ?? []
+  );
+  const [activeDebuffs, setActiveDebuffs] = createSignal<ActiveEffect[]>(
+    props.initialState?.activeDebuffs ?? []
+  );
   
   // Notify parent when HOTs change
   createEffect(() => {
@@ -325,7 +353,7 @@ export function CombatEngine(props: CombatEngineProps) {
     reflectPercent: number;
     duration: number;
     expiresAt: number;
-  } | null>(null);
+  } | null>(props.initialState?.thornsEffect ?? null);
   
   // Flag to prevent sync loops when we update health internally
   let isInternalHealthUpdate = false;
@@ -995,6 +1023,35 @@ export function CombatEngine(props: CombatEngineProps) {
     }
     if (cooldownIntervalId) {
       clearInterval(cooldownIntervalId);
+    }
+    
+    // Save combat state to localStorage if combat is still active
+    const currentState = state();
+    if (currentState.isActive && !currentState.result) {
+      const cooldownsRecord: Record<number, number> = {};
+      abilityCooldowns().forEach((value, key) => {
+        if (value > 0) {
+          cooldownsRecord[key] = value;
+        }
+      });
+      
+      saveCombatState({
+        characterHealth: currentState.characterHealth,
+        characterMana: currentMana(),
+        mobHealth: currentState.mobHealth,
+        characterTicks: currentState.characterTicks,
+        mobTicks: currentState.mobTicks,
+        characterAttackTicks: currentState.characterAttackTicks,
+        mobAttackTicks: currentState.mobAttackTicks,
+        log: currentState.log,
+        mob: props.mob,
+        timestamp: Date.now(),
+        activeDots: activeDots(),
+        activeHots: activeHots(),
+        activeDebuffs: activeDebuffs(),
+        thornsEffect: thornsEffect(),
+        abilityCooldowns: cooldownsRecord,
+      });
     }
   });
 

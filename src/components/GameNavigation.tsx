@@ -1,6 +1,6 @@
 import { A } from "@solidjs/router";
 import { createSignal, Show } from "solid-js";
-import { Swords, Backpack, ScrollText, Hammer, User } from "lucide-solid";
+import { Swords, Backpack, ScrollText, Hammer, User, BadgeAlert } from "lucide-solid";
 import { CharacterModal } from "./CharacterModal";
 import { QuestLogModal } from "./QuestLogModal";
 import { useCharacter } from "~/lib/CharacterContext";
@@ -35,16 +35,16 @@ export function GameNavigation() {
               <ScrollText size={18} style={{ "margin-right": "0.5rem" }} />
               Quest Log
               <Show when={store.hasCompletableQuests}>
-                <span style={{
-                  position: "absolute",
-                  top: "4px",
-                  right: "4px",
-                  width: "8px",
-                  height: "8px",
-                  "background-color": "#FFD700",
-                  "border-radius": "50%",
-                  "box-shadow": "0 0 4px rgba(255, 215, 0, 0.8)"
-                }}>!</span>
+                <BadgeAlert 
+                  size={16} 
+                  color="#FFD700"
+                  style={{
+                    position: "absolute",
+                    top: "4px",
+                    right: "4px",
+                    filter: "drop-shadow(0 0 4px rgba(255, 215, 0, 0.8))"
+                  }}
+                />
               </Show>
             </button>
             <A href="/game/crafting" class="button" activeClass="active">
@@ -73,16 +73,16 @@ export function GameNavigation() {
           <ScrollText size={24} />
           <span>Quests</span>
           <Show when={store.hasCompletableQuests}>
-            <span style={{
-              position: "absolute",
-              top: "8px",
-              right: "8px",
-              width: "8px",
-              height: "8px",
-              "background-color": "#FFD700",
-              "border-radius": "50%",
-              "box-shadow": "0 0 4px rgba(255, 215, 0, 0.8)"
-            }}>!</span>
+            <BadgeAlert 
+              size={18} 
+              color="#FFD700"
+              style={{
+                position: "absolute",
+                top: "8px",
+                right: "8px",
+                filter: "drop-shadow(0 0 4px rgba(255, 215, 0, 0.8))"
+              }}
+            />
           </Show>
         </button>
         <A href="/game/crafting" class="nav-item" activeClass="active">

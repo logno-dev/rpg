@@ -12,6 +12,7 @@ import { ItemDetailModal } from "~/components/ItemDetailModal";
 import { GameNavigation } from "~/components/GameNavigation";
 import { useCharacter } from "~/lib/CharacterContext";
 import { useActiveEffects } from "~/lib/ActiveEffectsContext";
+import { loadCombatState, clearCombatState, type StoredCombatState } from "~/lib/combatStorage";
 
 const getGameData = cache(async () => {
   "use server";
@@ -95,6 +96,7 @@ export default function GamePage() {
   const [combatLog, setCombatLog] = createSignal<string[]>([]);
   const [isRoaming, setIsRoaming] = createSignal(false);
   const [isTraveling, setIsTraveling] = createSignal(false);
+  const [savedCombatState, setSavedCombatState] = createSignal<StoredCombatState | null>(null);
   const [subAreas, setSubAreas] = createSignal<any[]>([]);
   const [showSubAreaModal, setShowSubAreaModal] = createSignal(false);
   const [subAreaMobs, setSubAreaMobs] = createSignal<Record<number, any[]>>({});
@@ -813,6 +815,10 @@ export default function GamePage() {
 
   const handleCombatEnd = async (result: 'victory' | 'defeat', finalState: any) => {
     try {
+      // Clear saved combat state since combat is ending
+      clearCombatState();
+      setSavedCombatState(null);
+      
       const response = await fetch('/api/game/finish-combat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1801,6 +1807,21 @@ export default function GamePage() {
     setAdventureLogUserScrolledUp(!isAtBottom);
   };
 
+  // Check for saved combat state on mount
+  onMount(() => {
+    const saved = loadCombatState();
+    if (saved) {
+      console.log('[Combat Storage] Restoring saved combat state');
+      setSavedCombatState(saved);
+      setActiveMob(saved.mob);
+      // Restore health/mana to the saved values
+      actions.updateHealth(saved.characterHealth, saved.characterMana);
+    }
+  });
+  
+  // Regen should not be paused on the game route itself (combat is active here)
+  const isRegenPaused = () => false;
+
   // Scroll detection for sticky header
   onMount(() => {
     const handleScroll = () => {
@@ -2061,11 +2082,8 @@ export default function GamePage() {
             constitution={() => totalStats().constitution}
             wisdom={() => totalStats().wisdom}
             isInCombat={() => !!activeMob()}
+            isPaused={isRegenPaused}
             onRegenTick={handleRegenTick}
-            onRegenComplete={(health, mana) => {
-              // Update store, sync will happen automatically
-              actions.updateHealth(health, mana);
-            }}
           />
           
           {/* Mobile Title */}
@@ -2186,6 +2204,7 @@ export default function GamePage() {
                     setEnemyCurrentHealth(currentHealth);
                     setEnemyMaxHealth(maxHealth);
                   }}
+                  initialState={savedCombatState() ?? undefined}
                   onUseConsumable={async (itemId) => {
                     const item = currentInventory().find((i: any) => i.id === itemId);
                     if (item) {

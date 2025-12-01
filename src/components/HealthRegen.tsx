@@ -8,6 +8,7 @@ type HealthRegenProps = {
   constitution: () => number;
   wisdom: () => number;
   isInCombat: () => boolean;
+  isPaused?: () => boolean; // Pause regen when combat is stored in localStorage
   onRegenTick: (health: number, mana: number) => void;
 };
 
@@ -30,11 +31,17 @@ export function HealthRegen(props: HealthRegenProps) {
     const currentH = props.currentHealth();
     const maxH = props.maxHealth();
     const inCombat = props.isInCombat();
+    const paused = props.isPaused?.() ?? false;
     
     // Clear existing health interval
     if (healthIntervalId !== undefined) {
       clearInterval(healthIntervalId);
       healthIntervalId = undefined;
+    }
+    
+    // Don't regen if paused (combat stored in localStorage)
+    if (paused) {
+      return;
     }
     
     // Check if we need health regen
@@ -76,11 +83,17 @@ export function HealthRegen(props: HealthRegenProps) {
     const currentM = props.currentMana();
     const maxM = props.maxMana();
     const inCombat = props.isInCombat();
+    const paused = props.isPaused?.() ?? false;
     
     // Clear existing mana interval
     if (manaIntervalId !== undefined) {
       clearInterval(manaIntervalId);
       manaIntervalId = undefined;
+    }
+    
+    // Don't regen if paused (combat stored in localStorage)
+    if (paused) {
+      return;
     }
     
     // Check if we need mana regen

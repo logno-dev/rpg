@@ -210,12 +210,14 @@ export const CharacterProvider: ParentComponent<{ initialData?: Partial<Characte
     },
 
     updateDungeonEncounter: (encounterNumber: number, health: number, mana: number) => {
+      if (!store.dungeonSession) return; // Guard against null session
       setStore("dungeonSession", "current_encounter", encounterNumber);
       setStore("dungeonSession", "session_health", health);
       setStore("dungeonSession", "session_mana", mana);
     },
 
     updateHealth: (health: number, mana?: number) => {
+      if (!store.character) return; // Guard against null character
       setStore("character", "current_health", health);
       if (mana !== undefined) {
         setStore("character", "current_mana", mana);
@@ -223,10 +225,12 @@ export const CharacterProvider: ParentComponent<{ initialData?: Partial<Characte
     },
 
     updateGold: (gold: number) => {
+      if (!store.character) return; // Guard against null character
       setStore("character", "gold", gold);
     },
 
     updateExperience: (exp: number) => {
+      if (!store.character) return; // Guard against null character
       setStore("character", "experience", exp);
     },
 
