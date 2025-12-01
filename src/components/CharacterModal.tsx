@@ -1,4 +1,4 @@
-import { TrendingUp, Grid3x3, Users, LogOut } from "lucide-solid";
+import { TrendingUp, Grid3x3, Users, LogOut, SquareArrowOutUpRight } from "lucide-solid";
 import { A, useNavigate } from "@solidjs/router";
 
 type CharacterModalProps = {
@@ -147,6 +147,39 @@ export function CharacterModal(props: CharacterModalProps) {
               </div>
             </div>
           </A>
+
+          <a 
+            href="/wiki" 
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ 
+              display: "flex",
+              "align-items": "center",
+              padding: "1rem",
+              background: "var(--bg-light)",
+              "border-radius": "6px",
+              border: "1px solid var(--border)",
+              "text-decoration": "none",
+              color: "var(--text-primary)",
+              transition: "all 0.2s"
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = "var(--accent)";
+              e.currentTarget.style.borderColor = "var(--accent)";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = "var(--bg-light)";
+              e.currentTarget.style.borderColor = "var(--border)";
+            }}
+          >
+            <SquareArrowOutUpRight size={24} style={{ "margin-right": "1rem", "flex-shrink": "0" }} />
+            <div>
+              <div style={{ "font-weight": "600", "margin-bottom": "0.25rem" }}>Morthvale Wiki</div>
+              <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
+                Browse guides and game info
+              </div>
+            </div>
+          </a>
 
           <A 
             href="/character-select" 

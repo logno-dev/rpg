@@ -17,6 +17,7 @@ const wikiNavigation: WikiNavItem[] = [
     href: "/wiki#mechanics",
     children: [
       { title: "Combat System", href: "/wiki/combat" },
+      { title: "Quests", href: "/wiki/quest" },
     ],
   },
   {
@@ -30,7 +31,7 @@ const wikiNavigation: WikiNavItem[] = [
     title: "Character Development",
     href: "/wiki#character",
     children: [
-      { title: "Abilities & Spells", href: "/wiki/abilities" },
+      { title: "Abilities & Spells", href: "/wiki/ability" },
       { title: "Equipment & Items", href: "/wiki/equipment" },
     ],
   },

@@ -163,82 +163,83 @@ export function GameLayout(props: GameLayoutProps) {
       </Show>
 
       <Show when={currentCharacter()}>
-        <div class="container" style={{ "padding-bottom": "calc(5rem + env(safe-area-inset-bottom, 0px))" }}>
-          {/* Passive Health/Mana Regeneration */}
-          <HealthRegen
-            maxHealth={currentMaxHealth}
-            maxMana={currentMaxMana}
-            currentHealth={currentHealth}
-            currentMana={currentMana}
-            constitution={() => totalStats().constitution}
-            wisdom={() => totalStats().wisdom}
-            isInCombat={() => false}
-            onRegenTick={handleRegenTick}
-          />
-          
-          {/* Mobile Title */}
-          <h1 class="title mobile-title" style={{ 
-            "text-align": "center", 
-            "margin-bottom": "1rem",
-            "font-size": "2rem"
-          }}>
-            Morthvale
-          </h1>
-          
-          {/* Character Info Panel */}
-          <div class="card">
-            <div style={{ display: "flex", "justify-content": "space-between", "align-items": "start", "flex-wrap": "wrap", gap: "1rem" }}>
-              <div style={{ flex: 1, "min-width": "250px" }}>
-                <h2>{currentCharacter()?.name}</h2>
-                <p style={{ color: "var(--text-secondary)", "margin-bottom": "0.5rem", display: "flex", "align-items": "center", gap: "0.5rem" }}>
-                  <span>Level {currentCharacter()!.level}</span>
-                  <span>|</span>
-                  <span style={{ display: "flex", "align-items": "center", gap: "0.25rem" }}>
-                    <Coins size={16} /> {currentGold()} Gold
-                  </span>
-                </p>
-                {/* XP Progress Bar */}
-                <div>
-                  <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "margin-bottom": "0.25rem", display: "flex", "justify-content": "space-between" }}>
-                    <span>Experience</span>
-                    <span>{currentCharacter()?.experience}/{(currentCharacter()?.level || 1) * 125} XP</span>
-                  </div>
-                  <div class="progress-bar">
-                    <div
-                      class="progress-fill"
-                      style={{ 
-                        width: `${((currentCharacter()?.experience || 0) / ((currentCharacter()?.level || 1) * 125)) * 100}%`,
-                        background: "linear-gradient(90deg, var(--warning), var(--accent))"
-                      }}
-                    />
+        {(character) => (
+          <div class="container" style={{ "padding-bottom": "calc(5rem + env(safe-area-inset-bottom, 0px))" }}>
+            {/* Passive Health/Mana Regeneration */}
+            <HealthRegen
+              maxHealth={currentMaxHealth}
+              maxMana={currentMaxMana}
+              currentHealth={currentHealth}
+              currentMana={currentMana}
+              constitution={() => totalStats().constitution}
+              wisdom={() => totalStats().wisdom}
+              isInCombat={() => false}
+              onRegenTick={handleRegenTick}
+            />
+            
+            {/* Mobile Title */}
+            <h1 class="title mobile-title" style={{ 
+              "text-align": "center", 
+              "margin-bottom": "1rem",
+              "font-size": "2rem"
+            }}>
+              Morthvale
+            </h1>
+            
+            {/* Character Info Panel */}
+            <div class="card">
+              <div style={{ display: "flex", "justify-content": "space-between", "align-items": "start", "flex-wrap": "wrap", gap: "1rem" }}>
+                <div style={{ flex: 1, "min-width": "250px" }}>
+                  <h2>{character().name}</h2>
+                  <p style={{ color: "var(--text-secondary)", "margin-bottom": "0.5rem", display: "flex", "align-items": "center", gap: "0.5rem" }}>
+                    <span>Level {character().level}</span>
+                    <span>|</span>
+                    <span style={{ display: "flex", "align-items": "center", gap: "0.25rem" }}>
+                      <Coins size={16} /> {currentGold()} Gold
+                    </span>
+                  </p>
+                  {/* XP Progress Bar */}
+                  <div>
+                    <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "margin-bottom": "0.25rem", display: "flex", "justify-content": "space-between" }}>
+                      <span>Experience</span>
+                      <span>{character().experience}/{character().level * 125} XP</span>
+                    </div>
+                    <div class="progress-bar">
+                      <div
+                        class="progress-fill"
+                        style={{ 
+                          width: `${(character().experience / (character().level * 125)) * 100}%`,
+                          background: "linear-gradient(90deg, var(--warning), var(--accent))"
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-              <Show when={currentCharacter() && currentCharacter()!.available_points > 0}>
-                <button 
-                  style={{ 
-                    padding: "0.5rem 1rem", 
-                    background: "var(--warning)", 
-                    color: "var(--bg-dark)", 
-                    "border-radius": "6px", 
-                    "font-weight": "bold",
-                    border: "none",
-                    cursor: "pointer",
-                    transition: "all 0.2s"
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = "scale(1.05)";
-                    e.currentTarget.style.boxShadow = "0 4px 8px rgba(0, 0, 0, 0.3)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = "scale(1)";
-                    e.currentTarget.style.boxShadow = "none";
-                  }}
-                  onClick={() => navigate('/game/stats')}
-                >
-                  {currentCharacter()!.available_points} Stat Points Available!
-                </button>
-              </Show>
+                <Show when={character().available_points > 0}>
+                  <button 
+                    style={{ 
+                      padding: "0.5rem 1rem", 
+                      background: "var(--warning)", 
+                      color: "var(--bg-dark)", 
+                      "border-radius": "6px", 
+                      "font-weight": "bold",
+                      border: "none",
+                      cursor: "pointer",
+                      transition: "all 0.2s"
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = "scale(1.05)";
+                      e.currentTarget.style.boxShadow = "0 4px 8px rgba(0, 0, 0, 0.3)";
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = "scale(1)";
+                      e.currentTarget.style.boxShadow = "none";
+                    }}
+                    onClick={() => navigate('/game/stats')}
+                  >
+                    {character().available_points} Stat Points Available!
+                  </button>
+                </Show>
             </div>
 
             <div style={{ display: "grid", "grid-template-columns": "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", "margin-top": "1rem" }}>
@@ -269,9 +270,10 @@ export function GameLayout(props: GameLayoutProps) {
             </div>
           </div>
 
-          {/* Page Content */}
-          {props.children}
-        </div>
+            {/* Page Content */}
+            {props.children}
+          </div>
+        )}
       </Show>
     </div>
   );

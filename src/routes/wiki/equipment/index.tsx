@@ -1,5 +1,5 @@
 import { WikiData, ItemTable } from "~/components/WikiData";
-import { createSignal } from "solid-js";
+import { createSignal, For } from "solid-js";
 import WikiLayout from "~/components/WikiLayout";
 
 export default function EquipmentWiki() {
@@ -50,14 +50,16 @@ export default function EquipmentWiki() {
       <div class="card" style={{ "margin-bottom": "2rem" }}>
         <h2>Browse Equipment</h2>
         <div style={{ "margin-bottom": "1rem", display: "flex", gap: "0.5rem", "flex-wrap": "wrap" }}>
-          {equipmentTypes.map((type) => (
-            <button
-              class={`button ${selectedType() === type.value ? "" : "secondary"}`}
-              onClick={() => setSelectedType(type.value)}
-            >
-              {type.label}
-            </button>
-          ))}
+          <For each={equipmentTypes}>
+            {(type) => (
+              <button
+                class={`button ${selectedType() === type.value ? "" : "secondary"}`}
+                onClick={() => setSelectedType(type.value)}
+              >
+                {type.label}
+              </button>
+            )}
+          </For>
         </div>
         
         <WikiData endpoint="items" params={{ type: selectedType() }}>

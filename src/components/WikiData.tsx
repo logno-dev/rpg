@@ -1,4 +1,5 @@
 import { createResource, Show, For } from "solid-js";
+import { A } from "@solidjs/router";
 import { db } from "~/lib/db";
 
 interface WikiDataProps {
@@ -121,6 +122,57 @@ async function fetchWikiData(endpoint: string, params?: Record<string, string>) 
       return mobs.rows;
     }
     
+    if (endpoint === "quests") {
+      const regionId = params?.regionId;
+      const minLevel = params?.minLevel;
+      const maxLevel = params?.maxLevel;
+      
+      let query = `
+        SELECT q.id, q.name, q.description, q.min_level, q.repeatable, 
+               r.name as region_name, r.id as region_id
+        FROM quests q
+        JOIN regions r ON q.region_id = r.id
+        WHERE 1=1
+      `;
+      
+      const args: any[] = [];
+      
+      if (regionId) {
+        query += ` AND q.region_id = ?`;
+        args.push(parseInt(regionId));
+      }
+      
+      if (minLevel) {
+        query += ` AND q.min_level >= ?`;
+        args.push(parseInt(minLevel));
+      }
+      
+      if (maxLevel) {
+        query += ` AND q.min_level <= ?`;
+        args.push(parseInt(maxLevel));
+      }
+      
+      query += ` ORDER BY q.min_level ASC, q.name ASC`;
+      
+      const questsResult = await db.execute({ sql: query, args });
+      const quests = questsResult.rows;
+      
+      // Fetch rewards for all quests
+      for (const quest of quests) {
+        const rewardsResult = await db.execute({
+          sql: `SELECT qr.*, i.name as item_name, i.id as item_id, cm.name as material_name
+                FROM quest_rewards qr
+                LEFT JOIN items i ON qr.reward_item_id = i.id
+                LEFT JOIN crafting_materials cm ON qr.reward_material_id = cm.id
+                WHERE qr.quest_id = ?`,
+          args: [quest.id]
+        });
+        (quest as any).rewards = rewardsResult.rows;
+      }
+      
+      return quests;
+    }
+    
     return [];
   } catch (error: any) {
     console.error("Wiki data fetch error:", error);
@@ -196,7 +248,11 @@ export function AbilityTable(props: AbilityTableProps) {
         <For each={props.data}>
           {(ability) => (
             <tr>
-              <td><strong>{ability.name}</strong></td>
+              <td>
+                <A href={`/wiki/ability/${ability.id}`} style={{ color: "var(--accent)", "font-weight": "bold" }}>
+                  {ability.name}
+                </A>
+              </td>
               <td>{ability.type}</td>
               <td>{ability.category}</td>
               <td>{ability.level}</td>
@@ -247,7 +303,11 @@ export function ItemTable(props: ItemTableProps) {
         <For each={props.data}>
           {(item) => (
             <tr>
-              <td><strong style={{ color: getRarityColor(item.rarity) }}>{item.name}</strong></td>
+              <td>
+                <A href={`/wiki/equipment/${item.id}`} style={{ color: getRarityColor(item.rarity), "font-weight": "bold" }}>
+                  {item.name}
+                </A>
+              </td>
               <td>{item.type} {item.slot ? `(${item.slot})` : ""}</td>
               <td style={{ color: getRarityColor(item.rarity) }}>{item.rarity}</td>
               <td style={{ "font-size": "0.9em" }}>
@@ -298,6 +358,71 @@ export function MobTable(props: MobTableProps) {
               <td>
                 {mob.experience_reward} XP, {mob.gold_min}-{mob.gold_max} Gold
               </td>
+            </tr>
+          )}
+        </For>
+      </tbody>
+    </table>
+  );
+}
+
+interface QuestTableProps {
+  data: any[];
+}
+
+export function QuestTable(props: QuestTableProps) {
+  return (
+    <table class="wiki-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Level</th>
+          <th>Region</th>
+          <th>Type</th>
+          <th>Rewards</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <For each={props.data}>
+          {(quest) => (
+            <tr>
+              <td>
+                <A href={`/wiki/quest/${quest.id}`} style={{ color: "var(--accent)", "font-weight": "bold" }}>
+                  {quest.name}
+                </A>
+              </td>
+              <td>{quest.min_level}</td>
+              <td>{quest.region_name}</td>
+              <td>{quest.repeatable ? "Repeatable" : "One-time"}</td>
+              <td style={{ "font-size": "0.85em" }}>
+                <Show when={quest.rewards && quest.rewards.length > 0}>
+                  <For each={quest.rewards}>
+                    {(reward, index) => (
+                      <>
+                        {index() > 0 && ", "}
+                        {reward.reward_type === 'xp' && `${reward.reward_amount} XP`}
+                        {reward.reward_type === 'gold' && `${reward.reward_amount} Gold`}
+                        {reward.reward_type === 'item' && reward.item_name && (
+                          <>
+                            <A href={`/wiki/equipment/${reward.item_id}`} style={{ color: "var(--accent)" }}>
+                              {reward.item_name}
+                            </A>
+                            {reward.reward_amount > 1 && ` x${reward.reward_amount}`}
+                          </>
+                        )}
+                        {reward.reward_type === 'crafting_material' && reward.material_name && (
+                          <>
+                            {reward.material_name}
+                            {reward.reward_amount > 1 && ` x${reward.reward_amount}`}
+                          </>
+                        )}
+                      </>
+                    )}
+                  </For>
+                </Show>
+              </td>
+              <td style={{ "font-size": "0.9em" }}>{quest.description}</td>
             </tr>
           )}
         </For>
