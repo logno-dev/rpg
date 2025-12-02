@@ -2760,8 +2760,19 @@ export default function GMPage() {
                     </div>
                     <div>
                       <label>Tick Interval (seconds)</label>
-                      <input type="number" min="0" value={editingAbilityEffect()?.tick_interval ?? 0} 
-                             onInput={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, tick_interval: parseInt(e.currentTarget.value) || 0})} />
+                      <input 
+                        type="number" 
+                        min="0" 
+                        step="0.1" 
+                        value={editingAbilityEffect()?.tick_interval ?? 0} 
+                        onChange={(e) => {
+                          const val = parseFloat(e.currentTarget.value);
+                          setEditingAbilityEffect({...editingAbilityEffect()!, tick_interval: isNaN(val) ? 0 : val});
+                        }} 
+                      />
+                      <small style={{ display: "block", "font-size": "0.75rem", color: "var(--text-secondary)", "margin-top": "0.25rem" }}>
+                        Can use decimals (e.g., 0.5 for half-second ticks)
+                      </small>
                     </div>
                     <div>
                       <label>Tick Count</label>
