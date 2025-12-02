@@ -20,6 +20,7 @@ export default function GMPage() {
   const [regionMobs, setRegionMobs] = createSignal<any[]>([]);
   const [merchantInventory, setMerchantInventory] = createSignal<any[]>([]);
   const [abilityEffects, setAbilityEffects] = createSignal<any[]>([]);
+  const [quests, setQuests] = createSignal<any[]>([]);
   
   // Edit modal state
   const [editingMob, setEditingMob] = createSignal<any | null>(null);
@@ -49,6 +50,10 @@ export default function GMPage() {
   const [showAbilityEffectModal, setShowAbilityEffectModal] = createSignal(false);
   const [showCharacterModal, setShowCharacterModal] = createSignal(false);
   const [characterModalTab, setCharacterModalTab] = createSignal<'stats' | 'inventory' | 'abilities' | 'regions'>('stats');
+  const [showQuestModal, setShowQuestModal] = createSignal(false);
+  const [editingQuest, setEditingQuest] = createSignal<any | null>(null);
+  const [editingQuestObjectives, setEditingQuestObjectives] = createSignal<any[]>([]);
+  const [questFilterRegion, setQuestFilterRegion] = createSignal<number | null>(null);
   const [showAddItemModal, setShowAddItemModal] = createSignal(false);
   const [showAddAbilityModal, setShowAddAbilityModal] = createSignal(false);
   const [searchAddItem, setSearchAddItem] = createSignal("");
@@ -73,6 +78,14 @@ export default function GMPage() {
   const [searchRegionLoot, setSearchRegionLoot] = createSignal("");
   const [searchRegionMobs, setSearchRegionMobs] = createSignal("");
   const [searchMerchantInventory, setSearchMerchantInventory] = createSignal("");
+  
+  // Computed values
+  const allRegions = () => regions();
+  const filteredQuests = () => {
+    const filter = questFilterRegion();
+    if (!filter) return quests();
+    return quests().filter((q: any) => q.region_id === filter);
+  };
   
   // Helper to check if XP is balanced
   const getXPStatus = (mobLevel: number, xp: number) => {
@@ -120,6 +133,12 @@ export default function GMPage() {
   const reloadMerchants = async () => {
     const merchantsData = await getAllMerchants();
     setMerchants(merchantsData as any);
+  };
+  
+  const refetchQuests = async () => {
+    const response = await fetch('/api/gm/quests');
+    const data = await response.json();
+    setQuests(data.quests || []);
   };
   
   // Handle mob edit/delete
@@ -686,7 +705,7 @@ export default function GMPage() {
       // User is authorized, load data
       setAuthorized(true);
       
-      const [playersData, mobsData, itemsData, regionsData, abilitiesData, merchantsData, mobLootData, regionLootData, regionMobsData, merchantInvData] = await Promise.all([
+      const [playersData, mobsData, itemsData, regionsData, abilitiesData, merchantsData, mobLootData, regionLootData, regionMobsData, merchantInvData, questsResponse] = await Promise.all([
         getAllPlayers(),
         getAllMobs(),
         getAllItems(),
@@ -697,6 +716,7 @@ export default function GMPage() {
         getAllRegionRareLoot(),
         getAllRegionMobs(),
         getAllMerchantInventory(),
+        fetch('/api/gm/quests').then(r => r.json()),
       ]);
       
       setPlayers(playersData as any);
@@ -709,6 +729,7 @@ export default function GMPage() {
       setRegionRareLoot(regionLootData as any);
       setRegionMobs(regionMobsData as any);
       setMerchantInventory(merchantInvData as any);
+      setQuests(questsResponse.quests || []);
     } catch (err) {
       console.error('GM page error:', err);
       navigate("/");
@@ -775,6 +796,12 @@ export default function GMPage() {
               onClick={() => setActiveTab("merchants")}
             >
               Merchants
+            </button>
+            <button
+              class={activeTab() === "quests" ? "button primary" : "button secondary"}
+              onClick={() => setActiveTab("quests")}
+            >
+              Quests
             </button>
             <button
               class={activeTab() === "loot" ? "button primary" : "button secondary"}
@@ -1360,6 +1387,277 @@ export default function GMPage() {
             </div>
           </Show>
           
+          {/* Quests Tab */}
+          <Show when={activeTab() === "quests"}>
+            <div class="card" style={{ "margin-bottom": "1rem" }}>
+              <h2 style={{ "margin-bottom": "1rem" }}>Quest Management</h2>
+              
+              <div style={{ display: "grid", "grid-template-columns": "1fr auto", gap: "1rem", "margin-bottom": "1rem" }}>
+                <div>
+                  <label>Filter by Region</label>
+                  <select value={questFilterRegion() || ''} onChange={(e) => setQuestFilterRegion(e.currentTarget.value ? Number(e.currentTarget.value) : null)}>
+                    <option value="">All Regions</option>
+                    <For each={allRegions()}>
+                      {(region) => <option value={region.id}>{region.name}</option>}
+                    </For>
+                  </select>
+                </div>
+                <button class="button primary" onClick={() => {
+                  setEditingQuest({
+                    id: null,
+                    name: '',
+                    description: '',
+                    region_id: 1,
+                    min_level: 1,
+                    repeatable: 0,
+                    cooldown_hours: 0,
+                    chain_id: null,
+                    chain_order: null
+                  });
+                  setEditingQuestObjectives([]);
+                  setShowQuestModal(true);
+                }}>
+                  Create New Quest
+                </button>
+              </div>
+
+              <div style={{ "max-height": "600px", "overflow-y": "auto" }}>
+                <For each={filteredQuests()}>
+                  {(quest) => (
+                    <div class="card" style={{ "margin-bottom": "1rem", background: "var(--bg-light)" }}>
+                      <div style={{ display: "flex", "justify-content": "space-between", "align-items": "start" }}>
+                        <div style={{ flex: 1 }}>
+                          <h3 style={{ "margin-bottom": "0.5rem" }}>{quest.name}</h3>
+                          <p style={{ color: "var(--text-secondary)", "font-size": "0.875rem", "margin-bottom": "0.5rem" }}>
+                            {quest.description}
+                          </p>
+                          <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
+                            <div>Region: {allRegions().find(r => r.id === quest.region_id)?.name || 'Unknown'}</div>
+                            <div>Min Level: {quest.min_level}</div>
+                            <div>Repeatable: {quest.repeatable ? `Yes (${quest.cooldown_hours}h cooldown)` : 'No'}</div>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: "0.5rem" }}>
+                          <button class="button secondary" onClick={async () => {
+                            const response = await fetch(`/api/gm/quests/${quest.id}`);
+                            const data = await response.json();
+                            setEditingQuest(data.quest);
+                            setEditingQuestObjectives(data.objectives || []);
+                            setShowQuestModal(true);
+                          }}>
+                            Edit
+                          </button>
+                          <button class="button error" onClick={async () => {
+                            if (confirm(`Delete quest "${quest.name}"?`)) {
+                              await fetch(`/api/gm/quests/${quest.id}`, { method: 'DELETE' });
+                              await refetchQuests();
+                            }
+                          }}>
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </For>
+              </div>
+            </div>
+
+            {/* Quest Edit Modal */}
+            <Show when={showQuestModal() && editingQuest()}>
+              <div class="modal-overlay" onClick={() => setShowQuestModal(false)}>
+                <div class="modal-content" style={{ "max-width": "800px", "max-height": "90vh", "overflow-y": "auto" }} onClick={(e) => e.stopPropagation()}>
+                  <h2>{editingQuest()!.id ? 'Edit Quest' : 'Create Quest'}</h2>
+                  
+                  <div style={{ display: "grid", "grid-template-columns": "1fr 1fr", gap: "1rem", "margin-bottom": "1rem" }}>
+                    <div style={{ "grid-column": "1 / -1" }}>
+                      <label>Quest Name</label>
+                      <input type="text" value={editingQuest()!.name} 
+                             onInput={(e) => setEditingQuest({...editingQuest()!, name: e.currentTarget.value})} />
+                    </div>
+                    
+                    <div style={{ "grid-column": "1 / -1" }}>
+                      <label>Description</label>
+                      <textarea rows="3" value={editingQuest()!.description} 
+                                onInput={(e) => setEditingQuest({...editingQuest()!, description: e.currentTarget.value})} />
+                    </div>
+                    
+                    <div>
+                      <label>Region</label>
+                      <select value={editingQuest()!.region_id} 
+                              onChange={(e) => setEditingQuest({...editingQuest()!, region_id: Number(e.currentTarget.value)})}>
+                        <For each={allRegions()}>
+                          {(region) => <option value={region.id}>{region.name}</option>}
+                        </For>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label>Minimum Level</label>
+                      <input type="number" min="1" value={editingQuest()!.min_level} 
+                             onInput={(e) => setEditingQuest({...editingQuest()!, min_level: parseInt(e.currentTarget.value)})} />
+                    </div>
+                    
+                    <div>
+                      <label>
+                        <input type="checkbox" checked={editingQuest()!.repeatable === 1} 
+                               onChange={(e) => setEditingQuest({...editingQuest()!, repeatable: e.currentTarget.checked ? 1 : 0})} />
+                        {' '}Repeatable
+                      </label>
+                    </div>
+                    
+                    <Show when={editingQuest()!.repeatable === 1}>
+                      <div>
+                        <label>Cooldown (hours)</label>
+                        <input type="number" min="0" value={editingQuest()!.cooldown_hours} 
+                               onInput={(e) => setEditingQuest({...editingQuest()!, cooldown_hours: parseInt(e.currentTarget.value)})} />
+                      </div>
+                    </Show>
+                  </div>
+
+                  <h3 style={{ "margin-top": "1.5rem", "margin-bottom": "1rem" }}>Quest Objectives</h3>
+                  
+                  <For each={editingQuestObjectives()}>
+                    {(objective, index) => (
+                      <div class="card" style={{ background: "var(--bg-light)", "margin-bottom": "1rem" }}>
+                        <div style={{ display: "flex", "justify-content": "space-between", "margin-bottom": "0.5rem" }}>
+                          <strong>Objective {objective.objective_order}</strong>
+                          <button class="button error" onClick={() => {
+                            setEditingQuestObjectives(editingQuestObjectives().filter((_, i) => i !== index()));
+                          }}>Remove</button>
+                        </div>
+                        
+                        <div style={{ display: "grid", "grid-template-columns": "1fr 1fr", gap: "0.5rem" }}>
+                          <div>
+                            <label>Type</label>
+                            <select value={objective.type} onChange={(e) => {
+                              const updated = [...editingQuestObjectives()];
+                              updated[index()] = {...objective, type: e.currentTarget.value};
+                              setEditingQuestObjectives(updated);
+                            }}>
+                              <option value="kill">Kill</option>
+                              <option value="collect">Collect</option>
+                              <option value="explore">Explore</option>
+                            </select>
+                          </div>
+                          
+                          <div>
+                            <label>Description</label>
+                            <input type="text" value={objective.description} onInput={(e) => {
+                              const updated = [...editingQuestObjectives()];
+                              updated[index()] = {...objective, description: e.currentTarget.value};
+                              setEditingQuestObjectives(updated);
+                            }} />
+                          </div>
+                          
+                          <Show when={objective.type === 'kill'}>
+                            <div>
+                              <label>Target Mob ID</label>
+                              <input type="number" value={objective.target_mob_id || ''} onInput={(e) => {
+                                const updated = [...editingQuestObjectives()];
+                                updated[index()] = {...objective, target_mob_id: parseInt(e.currentTarget.value) || null};
+                                setEditingQuestObjectives(updated);
+                              }} />
+                            </div>
+                          </Show>
+                          
+                          <Show when={objective.type === 'collect'}>
+                            <div>
+                              <label>Target Item/Material ID</label>
+                              <input type="number" value={objective.target_item_id || ''} onInput={(e) => {
+                                const updated = [...editingQuestObjectives()];
+                                updated[index()] = {...objective, target_item_id: parseInt(e.currentTarget.value) || null};
+                                setEditingQuestObjectives(updated);
+                              }} />
+                            </div>
+                          </Show>
+                          
+                          <Show when={objective.type === 'explore'}>
+                            <div>
+                              <label>Target Sub-Area ID</label>
+                              <input type="number" value={objective.target_sub_area_id || ''} onInput={(e) => {
+                                const updated = [...editingQuestObjectives()];
+                                updated[index()] = {...objective, target_sub_area_id: parseInt(e.currentTarget.value) || null};
+                                setEditingQuestObjectives(updated);
+                              }} />
+                            </div>
+                          </Show>
+                          
+                          <div>
+                            <label>Required Count</label>
+                            <input type="number" min="1" value={objective.required_count} onInput={(e) => {
+                              const updated = [...editingQuestObjectives()];
+                              updated[index()] = {...objective, required_count: parseInt(e.currentTarget.value)};
+                              setEditingQuestObjectives(updated);
+                            }} />
+                          </div>
+                          
+                          <div>
+                            <label>
+                              <input type="checkbox" checked={objective.auto_complete === 1} onChange={(e) => {
+                                const updated = [...editingQuestObjectives()];
+                                updated[index()] = {...objective, auto_complete: e.currentTarget.checked ? 1 : 0};
+                                setEditingQuestObjectives(updated);
+                              }} />
+                              {' '}Auto-complete
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </For>
+                  
+                  <button class="button secondary" style={{ "margin-bottom": "1rem" }} onClick={() => {
+                    setEditingQuestObjectives([
+                      ...editingQuestObjectives(),
+                      {
+                        id: null,
+                        quest_id: editingQuest()!.id,
+                        objective_order: editingQuestObjectives().length + 1,
+                        type: 'kill',
+                        description: '',
+                        target_mob_id: null,
+                        target_item_id: null,
+                        target_region_id: null,
+                        target_sub_area_id: null,
+                        required_count: 1,
+                        auto_complete: 1
+                      }
+                    ]);
+                  }}>
+                    Add Objective
+                  </button>
+
+                  <div style={{ display: "flex", gap: "1rem", "justify-content": "flex-end" }}>
+                    <button class="button secondary" onClick={() => setShowQuestModal(false)}>
+                      Cancel
+                    </button>
+                    <button class="button primary" onClick={async () => {
+                      const method = editingQuest()!.id ? 'PUT' : 'POST';
+                      const url = editingQuest()!.id ? `/api/gm/quests/${editingQuest()!.id}` : '/api/gm/quests';
+                      
+                      const response = await fetch(url, {
+                        method,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          quest: editingQuest(),
+                          objectives: editingQuestObjectives()
+                        })
+                      });
+                      
+                      if (response.ok) {
+                        setShowQuestModal(false);
+                        await refetchQuests();
+                      }
+                    }}>
+                      Save Quest
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </Show>
+          </Show>
+
           {/* Loot Tables Tab */}
           <Show when={activeTab() === "loot"}>
             <div class="card" style={{ "margin-bottom": "1rem" }}>
