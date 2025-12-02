@@ -40,7 +40,7 @@ export async function POST(event: APIEvent) {
     await requireGM();
     
     const body = await event.request.json();
-    const { quest, objectives } = body;
+    const { quest, objectives, rewards } = body;
     
     // Insert quest
     const questResult = await db.execute({
@@ -77,6 +77,23 @@ export async function POST(event: APIEvent) {
             obj.target_sub_area_id || null,
             obj.required_count,
             obj.auto_complete !== undefined ? obj.auto_complete : 1,
+          ],
+        });
+      }
+    }
+    
+    // Insert rewards
+    if (rewards && rewards.length > 0) {
+      for (const reward of rewards) {
+        await db.execute({
+          sql: `INSERT INTO quest_rewards (quest_id, reward_type, reward_item_id, reward_material_id, reward_amount)
+                VALUES (?, ?, ?, ?, ?)`,
+          args: [
+            questId,
+            reward.reward_type,
+            reward.reward_item_id || null,
+            reward.reward_material_id || null,
+            reward.reward_amount,
           ],
         });
       }

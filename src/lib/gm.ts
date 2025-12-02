@@ -1011,9 +1011,89 @@ export async function unlockRegionForCharacter(characterId: number, regionId: nu
 
 export async function lockRegionForCharacter(characterId: number, regionId: number) {
   await requireGM();
-  
   await db.execute({
     sql: 'DELETE FROM character_region_unlocks WHERE character_id = ? AND region_id = ?',
     args: [characterId, regionId],
   });
+}
+
+// Sub Area Mobs Management
+export async function getAllSubAreaMobs() {
+  await requireGM();
+  
+  const result = await db.execute({
+    sql: `SELECT 
+            sam.id,
+            sam.sub_area_id,
+            sam.mob_id,
+            sam.spawn_weight,
+            sam.level_variance,
+            sa.name as sub_area_name,
+            sa.region_id,
+            r.name as region_name,
+            m.name as mob_name,
+            m.level as mob_level
+          FROM sub_area_mobs sam
+          JOIN sub_areas sa ON sam.sub_area_id = sa.id
+          JOIN regions r ON sa.region_id = r.id
+          JOIN mobs m ON sam.mob_id = m.id
+          ORDER BY r.id, sa.id, sam.spawn_weight DESC`,
+    args: [],
+  });
+  
+  return result.rows;
+}
+
+export async function createSubAreaMob(data: any) {
+  await requireGM();
+  
+  const result = await db.execute({
+    sql: `INSERT INTO sub_area_mobs (sub_area_id, mob_id, spawn_weight, level_variance)
+          VALUES (?, ?, ?, ?)`,
+    args: [data.sub_area_id, data.mob_id, data.spawn_weight, data.level_variance],
+  });
+  
+  return result.lastInsertRowid;
+}
+
+export async function updateSubAreaMob(id: number, data: any) {
+  await requireGM();
+  
+  await db.execute({
+    sql: `UPDATE sub_area_mobs 
+          SET sub_area_id = ?, mob_id = ?, spawn_weight = ?, level_variance = ?
+          WHERE id = ?`,
+    args: [data.sub_area_id, data.mob_id, data.spawn_weight, data.level_variance, id],
+  });
+}
+
+export async function deleteSubAreaMob(id: number) {
+  await requireGM();
+  
+  await db.execute({
+    sql: 'DELETE FROM sub_area_mobs WHERE id = ?',
+    args: [id],
+  });
+}
+
+// Get all sub areas
+export async function getAllSubAreas() {
+  await requireGM();
+  
+  const result = await db.execute({
+    sql: `SELECT 
+            sa.id,
+            sa.region_id,
+            sa.name,
+            sa.description,
+            sa.min_level,
+            sa.max_level,
+            r.name as region_name
+          FROM sub_areas sa
+          JOIN regions r ON sa.region_id = r.id
+          ORDER BY r.id, sa.id`,
+    args: [],
+  });
+  
+  return result.rows;
 }

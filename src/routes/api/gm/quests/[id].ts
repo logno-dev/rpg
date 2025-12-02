@@ -41,9 +41,18 @@ export async function GET(event: APIEvent) {
       args: [questId],
     });
     
+    // Get rewards
+    const rewardsResult = await db.execute({
+      sql: `SELECT *
+            FROM quest_rewards
+            WHERE quest_id = ?`,
+      args: [questId],
+    });
+    
     return new Response(JSON.stringify({ 
       quest: questResult.rows[0],
-      objectives: objectivesResult.rows 
+      objectives: objectivesResult.rows,
+      rewards: rewardsResult.rows
     }), {
       headers: { 'Content-Type': 'application/json' },
     });
@@ -61,7 +70,7 @@ export async function PUT(event: APIEvent) {
     
     const questId = event.params.id;
     const body = await event.request.json();
-    const { quest, objectives } = body;
+    const { quest, objectives, rewards } = body;
     
     // Update quest
     await db.execute({
@@ -109,6 +118,29 @@ export async function PUT(event: APIEvent) {
       }
     }
     
+    // Delete existing rewards
+    await db.execute({
+      sql: `DELETE FROM quest_rewards WHERE quest_id = ?`,
+      args: [questId],
+    });
+    
+    // Insert new rewards
+    if (rewards && rewards.length > 0) {
+      for (const reward of rewards) {
+        await db.execute({
+          sql: `INSERT INTO quest_rewards (quest_id, reward_type, reward_item_id, reward_material_id, reward_amount)
+                VALUES (?, ?, ?, ?, ?)`,
+          args: [
+            questId,
+            reward.reward_type,
+            reward.reward_item_id || null,
+            reward.reward_material_id || null,
+            reward.reward_amount,
+          ],
+        });
+      }
+    }
+    
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' },
     });
@@ -130,6 +162,12 @@ export async function DELETE(event: APIEvent) {
     // Delete objectives first (foreign key)
     await db.execute({
       sql: `DELETE FROM quest_objectives WHERE quest_id = ?`,
+      args: [questId],
+    });
+    
+    // Delete rewards
+    await db.execute({
+      sql: `DELETE FROM quest_rewards WHERE quest_id = ?`,
       args: [questId],
     });
     

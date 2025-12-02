@@ -1,7 +1,7 @@
 import { createSignal, Show, For, onMount } from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
 import { getUser } from "~/lib/auth";
-import { isGM, getAllPlayers, getAllMobs, getAllItems, getAllRegions, getAllAbilities, getAllMerchants, updateMob, deleteMob, createMob, updateItem, deleteItem, createItem, getAllMobLoot, getAllRegionRareLoot, createMobLoot, updateMobLoot, deleteMobLoot, createRegionRareLoot, updateRegionRareLoot, deleteRegionRareLoot, createAbility, updateAbility, deleteAbility, createRegion, updateRegion, deleteRegion, createMerchant, updateMerchant, deleteMerchant, getAllRegionMobs, createRegionMob, updateRegionMob, deleteRegionMob, getAllMerchantInventory, createMerchantInventory, updateMerchantInventory, deleteMerchantInventory, getAbilityEffects, createAbilityEffect, updateAbilityEffect, deleteAbilityEffect, getCharacter, updateCharacter, getCharacterInventory, getCharacterAbilities, addItemToCharacter, removeItemFromCharacter, updateCharacterInventoryItem, addAbilityToCharacter, removeAbilityFromCharacter, getCharacterRegionUnlocks, unlockRegionForCharacter, lockRegionForCharacter } from "~/lib/gm";
+import { isGM, getAllPlayers, getAllMobs, getAllItems, getAllRegions, getAllAbilities, getAllMerchants, updateMob, deleteMob, createMob, updateItem, deleteItem, createItem, getAllMobLoot, getAllRegionRareLoot, createMobLoot, updateMobLoot, deleteMobLoot, createRegionRareLoot, updateRegionRareLoot, deleteRegionRareLoot, createAbility, updateAbility, deleteAbility, createRegion, updateRegion, deleteRegion, createMerchant, updateMerchant, deleteMerchant, getAllSubAreaMobs, createSubAreaMob, updateSubAreaMob, deleteSubAreaMob, getAllSubAreas, getAllMerchantInventory, createMerchantInventory, updateMerchantInventory, deleteMerchantInventory, getAbilityEffects, createAbilityEffect, updateAbilityEffect, deleteAbilityEffect, getCharacter, updateCharacter, getCharacterInventory, getCharacterAbilities, addItemToCharacter, removeItemFromCharacter, updateCharacterInventoryItem, addAbilityToCharacter, removeAbilityFromCharacter, getCharacterRegionUnlocks, unlockRegionForCharacter, lockRegionForCharacter } from "~/lib/gm";
 
 export default function GMPage() {
   const navigate = useNavigate();
@@ -17,7 +17,8 @@ export default function GMPage() {
   const [merchants, setMerchants] = createSignal<any[]>([]);
   const [mobLoot, setMobLoot] = createSignal<any[]>([]);
   const [regionRareLoot, setRegionRareLoot] = createSignal<any[]>([]);
-  const [regionMobs, setRegionMobs] = createSignal<any[]>([]);
+  const [subAreaMobs, setSubAreaMobs] = createSignal<any[]>([]);
+  const [subAreas, setSubAreas] = createSignal<any[]>([]);
   const [merchantInventory, setMerchantInventory] = createSignal<any[]>([]);
   const [abilityEffects, setAbilityEffects] = createSignal<any[]>([]);
   const [quests, setQuests] = createSignal<any[]>([]);
@@ -30,7 +31,7 @@ export default function GMPage() {
   const [editingAbility, setEditingAbility] = createSignal<any | null>(null);
   const [editingRegion, setEditingRegion] = createSignal<any | null>(null);
   const [editingMerchant, setEditingMerchant] = createSignal<any | null>(null);
-  const [editingRegionMob, setEditingRegionMob] = createSignal<any | null>(null);
+  const [editingSubAreaMob, setEditingSubAreaMob] = createSignal<any | null>(null);
   const [editingMerchantInv, setEditingMerchantInv] = createSignal<any | null>(null);
   const [editingAbilityEffect, setEditingAbilityEffect] = createSignal<any | null>(null);
   const [editingCharacter, setEditingCharacter] = createSignal<any | null>(null);
@@ -45,7 +46,7 @@ export default function GMPage() {
   const [showAbilityModal, setShowAbilityModal] = createSignal(false);
   const [showRegionModal, setShowRegionModal] = createSignal(false);
   const [showMerchantModal, setShowMerchantModal] = createSignal(false);
-  const [showRegionMobModal, setShowRegionMobModal] = createSignal(false);
+  const [showSubAreaMobModal, setShowSubAreaMobModal] = createSignal(false);
   const [showMerchantInvModal, setShowMerchantInvModal] = createSignal(false);
   const [showAbilityEffectModal, setShowAbilityEffectModal] = createSignal(false);
   const [showCharacterModal, setShowCharacterModal] = createSignal(false);
@@ -53,7 +54,12 @@ export default function GMPage() {
   const [showQuestModal, setShowQuestModal] = createSignal(false);
   const [editingQuest, setEditingQuest] = createSignal<any | null>(null);
   const [editingQuestObjectives, setEditingQuestObjectives] = createSignal<any[]>([]);
+  const [editingQuestRewards, setEditingQuestRewards] = createSignal<any[]>([]);
   const [questFilterRegion, setQuestFilterRegion] = createSignal<number | null>(null);
+  const [showQuestRewardItemModal, setShowQuestRewardItemModal] = createSignal(false);
+  const [editingRewardIndex, setEditingRewardIndex] = createSignal<number | null>(null);
+  const [selectedRewardItemId, setSelectedRewardItemId] = createSignal<number | null>(null);
+  const [rewardItemQuantity, setRewardItemQuantity] = createSignal(1);
   const [showAddItemModal, setShowAddItemModal] = createSignal(false);
   const [showAddAbilityModal, setShowAddAbilityModal] = createSignal(false);
   const [searchAddItem, setSearchAddItem] = createSignal("");
@@ -64,7 +70,7 @@ export default function GMPage() {
   const [calcLevel, setCalcLevel] = createSignal(1);
   const [selectedMobForLoot, setSelectedMobForLoot] = createSignal<number | null>(null);
   const [selectedRegionForLoot, setSelectedRegionForLoot] = createSignal<number | null>(null);
-  const [selectedRegionForMobs, setSelectedRegionForMobs] = createSignal<number | null>(null);
+  const [selectedSubAreaForMobs, setSelectedSubAreaForMobs] = createSignal<number | null>(null);
   const [selectedMerchantForInv, setSelectedMerchantForInv] = createSignal<number | null>(null);
   
   // Search filters
@@ -447,9 +453,9 @@ export default function GMPage() {
   };
   
   // Reload functions for new tables
-  const reloadRegionMobs = async () => {
-    const data = await getAllRegionMobs();
-    setRegionMobs(data as any);
+  const reloadSubAreaMobs = async () => {
+    const data = await getAllSubAreaMobs();
+    setSubAreaMobs(data as any);
   };
   
   const reloadMerchantInventory = async () => {
@@ -457,41 +463,41 @@ export default function GMPage() {
     setMerchantInventory(data as any);
   };
   
-  // Handle region mob spawns edit/delete
-  const handleEditRegionMob = (regionMob: any) => {
-    setEditingRegionMob({...regionMob});
-    setShowRegionMobModal(true);
-  };
-  
-  const handleDeleteRegionMob = async (id: number) => {
-    if (!confirm('Are you sure you want to remove this mob from the region?')) return;
+  // Handle sub-area mob spawns edit/delete  
+  const handleDeleteSubAreaMob = async (id: number) => {
+    if (!confirm('Are you sure you want to remove this mob from the sub-area?')) return;
     try {
-      await deleteRegionMob(id);
-      await reloadRegionMobs();
+      await deleteSubAreaMob(id);
+      await reloadSubAreaMobs();
     } catch (err) {
-      console.error('Error deleting region mob:', err);
-      alert('Failed to delete region mob');
+      console.error('Error deleting sub-area mob:', err);
+      alert('Failed to delete sub-area mob');
     }
   };
   
-  const handleSaveRegionMob = async (e: Event) => {
+  const handleSaveSubAreaMob = async (e: Event) => {
     e.preventDefault();
-    const regionMob = editingRegionMob();
-    if (!regionMob) return;
+    const subAreaMob = editingSubAreaMob();
+    if (!subAreaMob) return;
     
     try {
-      if (regionMob.id) {
-        await updateRegionMob(regionMob.id, regionMob);
+      if (subAreaMob.id) {
+        await updateSubAreaMob(subAreaMob.id, subAreaMob);
       } else {
-        await createRegionMob(regionMob);
+        await createSubAreaMob(subAreaMob);
       }
-      setShowRegionMobModal(false);
-      setEditingRegionMob(null);
-      await reloadRegionMobs();
+      setShowSubAreaMobModal(false);
+      setEditingSubAreaMob(null);
+      await reloadSubAreaMobs();
     } catch (err) {
-      console.error('Error saving region mob:', err);
-      alert('Failed to save region mob');
+      console.error('Error saving sub-area mob:', err);
+      alert('Failed to save sub-area mob');
     }
+  };
+  
+  const handleEditSubAreaMob = (subAreaMob: any) => {
+    setEditingSubAreaMob(subAreaMob);
+    setShowSubAreaMobModal(true);
   };
   
   // Handle merchant inventory edit/delete
@@ -705,7 +711,7 @@ export default function GMPage() {
       // User is authorized, load data
       setAuthorized(true);
       
-      const [playersData, mobsData, itemsData, regionsData, abilitiesData, merchantsData, mobLootData, regionLootData, regionMobsData, merchantInvData, questsResponse] = await Promise.all([
+      const [playersData, mobsData, itemsData, regionsData, abilitiesData, merchantsData, mobLootData, regionLootData, subAreaMobsData, subAreasData, merchantInvData, questsResponse] = await Promise.all([
         getAllPlayers(),
         getAllMobs(),
         getAllItems(),
@@ -714,7 +720,8 @@ export default function GMPage() {
         getAllMerchants(),
         getAllMobLoot(),
         getAllRegionRareLoot(),
-        getAllRegionMobs(),
+        getAllSubAreaMobs(),
+        getAllSubAreas(),
         getAllMerchantInventory(),
         fetch('/api/gm/quests').then(r => r.json()),
       ]);
@@ -727,7 +734,8 @@ export default function GMPage() {
       setMerchants(merchantsData as any);
       setMobLoot(mobLootData as any);
       setRegionRareLoot(regionLootData as any);
-      setRegionMobs(regionMobsData as any);
+      setSubAreaMobs(subAreaMobsData as any);
+      setSubAreas(subAreasData as any);
       setMerchantInventory(merchantInvData as any);
       setQuests(questsResponse.quests || []);
     } catch (err) {
@@ -1415,6 +1423,7 @@ export default function GMPage() {
                     chain_order: null
                   });
                   setEditingQuestObjectives([]);
+                  setEditingQuestRewards([]);
                   setShowQuestModal(true);
                 }}>
                   Create New Quest
@@ -1443,6 +1452,7 @@ export default function GMPage() {
                             const data = await response.json();
                             setEditingQuest(data.quest);
                             setEditingQuestObjectives(data.objectives || []);
+                            setEditingQuestRewards(data.rewards || []);
                             setShowQuestModal(true);
                           }}>
                             Edit
@@ -1628,6 +1638,97 @@ export default function GMPage() {
                     Add Objective
                   </button>
 
+                  <h3 style={{ "margin-top": "1.5rem", "margin-bottom": "1rem" }}>Quest Rewards</h3>
+                  
+                  <For each={editingQuestRewards()}>
+                    {(reward, index) => (
+                      <div class="card" style={{ background: "var(--bg-light)", "margin-bottom": "1rem" }}>
+                        <div style={{ display: "flex", "justify-content": "space-between", "margin-bottom": "0.5rem" }}>
+                          <strong>Reward {index() + 1}</strong>
+                          <button class="button error" onClick={() => {
+                            setEditingQuestRewards(editingQuestRewards().filter((_, i) => i !== index()));
+                          }}>Remove</button>
+                        </div>
+                        
+                        <div style={{ display: "grid", "grid-template-columns": "repeat(3, 1fr)", gap: "0.5rem" }}>
+                          <div>
+                            <label>Type</label>
+                            <select value={reward.reward_type} onChange={(e) => {
+                              const updated = [...editingQuestRewards()];
+                              updated[index()] = {...reward, reward_type: e.currentTarget.value};
+                              setEditingQuestRewards(updated);
+                            }}>
+                              <option value="xp">XP</option>
+                              <option value="gold">Gold</option>
+                              <option value="item">Item</option>
+                              <option value="crafting_material">Crafting Material</option>
+                            </select>
+                          </div>
+                          
+                          <Show when={reward.reward_type === 'item'}>
+                            <div style={{ "grid-column": "span 2" }}>
+                              <label>Item</label>
+                              <div style={{ display: "flex", gap: "0.5rem", "align-items": "center" }}>
+                                <Show when={reward.reward_item_id}>
+                                  <span style={{ flex: 1 }}>
+                                    {items().find((i: any) => i.id === reward.reward_item_id)?.name || `Item #${reward.reward_item_id}`}
+                                  </span>
+                                </Show>
+                                <Show when={!reward.reward_item_id}>
+                                  <span style={{ flex: 1, color: "var(--text-muted)" }}>No item selected</span>
+                                </Show>
+                                <button type="button" class="button secondary" onClick={() => {
+                                  setEditingRewardIndex(index());
+                                  setSelectedRewardItemId(reward.reward_item_id);
+                                  setRewardItemQuantity(reward.reward_amount || 1);
+                                  setShowQuestRewardItemModal(true);
+                                }}>
+                                  {reward.reward_item_id ? 'Change' : 'Select'} Item
+                                </button>
+                              </div>
+                            </div>
+                          </Show>
+                          
+                          <Show when={reward.reward_type === 'crafting_material'}>
+                            <div>
+                              <label>Material ID</label>
+                              <input type="number" value={reward.reward_material_id || ''} onInput={(e) => {
+                                const updated = [...editingQuestRewards()];
+                                updated[index()] = {...reward, reward_material_id: parseInt(e.currentTarget.value) || null};
+                                setEditingQuestRewards(updated);
+                              }} />
+                            </div>
+                          </Show>
+                          
+                          <div>
+                            <label>Amount</label>
+                            <input type="number" min="1" value={reward.reward_amount} onInput={(e) => {
+                              const updated = [...editingQuestRewards()];
+                              updated[index()] = {...reward, reward_amount: parseInt(e.currentTarget.value)};
+                              setEditingQuestRewards(updated);
+                            }} />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </For>
+                  
+                  <button class="button secondary" style={{ "margin-bottom": "1rem" }} onClick={() => {
+                    setEditingQuestRewards([
+                      ...editingQuestRewards(),
+                      {
+                        id: null,
+                        quest_id: editingQuest()!.id,
+                        reward_type: 'xp',
+                        reward_item_id: null,
+                        reward_material_id: null,
+                        reward_amount: 100
+                      }
+                    ]);
+                  }}>
+                    Add Reward
+                  </button>
+
                   <div style={{ display: "flex", gap: "1rem", "justify-content": "flex-end" }}>
                     <button class="button secondary" onClick={() => setShowQuestModal(false)}>
                       Cancel
@@ -1641,7 +1742,8 @@ export default function GMPage() {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                           quest: editingQuest(),
-                          objectives: editingQuestObjectives()
+                          objectives: editingQuestObjectives(),
+                          rewards: editingQuestRewards()
                         })
                       });
                       
@@ -1656,6 +1758,150 @@ export default function GMPage() {
                 </div>
               </div>
             </Show>
+          </Show>
+
+          {/* Quest Reward Item Selection Modal */}
+          <Show when={showQuestRewardItemModal()}>
+            <div style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(0, 0, 0, 0.5)",
+              display: "flex",
+              "align-items": "center",
+              "justify-content": "center",
+              "z-index": 1001,
+              padding: "1rem"
+            }}>
+              <div class="card" style={{ 
+                "max-width": "900px", 
+                width: "100%",
+                "max-height": "80vh",
+                "overflow-y": "auto"
+              }}>
+                <h2 style={{ "margin-bottom": "1rem" }}>Select Item for Quest Reward</h2>
+                
+                <div style={{ "margin-bottom": "1rem" }}>
+                  <input 
+                    type="text" 
+                    placeholder="Search items..." 
+                    value={searchItems()} 
+                    onInput={(e) => setSearchItems(e.currentTarget.value)}
+                    style={{ width: "100%", padding: "0.5rem" }}
+                  />
+                </div>
+                
+                <div style={{ "max-height": "400px", "overflow-y": "auto", "margin-bottom": "1rem" }}>
+                  <table style={{ width: "100%", "border-collapse": "collapse" }}>
+                    <thead style={{ position: "sticky", top: 0, background: "var(--bg)", "z-index": 1 }}>
+                      <tr style={{ "border-bottom": "2px solid var(--bg-light)" }}>
+                        <th style={{ padding: "0.5rem", "text-align": "left" }}>Select</th>
+                        <th style={{ padding: "0.5rem", "text-align": "center" }}>ID</th>
+                        <th style={{ padding: "0.5rem", "text-align": "left" }}>Name</th>
+                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Type</th>
+                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Rarity</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <For each={items().filter((item: any) => 
+                        !searchItems() || 
+                        item.name.toLowerCase().includes(searchItems().toLowerCase()) ||
+                        item.type.toLowerCase().includes(searchItems().toLowerCase())
+                      )}>
+                        {(item: any) => (
+                          <tr 
+                            style={{ 
+                              "border-bottom": "1px solid var(--bg-light)",
+                              background: selectedRewardItemId() === item.id ? "var(--bg-light)" : "transparent",
+                              cursor: "pointer"
+                            }}
+                            onClick={() => setSelectedRewardItemId(item.id)}
+                          >
+                            <td style={{ padding: "0.5rem", "text-align": "center" }}>
+                              <input 
+                                type="radio" 
+                                checked={selectedRewardItemId() === item.id}
+                                onChange={() => setSelectedRewardItemId(item.id)}
+                              />
+                            </td>
+                            <td style={{ padding: "0.5rem", "text-align": "center", "font-weight": "bold", color: "var(--accent)" }}>{item.id}</td>
+                            <td style={{ padding: "0.5rem" }}>{item.name}</td>
+                            <td style={{ padding: "0.5rem", "text-align": "center" }}>{item.type}</td>
+                            <td style={{ padding: "0.5rem", "text-align": "center" }}>
+                              <span style={{ 
+                                padding: "0.2rem 0.4rem", 
+                                "border-radius": "3px",
+                                background: item.rarity === 'legendary' ? 'var(--legendary)' :
+                                           item.rarity === 'epic' ? 'var(--epic)' :
+                                           item.rarity === 'rare' ? 'var(--rare)' :
+                                           item.rarity === 'uncommon' ? 'var(--uncommon)' :
+                                           'var(--common)',
+                                color: '#fff',
+                                "font-size": "0.75rem"
+                              }}>
+                                {item.rarity}
+                              </span>
+                            </td>
+                          </tr>
+                        )}
+                      </For>
+                    </tbody>
+                  </table>
+                </div>
+                
+                <div style={{ display: "flex", gap: "1rem", "align-items": "end" }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: "block", "margin-bottom": "0.25rem" }}>Quantity</label>
+                    <input 
+                      type="number" 
+                      min="1" 
+                      value={rewardItemQuantity()} 
+                      onInput={(e) => setRewardItemQuantity(parseInt(e.currentTarget.value) || 1)}
+                      style={{ width: "100%", padding: "0.5rem" }}
+                    />
+                  </div>
+                  <button 
+                    type="button" 
+                    class="button primary" 
+                    style={{ flex: 1 }}
+                    onClick={() => {
+                      const idx = editingRewardIndex();
+                      if (idx !== null && selectedRewardItemId()) {
+                        const updated = [...editingQuestRewards()];
+                        updated[idx] = {
+                          ...updated[idx],
+                          reward_item_id: selectedRewardItemId(),
+                          reward_amount: rewardItemQuantity()
+                        };
+                        setEditingQuestRewards(updated);
+                        setShowQuestRewardItemModal(false);
+                        setEditingRewardIndex(null);
+                        setSelectedRewardItemId(null);
+                        setRewardItemQuantity(1);
+                      }
+                    }}
+                    disabled={!selectedRewardItemId()}
+                  >
+                    Confirm
+                  </button>
+                  <button 
+                    type="button" 
+                    class="button secondary" 
+                    style={{ flex: 1 }}
+                    onClick={() => {
+                      setShowQuestRewardItemModal(false);
+                      setEditingRewardIndex(null);
+                      setSelectedRewardItemId(null);
+                      setRewardItemQuantity(1);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
           </Show>
 
           {/* Loot Tables Tab */}
@@ -1970,45 +2216,46 @@ export default function GMPage() {
           {/* Mob Spawns Tab */}
           <Show when={activeTab() === "spawns"}>
             <div class="card">
-              <h2 style={{ "margin-bottom": "1rem" }}>Region Mob Spawns</h2>
+              <h2 style={{ "margin-bottom": "1rem" }}>Sub-Area Mob Spawns</h2>
               <div style={{ display: "grid", "grid-template-columns": "1fr auto", gap: "1rem", "margin-bottom": "1rem", "align-items": "end" }}>
                 <div>
-                  <label style={{ display: "block", "margin-bottom": "0.5rem", "font-weight": "bold" }}>Select Region</label>
+                  <label style={{ display: "block", "margin-bottom": "0.5rem", "font-weight": "bold" }}>Select Sub-Area</label>
                   <select 
-                    value={selectedRegionForMobs() || ''} 
-                    onChange={(e) => setSelectedRegionForMobs(e.currentTarget.value ? parseInt(e.currentTarget.value) : null)}
+                    value={selectedSubAreaForMobs() || ''} 
+                    onChange={(e) => setSelectedSubAreaForMobs(e.currentTarget.value ? parseInt(e.currentTarget.value) : null)}
                     style={{ width: "100%", padding: "0.5rem", "font-size": "1rem" }}
                   >
-                    <option value="">-- Select a region --</option>
-                    <For each={regions().sort((a: any, b: any) => a.min_level - b.min_level)}>
-                      {(region: any) => (
-                        <option value={region.id}>
-                          {region.name} (Lvl {region.min_level}-{region.max_level}) - {regionMobs().filter((rm: any) => rm.region_id === region.id).length} mobs
+                    <option value="">-- Select a sub-area --</option>
+                    <For each={subAreas().sort((a: any, b: any) => a.region_id - b.region_id || a.id - b.id)}>
+                      {(subArea: any) => (
+                        <option value={subArea.id}>
+                          {subArea.region_name} - {subArea.name} (Lvl {subArea.min_level}-{subArea.max_level}) - {subAreaMobs().filter((sam: any) => sam.sub_area_id === subArea.id).length} mobs
                         </option>
                       )}
                     </For>
                   </select>
                 </div>
-                <Show when={selectedRegionForMobs()}>
+                <Show when={selectedSubAreaForMobs()}>
                   <button class="button primary" onClick={() => {
-                    setEditingRegionMob({
-                      region_id: selectedRegionForMobs()!,
+                    setEditingSubAreaMob({
+                      sub_area_id: selectedSubAreaForMobs()!,
                       mob_id: mobs()[0]?.id || 1,
-                      spawn_weight: 1
+                      spawn_weight: 100,
+                      level_variance: 0
                     });
-                    setShowRegionMobModal(true);
+                    setShowSubAreaMobModal(true);
                   }}>
                     Add Mob Spawn
                   </button>
                 </Show>
               </div>
               
-              <Show when={selectedRegionForMobs()}>
+              <Show when={selectedSubAreaForMobs()}>
                 <Show 
-                  when={regionMobs().filter((rm: any) => rm.region_id === selectedRegionForMobs()).length > 0}
+                  when={subAreaMobs().filter((sam: any) => sam.sub_area_id === selectedSubAreaForMobs()).length > 0}
                   fallback={
                     <div style={{ padding: "2rem", "text-align": "center", color: "var(--text-secondary)" }}>
-                      <p>No mobs spawn in this region.</p>
+                      <p>No mobs spawn in this sub-area.</p>
                       <p style={{ "font-size": "0.9rem", "margin-top": "0.5rem" }}>Click "Add Mob Spawn" to configure mob spawns.</p>
                     </div>
                   }
@@ -2020,28 +2267,30 @@ export default function GMPage() {
                           <th style={{ padding: "0.5rem", "text-align": "left" }}>Mob Name</th>
                           <th style={{ padding: "0.5rem", "text-align": "center" }}>Level</th>
                           <th style={{ padding: "0.5rem", "text-align": "center" }}>Spawn Weight</th>
+                          <th style={{ padding: "0.5rem", "text-align": "center" }}>Level Variance</th>
                           <th style={{ padding: "0.5rem", "text-align": "center" }}>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        <For each={regionMobs().filter((rm: any) => rm.region_id === selectedRegionForMobs()).sort((a: any, b: any) => b.spawn_weight - a.spawn_weight)}>
-                          {(regionMob: any) => (
+                        <For each={subAreaMobs().filter((sam: any) => sam.sub_area_id === selectedSubAreaForMobs()).sort((a: any, b: any) => b.spawn_weight - a.spawn_weight)}>
+                          {(subAreaMob: any) => (
                             <tr style={{ "border-bottom": "1px solid var(--bg-light)" }}>
-                              <td style={{ padding: "0.5rem" }}>{regionMob.mob_name}</td>
-                              <td style={{ padding: "0.5rem", "text-align": "center" }}>{regionMob.mob_level}</td>
-                              <td style={{ padding: "0.5rem", "text-align": "center" }}>{regionMob.spawn_weight}</td>
+                              <td style={{ padding: "0.5rem" }}>{subAreaMob.mob_name}</td>
+                              <td style={{ padding: "0.5rem", "text-align": "center" }}>{subAreaMob.mob_level}</td>
+                              <td style={{ padding: "0.5rem", "text-align": "center" }}>{subAreaMob.spawn_weight}</td>
+                              <td style={{ padding: "0.5rem", "text-align": "center" }}>±{subAreaMob.level_variance}</td>
                               <td style={{ padding: "0.5rem", "text-align": "center" }}>
                                 <button 
                                   class="button secondary" 
                                   style={{ padding: "0.25rem 0.5rem", "font-size": "0.8rem", "margin-right": "0.25rem" }}
-                                  onClick={() => handleEditRegionMob(regionMob)}
+                                  onClick={() => handleEditSubAreaMob(subAreaMob)}
                                 >
                                   Edit
                                 </button>
                                 <button 
                                   class="button" 
                                   style={{ padding: "0.25rem 0.5rem", "font-size": "0.8rem", background: "var(--danger)" }}
-                                  onClick={() => handleDeleteRegionMob(regionMob.id)}
+                                  onClick={() => handleDeleteSubAreaMob(subAreaMob.id)}
                                 >
                                   Delete
                                 </button>
@@ -2055,9 +2304,9 @@ export default function GMPage() {
                 </Show>
               </Show>
               
-              <Show when={!selectedRegionForMobs()}>
+              <Show when={!selectedSubAreaForMobs()}>
                 <div style={{ padding: "3rem", "text-align": "center", color: "var(--text-secondary)" }}>
-                  <p style={{ "font-size": "1.1rem" }}>Select a region from the dropdown above to manage which mobs spawn there.</p>
+                  <p style={{ "font-size": "1.1rem" }}>Select a sub-area from the dropdown above to manage which mobs spawn there.</p>
                 </div>
               </Show>
             </div>
@@ -3211,9 +3460,27 @@ export default function GMPage() {
                 </div>
                 <div>
                   <label>Unlock Requirement (optional)</label>
+                  <div style={{ 
+                    background: "var(--bg-light)", 
+                    padding: "0.75rem", 
+                    "border-radius": "4px", 
+                    "margin-bottom": "0.5rem",
+                    "font-size": "0.85rem",
+                    "line-height": "1.5"
+                  }}>
+                    <strong style={{ display: "block", "margin-bottom": "0.5rem", color: "var(--accent)" }}>Supported Formats:</strong>
+                    <ul style={{ margin: "0", "padding-left": "1.25rem" }}>
+                      <li><strong>Level:</strong> "Reach level X" or "level X" (e.g., "Reach level 18")</li>
+                      <li><strong>Boss:</strong> "Defeat [Boss Name]" - must match named mob exactly (e.g., "Defeat Shadowfang")</li>
+                      <li><strong>Dungeon:</strong> "Complete [Dungeon Name] dungeon" (e.g., "Complete Ancient Ruins dungeon")</li>
+                    </ul>
+                    <small style={{ display: "block", "margin-top": "0.5rem", color: "var(--text-secondary)" }}>
+                      Note: Text patterns are case-insensitive. Changes take effect immediately for new unlocks.
+                    </small>
+                  </div>
                   <input type="text" value={editingRegion()?.unlock_requirement || ''} 
                          onInput={(e) => setEditingRegion({...editingRegion()!, unlock_requirement: e.currentTarget.value || null})}
-                         placeholder="e.g., Complete Greenfield Quest" />
+                         placeholder="e.g., Reach level 18" />
                 </div>
               </div>
               <div style={{ display: "flex", gap: "1rem", "margin-top": "1.5rem" }}>
@@ -3269,34 +3536,34 @@ export default function GMPage() {
         </div>
       </Show>
       
-      {/* Region Mob Spawn Modal */}
-      <Show when={showRegionMobModal()}>
+      {/* Sub-Area Mob Spawn Modal */}
+      <Show when={showSubAreaMobModal()}>
         <div style={{
           position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
           background: "rgba(0,0,0,0.7)", display: "flex",
           "align-items": "center", "justify-content": "center", "z-index": 1000
-        }} onClick={() => setShowRegionMobModal(false)}>
+        }} onClick={() => setShowSubAreaMobModal(false)}>
           <div class="card" style={{ "max-width": "500px", width: "90%"}} 
                onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center", "margin-bottom": "1rem" }}>
-              <h2>{editingRegionMob()?.id ? 'Edit Mob Spawn' : 'Add Mob Spawn'}</h2>
-              <button onClick={() => setShowRegionMobModal(false)} style={{ background: "none", border: "none", "font-size": "1.5rem", cursor: "pointer" }}>×</button>
+              <h2>{editingSubAreaMob()?.id ? 'Edit Mob Spawn' : 'Add Mob Spawn'}</h2>
+              <button onClick={() => setShowSubAreaMobModal(false)} style={{ background: "none", border: "none", "font-size": "1.5rem", cursor: "pointer" }}>×</button>
             </div>
-            <form onSubmit={handleSaveRegionMob}>
+            <form onSubmit={handleSaveSubAreaMob}>
               <div style={{ display: "grid", gap: "1rem" }}>
                 <div>
-                  <label>Region</label>
-                  <select value={editingRegionMob()?.region_id || 1} 
-                          onChange={(e) => setEditingRegionMob({...editingRegionMob()!, region_id: parseInt(e.currentTarget.value)})} required>
-                    <For each={regions()}>
-                      {(region: any) => <option value={region.id}>{region.name}</option>}
+                  <label>Sub-Area</label>
+                  <select value={editingSubAreaMob()?.sub_area_id || 1} 
+                          onChange={(e) => setEditingSubAreaMob({...editingSubAreaMob()!, sub_area_id: parseInt(e.currentTarget.value)})} required>
+                    <For each={subAreas().sort((a: any, b: any) => a.region_id - b.region_id || a.id - b.id)}>
+                      {(subArea: any) => <option value={subArea.id}>{subArea.region_name} - {subArea.name}</option>}
                     </For>
                   </select>
                 </div>
                 <div>
                   <label>Mob</label>
-                  <select value={editingRegionMob()?.mob_id || 1} 
-                          onChange={(e) => setEditingRegionMob({...editingRegionMob()!, mob_id: parseInt(e.currentTarget.value)})} required>
+                  <select value={editingSubAreaMob()?.mob_id || 1} 
+                          onChange={(e) => setEditingSubAreaMob({...editingSubAreaMob()!, mob_id: parseInt(e.currentTarget.value)})} required>
                     <For each={mobs().sort((a: any, b: any) => a.level - b.level || a.name.localeCompare(b.name))}>
                       {(mob: any) => <option value={mob.id}>{mob.name} (Lvl {mob.level})</option>}
                     </For>
@@ -3304,16 +3571,24 @@ export default function GMPage() {
                 </div>
                 <div>
                   <label>Spawn Weight (higher = more common)</label>
-                  <input type="number" min="1" value={editingRegionMob()?.spawn_weight || 1} 
-                         onInput={(e) => setEditingRegionMob({...editingRegionMob()!, spawn_weight: parseInt(e.currentTarget.value)})} required />
+                  <input type="number" min="1" value={editingSubAreaMob()?.spawn_weight || 100} 
+                         onInput={(e) => setEditingSubAreaMob({...editingSubAreaMob()!, spawn_weight: parseInt(e.currentTarget.value)})} required />
                   <small style={{ display: "block", "margin-top": "0.25rem", color: "var(--text-secondary)" }}>
                     Relative spawn frequency. Higher numbers = spawns more often.
+                  </small>
+                </div>
+                <div>
+                  <label>Level Variance (±)</label>
+                  <input type="number" min="0" max="5" value={editingSubAreaMob()?.level_variance || 0} 
+                         onInput={(e) => setEditingSubAreaMob({...editingSubAreaMob()!, level_variance: parseInt(e.currentTarget.value)})} required />
+                  <small style={{ display: "block", "margin-top": "0.25rem", color: "var(--text-secondary)" }}>
+                    Mob level can vary by ± this amount from base level.
                   </small>
                 </div>
               </div>
               <div style={{ display: "flex", gap: "1rem", "margin-top": "1.5rem" }}>
                 <button type="submit" class="button primary" style={{ flex: 1 }}>Save</button>
-                <button type="button" class="button secondary" style={{ flex: 1 }} onClick={() => setShowRegionMobModal(false)}>Cancel</button>
+                <button type="button" class="button secondary" style={{ flex: 1 }} onClick={() => setShowSubAreaMobModal(false)}>Cancel</button>
               </div>
             </form>
           </div>
