@@ -398,6 +398,10 @@ export default function DungeonRoute() {
     return (store.inventory || []).find((i: any) => i.equipped && i.slot === 'weapon');
   };
   
+  const equippedOffhand = () => {
+    return (store.inventory || []).find((i: any) => i.equipped && i.slot === 'offhand');
+  };
+  
   const equippedArmor = () => {
     return (store.inventory || []).filter((i: any) => i.equipped && i.slot !== 'weapon');
   };
@@ -761,6 +765,7 @@ export default function DungeonRoute() {
                 character={store.character!}
                 mob={activeMob()!}
                 equippedWeapon={equippedWeapon()}
+                equippedOffhand={equippedOffhand()}
                 equippedArmor={equippedArmor()}
                 currentHealth={currentHealth()}
                 currentMana={currentMana()}

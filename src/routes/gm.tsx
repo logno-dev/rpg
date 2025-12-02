@@ -2230,6 +2230,7 @@ export default function GMPage() {
                     <option value="shield">Shield</option>
                     <option value="tome">Tome</option>
                     <option value="orb">Orb</option>
+                    <option value="quiver">Quiver</option>
                     <option value="dual_dagger">Dual Daggers</option>
                     <option value="dual_sword">Dual Swords</option>
                   </select>

@@ -1401,7 +1401,7 @@ export function CombatEngine(props: CombatEngineProps) {
         ref={logContainerRef}
         class="combat-log" 
         style={{ 
-          "max-height": "150px", // More lines visible with denser spacing
+          "height": "150px", // Fixed height - always occupies same space
           "overflow-y": "auto",
           "scroll-behavior": "smooth"
         }}

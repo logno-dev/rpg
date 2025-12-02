@@ -2135,20 +2135,41 @@ export async function acceptQuest(characterId: number, questId: number): Promise
 
   // Initialize objective progress
   const objectives = await db.execute({
-    sql: 'SELECT id FROM quest_objectives WHERE quest_id = ?',
+    sql: 'SELECT * FROM quest_objectives WHERE quest_id = ?',
     args: [questId],
   });
 
   for (const obj of objectives.rows) {
+    const objective = obj as any;
+    let initialCount = 0;
+    
+    // For collect objectives, check if character already has the items/materials
+    if ((objective.type === 'collect' || objective.type === 'collection') && objective.target_item_id) {
+      // Check crafting materials inventory
+      const materialResult = await db.execute({
+        sql: 'SELECT quantity FROM character_crafting_materials WHERE character_id = ? AND material_id = ?',
+        args: [characterId, objective.target_item_id],
+      });
+      
+      if (materialResult.rows.length > 0) {
+        const existingQty = (materialResult.rows[0] as any).quantity;
+        // Initialize with existing quantity, up to required amount
+        initialCount = Math.min(existingQty, objective.required_count);
+        console.log(`[acceptQuest] Player already has ${existingQty} of material ${objective.target_item_id}, setting initial count to ${initialCount}`);
+      }
+    }
+    
+    const isCompleted = initialCount >= objective.required_count ? 1 : 0;
+    
     await db.execute({
       sql: `
         INSERT INTO character_quest_objectives (character_quest_id, quest_objective_id, current_count, completed)
-        VALUES (?, ?, 0, 0)
+        VALUES (?, ?, ?, ?)
         ON CONFLICT(character_quest_id, quest_objective_id) DO UPDATE SET
-          current_count = 0,
-          completed = 0
+          current_count = ?,
+          completed = ?
       `,
-      args: [characterQuestId, (obj as any).id],
+      args: [characterQuestId, objective.id, initialCount, isCompleted, initialCount, isCompleted],
     });
   }
 }
@@ -2174,18 +2195,19 @@ export async function updateQuestProgress(
     const cq = charQuest as any;
     console.log('[updateQuestProgress] Processing quest:', cq);
 
-    // Get current objective
+    // For kill/collect objectives, check ALL objectives for the quest (not just current)
+    // This allows tracking multiple kill targets simultaneously
     const objectiveResult = await db.execute({
       sql: `
-        SELECT qo.*, cqo.current_count, cqo.completed
+        SELECT qo.*, cqo.current_count, cqo.completed, cqo.character_quest_id
         FROM quest_objectives qo
         JOIN character_quest_objectives cqo ON qo.id = cqo.quest_objective_id
         WHERE qo.quest_id = ? 
-          AND qo.objective_order = ?
           AND cqo.character_quest_id = ?
           AND cqo.completed = 0
+          AND (qo.type IN ('kill', 'hunt', 'collect', 'collection'))
       `,
-      args: [cq.quest_id, cq.current_objective, cq.id],
+      args: [cq.quest_id, cq.id],
     });
 
     if (objectiveResult.rows.length === 0) {
@@ -2193,46 +2215,49 @@ export async function updateQuestProgress(
       continue;
     }
 
-    const objective = objectiveResult.rows[0] as any;
-    console.log('[updateQuestProgress] Checking objective:', objective);
+    // Check all objectives that match (could be multiple for kill quests)
+    for (const objRow of objectiveResult.rows) {
+      const objective = objRow as any;
+      console.log('[updateQuestProgress] Checking objective:', objective);
 
-    // Check if this objective matches
-    let matches = false;
-    if (type === 'kill' && (objective.type === 'kill' || objective.type === 'hunt')) {
-      // Check for specific mob kill
-      if (objective.target_mob_id && objective.target_mob_id === targetId) {
+      // Check if this objective matches
+      let matches = false;
+      if (type === 'kill' && (objective.type === 'kill' || objective.type === 'hunt')) {
+        // Check for specific mob kill
+        if (objective.target_mob_id && objective.target_mob_id === targetId) {
+          matches = true;
+        }
+        // Check for region-based kill (any mob in region)
+        else if (!objective.target_mob_id && objective.target_region_id && regionId && objective.target_region_id === regionId) {
+          matches = true;
+        }
+      } else if (type === 'collect' && (objective.type === 'collect' || objective.type === 'collection') && objective.target_item_id === targetId) {
         matches = true;
       }
-      // Check for region-based kill (any mob in region)
-      else if (!objective.target_mob_id && objective.target_region_id && regionId && objective.target_region_id === regionId) {
-        matches = true;
+
+      console.log('[updateQuestProgress] Matches:', matches);
+      
+      if (!matches) continue;
+
+      console.log('[updateQuestProgress] Updating progress for objective:', objective.id);
+      
+      // Update progress
+      const newCount = Math.min(objective.current_count + count, objective.required_count);
+      const isCompleted = newCount >= objective.required_count;
+
+      await db.execute({
+        sql: `
+          UPDATE character_quest_objectives
+          SET current_count = ?, completed = ?
+          WHERE character_quest_id = ? AND quest_objective_id = ?
+        `,
+        args: [newCount, isCompleted ? 1 : 0, objective.character_quest_id, objective.id],
+      });
+
+      // Check if this was the current objective and should advance
+      if (isCompleted && objective.auto_complete && objective.objective_order === cq.current_objective) {
+        await advanceQuestObjective(cq.id, cq.quest_id, cq.current_objective);
       }
-    } else if (type === 'collect' && (objective.type === 'collect' || objective.type === 'collection') && objective.target_item_id === targetId) {
-      matches = true;
-    }
-
-    console.log('[updateQuestProgress] Matches:', matches);
-    
-    if (!matches) continue;
-
-    console.log('[updateQuestProgress] Updating progress for objective:', objective.id);
-    
-    // Update progress
-    const newCount = Math.min(objective.current_count + count, objective.required_count);
-    const isCompleted = newCount >= objective.required_count;
-
-    await db.execute({
-      sql: `
-        UPDATE character_quest_objectives
-        SET current_count = ?, completed = ?
-        WHERE character_quest_id = ? AND quest_objective_id = ?
-      `,
-      args: [newCount, isCompleted ? 1 : 0, cq.id, objective.id],
-    });
-
-    // If auto-complete and objective is done, move to next objective
-    if (isCompleted && objective.auto_complete) {
-      await advanceQuestObjective(cq.id, cq.quest_id, cq.current_objective);
     }
   }
   

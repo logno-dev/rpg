@@ -225,7 +225,7 @@ export default function GamePage() {
   // Get loot item color based on type and rarity
   const getLootColor = (item: any) => {
     // Crafting materials - grey
-    if (item.type === 'material' || item.name?.includes('Ore') || item.name?.includes('Leather') || item.name?.includes('Cloth')) {
+    if (item.type === 'material' || item.type === 'crafting_material' || item.name?.includes('Ore') || item.name?.includes('Leather') || item.name?.includes('Cloth')) {
       return '#9ca3af'; // Gray
     }
     
