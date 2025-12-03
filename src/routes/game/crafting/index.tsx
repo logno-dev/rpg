@@ -88,9 +88,11 @@ export default function CraftingPage() {
   const fetchBasicCraftingData = async (characterId: number | undefined) => {
     if (!characterId) return null;
     
-    // Add timestamp to prevent caching
-    const timestamp = Date.now();
-    const response = await fetch(`/api/game/crafting/basic-data?characterId=${characterId}&t=${timestamp}`);
+    const response = await fetch(`/api/game/crafting/basic-data?characterId=${characterId}`, {
+      headers: {
+        'Cache-Control': 'no-cache'
+      }
+    });
     const data = await response.json();
     return data;
   };
@@ -139,15 +141,13 @@ export default function CraftingPage() {
   // XP per level formula (matches character XP formula: level * base XP)
   const CRAFTING_XP_BASE = 125;
 
-  // Refetch crafting data (forces fresh fetch by clearing cache first)
-  const refetchCraftingData = () => {
-    // Clear cached data to force refetch
-    mutateBasicData(undefined);
-    mutateRecipes(undefined);
-    
-    // Trigger refetch
-    refetchBasicData();
-    refetchRecipes();
+  // Refetch crafting data (forces fresh fetch)
+  const refetchCraftingData = async () => {
+    // Refetch without clearing - just trigger new fetch
+    await Promise.all([
+      refetchBasicData(),
+      refetchRecipes()
+    ]);
   };
 
   // Get profession data
@@ -280,13 +280,20 @@ export default function CraftingPage() {
         setAvailableRareMaterials(data.availableRareMaterials);
         setShowRareMaterialPrompt(true);
       } else if (data.success) {
+        // Update materials optimistically if provided
+        if (data.materials) {
+          const currentData = craftingData();
+          if (currentData) {
+            mutateBasicData({ ...currentData, materials: data.materials });
+          }
+        }
+        
         setMinigameData({
           ...data.session,
           professionLevel: profData.level,
           recipeLevel: recipe.level_required
         });
         setShowMinigame(true);
-        // Don't refetch here - materials will update when modal closes
       } else {
         alert(data.error || "Failed to start crafting");
       }
@@ -316,8 +323,26 @@ export default function CraftingPage() {
       const data = await response.json();
 
       if (data.success) {
+        // Optimistically update profession XP in local state
+        if (data.professionType && data.newLevel !== undefined && data.newExperience !== undefined) {
+          const currentData = craftingData();
+          if (currentData) {
+            const updatedProfessions = currentData.professions.map((p: ProfessionData) => {
+              if (p.type === data.professionType) {
+                return { ...p, level: data.newLevel, experience: data.newExperience };
+              }
+              return p;
+            });
+            mutateBasicData({ ...currentData, professions: updatedProfessions });
+          }
+        }
+        
+        // Update inventory in character context if provided
+        if (data.inventory) {
+          actions.setInventory(data.inventory);
+        }
+        
         // Return the result data to display in modal immediately
-        // Materials will be refetched when modal closes via onCancel
         return data;
       } else {
         alert(data.error || "Failed to complete crafting");
@@ -821,14 +846,13 @@ export default function CraftingPage() {
             professionLevel={minigameData()!.professionLevel}
             recipeLevel={minigameData()!.recipeLevel}
             onComplete={completeCraft}
-            onCancel={async () => {
-              // Close modal first
+            onCancel={() => {
+              // Close modal - all state already updated optimistically:
+              // - materials updated when craft started
+              // - profession XP updated on complete
+              // - inventory updated on complete
               setShowMinigame(false);
               setMinigameData(null);
-              
-              // Clear cache and force refetch
-              mutateBasicData(undefined);
-              await refetchBasicData();
             }}
           />
         </Show>

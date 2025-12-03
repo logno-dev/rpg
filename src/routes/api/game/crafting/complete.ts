@@ -210,6 +210,15 @@ export async function POST(event: APIEvent) {
       args: [session.id]
     });
 
+    // Get updated inventory for client
+    const inventoryResult = await db.execute({
+      sql: `SELECT ci.*, i.* FROM character_inventory ci
+            JOIN items i ON ci.item_id = i.id
+            WHERE ci.character_id = ?
+            ORDER BY i.type, i.name`,
+      args: [characterId]
+    });
+
     // Apply quality multipliers to stats for display
     let fullItemWithQuality = null;
     if (craftedItem && itemQuality) {
@@ -247,7 +256,8 @@ export async function POST(event: APIEvent) {
           quality: itemQuality
         } : null,
         fullItem: fullItemWithQuality,
-        recipeName: session.recipe_name
+        recipeName: session.recipe_name,
+        inventory: inventoryResult.rows
       }),
       {
         status: 200,

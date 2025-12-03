@@ -233,6 +233,27 @@ export async function POST(event: APIEvent) {
       ]
     });
 
+    // Get updated materials after consumption
+    const updatedMaterialsResult = await db.execute({
+      sql: `SELECT 
+              cm.id,
+              cm.name,
+              cm.description,
+              cm.rarity,
+              COALESCE(ccm.quantity, 0) as quantity
+            FROM crafting_materials cm
+            LEFT JOIN character_crafting_materials ccm 
+              ON cm.id = ccm.material_id AND ccm.character_id = ?
+            ORDER BY 
+              CASE cm.rarity 
+                WHEN 'common' THEN 1 
+                WHEN 'uncommon' THEN 2 
+                WHEN 'rare' THEN 3 
+              END,
+              cm.name`,
+      args: [characterId]
+    });
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -246,7 +267,8 @@ export async function POST(event: APIEvent) {
           craftTimeSeconds: recipe.craft_time_seconds,
           recipeName: recipe.name,
           profession: recipe.profession_type
-        }
+        },
+        materials: updatedMaterialsResult.rows
       }),
       {
         status: 200,

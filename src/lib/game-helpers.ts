@@ -20,7 +20,7 @@ export function getSelectedCharacterId(): number | null {
  * This fetches minimal data needed to initialize the character context
  * Uses session to get character ID - works on SSR!
  */
-async function fetchBasicCharacterDataFromSession() {
+const fetchBasicCharacterDataFromSession = cache(async () => {
   "use server";
   
   const user = await getUser();
@@ -53,7 +53,7 @@ async function fetchBasicCharacterDataFromSession() {
   ]);
 
   return { character, inventory, abilities, hotbar, activeDungeonProgress };
-}
+}, "basic-character-data");
 
 /**
  * Hook to get basic character data for context initialization

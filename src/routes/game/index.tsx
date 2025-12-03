@@ -323,15 +323,21 @@ export default function GamePage() {
   // Regional data from context store
   const currentMerchants = () => store.merchants;
   const currentDungeons = () => store.dungeons;
-  // Read from CharacterContext (single source of truth)
-  const currentCharacter = () => store.character;
-  const currentGold = () => store.character?.gold ?? 0;
   
-  // Read from CharacterContext (single source of truth)
-  const currentRegion = () => store.currentRegion;
-  const currentInventory = () => store.inventory;
-  const currentAbilities = () => store.abilities;
-  const currentHotbar = () => store.hotbar;
+  // Read from CharacterContext or server data
+  // For SSR and initial hydration, use server data to prevent mismatches
+  // After that, use context which is the source of truth
+  const currentCharacter = () => store.character ?? data()?.character;
+  const currentGold = () => {
+    const char = store.character ?? data()?.character;
+    return char?.gold ?? 0;
+  };
+  
+  // Read from CharacterContext or server data (fallback for SSR)
+  const currentRegion = () => store.currentRegion ?? data()?.currentRegion;
+  const currentInventory = () => store.inventory ?? data()?.inventory ?? [];
+  const currentAbilities = () => store.abilities ?? data()?.abilities ?? [];
+  const currentHotbar = () => store.hotbar ?? data()?.hotbar ?? [];
   
   // Initialize CharacterContext from server data ONLY on first load
   // After that, we update CharacterContext directly from API responses
@@ -397,18 +403,22 @@ export default function GamePage() {
     }
   });
   
-  // Read health/mana from CharacterContext
+  // Read health/mana from CharacterContext (or server data for SSR)
   // When in dungeon, use dungeon session as source of truth
   const currentHealth = createMemo(() => {
-    return store.dungeonSession 
-      ? store.dungeonSession.session_health 
-      : (store.character?.current_health ?? 0);
+    if (store.dungeonSession) {
+      return store.dungeonSession.session_health;
+    }
+    const char = store.character ?? data()?.character;
+    return char?.current_health ?? 0;
   });
   
   const currentMana = createMemo(() => {
-    return store.dungeonSession 
-      ? store.dungeonSession.session_mana 
-      : (store.character?.current_mana ?? 0);
+    if (store.dungeonSession) {
+      return store.dungeonSession.session_mana;
+    }
+    const char = store.character ?? data()?.character;
+    return char?.current_mana ?? 0;
   });
   
   // Legacy no-op functions (to be removed - all updates should use actions directly)
