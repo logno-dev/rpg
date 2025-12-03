@@ -2,6 +2,7 @@ import { createSignal, Show, For, onMount } from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
 import { getUser } from "~/lib/auth";
 import { isGM, getAllPlayers, getAllMobs, getAllItems, getAllRegions, getAllAbilities, getAllMerchants, updateMob, deleteMob, createMob, updateItem, deleteItem, createItem, getAllMobLoot, getAllRegionRareLoot, createMobLoot, updateMobLoot, deleteMobLoot, createRegionRareLoot, updateRegionRareLoot, deleteRegionRareLoot, createAbility, updateAbility, deleteAbility, createRegion, updateRegion, deleteRegion, createMerchant, updateMerchant, deleteMerchant, getAllSubAreaMobs, createSubAreaMob, updateSubAreaMob, deleteSubAreaMob, getAllSubAreas, getAllMerchantInventory, createMerchantInventory, updateMerchantInventory, deleteMerchantInventory, getAbilityEffects, createAbilityEffect, updateAbilityEffect, deleteAbilityEffect, getCharacter, updateCharacter, getCharacterInventory, getCharacterAbilities, addItemToCharacter, removeItemFromCharacter, updateCharacterInventoryItem, addAbilityToCharacter, removeAbilityFromCharacter, getCharacterRegionUnlocks, unlockRegionForCharacter, lockRegionForCharacter } from "~/lib/gm";
+import { BulkEditTable } from "~/components/BulkEditTable";
 
 export default function GMPage() {
   const navigate = useNavigate();
@@ -84,6 +85,8 @@ export default function GMPage() {
   const [searchRegionLoot, setSearchRegionLoot] = createSignal("");
   const [searchRegionMobs, setSearchRegionMobs] = createSignal("");
   const [searchMerchantInventory, setSearchMerchantInventory] = createSignal("");
+  const [searchAbilityLookup, setSearchAbilityLookup] = createSignal("");
+  const [copiedAbilityId, setCopiedAbilityId] = createSignal<number | null>(null);
   
   // Computed values
   const allRegions = () => regions();
@@ -147,6 +150,459 @@ export default function GMPage() {
     setQuests(data.quests || []);
   };
   
+  // Column configurations for bulk edit tables
+  const itemColumns = [
+    { key: 'id', label: 'ID', width: '60px', type: 'readonly' as const, align: 'center' as const },
+    { key: 'name', label: 'Name', width: '300px', type: 'text' as const },
+    { key: 'type', label: 'Type', width: '100px', type: 'select' as const, align: 'center' as const, options: [
+      { value: 'weapon', label: 'Weapon' },
+      { value: 'armor', label: 'Armor' },
+      { value: 'offhand', label: 'Offhand' },
+      { value: 'consumable', label: 'Consumable' },
+      { value: 'material', label: 'Material' },
+      { value: 'quest', label: 'Quest Item' }
+    ]},
+    { key: 'slot', label: 'Slot', width: '100px', type: 'select' as const, align: 'center' as const, options: [
+      { value: 'weapon', label: 'Weapon' },
+      { value: 'offhand', label: 'Offhand' },
+      { value: 'head', label: 'Head' },
+      { value: 'chest', label: 'Chest' },
+      { value: 'legs', label: 'Legs' },
+      { value: 'feet', label: 'Feet' },
+      { value: 'hands', label: 'Hands' },
+      { value: 'accessory', label: 'Accessory' },
+      { value: '', label: 'None' }
+    ]},
+    { key: 'rarity', label: 'Rarity', width: '90px', type: 'select' as const, align: 'center' as const, options: [
+      { value: 'common', label: 'Common' },
+      { value: 'uncommon', label: 'Uncommon' },
+      { value: 'rare', label: 'Rare' },
+      { value: 'epic', label: 'Epic' },
+      { value: 'legendary', label: 'Legendary' }
+    ]},
+    { key: 'required_level', label: 'Req Lvl', width: '70px', type: 'number' as const, align: 'center' as const },
+    { key: 'value', label: 'Value', width: '70px', type: 'number' as const, align: 'right' as const },
+    { key: 'weapon_type', label: 'Wpn Type', width: '100px', type: 'select' as const, align: 'center' as const, options: [
+      { value: '', label: 'None' },
+      { value: 'sword', label: 'Sword' },
+      { value: 'dual_sword', label: 'Dual Sword' },
+      { value: 'greatsword', label: 'Greatsword' },
+      { value: 'axe', label: 'Axe' },
+      { value: 'greataxe', label: 'Greataxe' },
+      { value: 'mace', label: 'Mace' },
+      { value: 'dagger', label: 'Dagger' },
+      { value: 'dual_dagger', label: 'Dual Dagger' },
+      { value: 'staff', label: 'Staff' },
+      { value: 'wand', label: 'Wand' },
+      { value: 'bow', label: 'Bow' }
+    ]},
+    { key: 'offhand_type', label: 'Off Type', width: '100px', type: 'select' as const, align: 'center' as const, options: [
+      { value: '', label: 'None' },
+      { value: 'shield', label: 'Shield' },
+      { value: 'tome', label: 'Tome' },
+      { value: 'orb', label: 'Orb' },
+      { value: 'focus', label: 'Focus' },
+      { value: 'quiver', label: 'Quiver' },
+      { value: 'instrument', label: 'Instrument' },
+      { value: 'dagger', label: 'Dagger' }
+    ]},
+    { key: 'is_two_handed', label: '2H', width: '50px', type: 'select' as const, align: 'center' as const, options: [
+      { value: 0, label: 'No' },
+      { value: 1, label: 'Yes' }
+    ]},
+    { key: 'damage_min', label: 'Dmg Min', width: '70px', type: 'number' as const, align: 'right' as const },
+    { key: 'damage_max', label: 'Dmg Max', width: '70px', type: 'number' as const, align: 'right' as const },
+    { key: 'armor', label: 'Armor', width: '60px', type: 'number' as const, align: 'right' as const },
+    { key: 'armor_type', label: 'Armor Type', width: '100px', type: 'select' as const, align: 'center' as const, options: [
+      { value: '', label: 'None' },
+      { value: 'cloth', label: 'Cloth' },
+      { value: 'leather', label: 'Leather' },
+      { value: 'chain', label: 'Chain' },
+      { value: 'plate', label: 'Plate' }
+    ]},
+    { key: 'attack_speed', label: 'Atk Spd', width: '70px', type: 'number' as const, align: 'right' as const },
+    { key: 'strength_bonus', label: 'STR', width: '50px', type: 'number' as const, align: 'right' as const },
+    { key: 'dexterity_bonus', label: 'DEX', width: '50px', type: 'number' as const, align: 'right' as const },
+    { key: 'constitution_bonus', label: 'CON', width: '50px', type: 'number' as const, align: 'right' as const },
+    { key: 'intelligence_bonus', label: 'INT', width: '50px', type: 'number' as const, align: 'right' as const },
+    { key: 'wisdom_bonus', label: 'WIS', width: '50px', type: 'number' as const, align: 'right' as const },
+    { key: 'charisma_bonus', label: 'CHA', width: '50px', type: 'number' as const, align: 'right' as const },
+    { key: 'required_strength', label: 'Req STR', width: '70px', type: 'number' as const, align: 'right' as const },
+    { key: 'required_dexterity', label: 'Req DEX', width: '70px', type: 'number' as const, align: 'right' as const },
+    { key: 'required_constitution', label: 'Req CON', width: '70px', type: 'number' as const, align: 'right' as const },
+    { key: 'required_intelligence', label: 'Req INT', width: '70px', type: 'number' as const, align: 'right' as const },
+    { key: 'required_wisdom', label: 'Req WIS', width: '70px', type: 'number' as const, align: 'right' as const },
+    { key: 'required_charisma', label: 'Req CHA', width: '70px', type: 'number' as const, align: 'right' as const },
+    { key: 'health_restore', label: 'HP Restore', width: '80px', type: 'number' as const, align: 'right' as const },
+    { key: 'mana_restore', label: 'MP Restore', width: '80px', type: 'number' as const, align: 'right' as const },
+    { key: 'stackable', label: 'Stack', width: '60px', type: 'select' as const, align: 'center' as const, options: [
+      { value: 0, label: 'No' },
+      { value: 1, label: 'Yes' }
+    ]},
+    { key: 'teaches_ability_id', label: 'Teaches', width: '70px', type: 'number' as const, align: 'center' as const }
+  ];
+  
+  const itemFilters = [
+    {
+      key: 'type',
+      label: 'Type',
+      type: 'multiselect' as const,
+      options: [
+        { value: 'weapon', label: 'Weapon' },
+        { value: 'armor', label: 'Armor' },
+        { value: 'offhand', label: 'Offhand' },
+        { value: 'consumable', label: 'Consumable' },
+        { value: 'material', label: 'Material' },
+        { value: 'quest', label: 'Quest Item' }
+      ]
+    },
+    {
+      key: 'slot',
+      label: 'Slot',
+      type: 'multiselect' as const,
+      options: [
+        { value: 'weapon', label: 'Weapon' },
+        { value: 'offhand', label: 'Offhand' },
+        { value: 'head', label: 'Head' },
+        { value: 'chest', label: 'Chest' },
+        { value: 'legs', label: 'Legs' },
+        { value: 'feet', label: 'Feet' },
+        { value: 'hands', label: 'Hands' },
+        { value: 'accessory', label: 'Accessory' }
+      ]
+    }
+  ];
+  
+  const abilityColumns = [
+    {
+      key: 'checkbox',
+      label: '',
+      width: '40px',
+      type: 'readonly' as const,
+      align: 'center' as const,
+      sortable: false,
+      render: (value: any, row: any) => (
+        <input
+          type="checkbox"
+          checked={selectedAbilities().has(row.id)}
+          onChange={(e) => {
+            const newSet = new Set(selectedAbilities());
+            if (e.currentTarget.checked) {
+              newSet.add(row.id);
+            } else {
+              newSet.delete(row.id);
+            }
+            setSelectedAbilities(newSet);
+            loadSelectedAbilityEffects();
+          }}
+        />
+      )
+    },
+    { key: 'id', label: 'ID', width: '60px', type: 'readonly' as const, align: 'center' as const },
+    { key: 'name', label: 'Name', width: '200px', type: 'text' as const },
+    { key: 'description', label: 'Description', width: '300px', type: 'text' as const },
+    { key: 'type', label: 'Type', width: '120px', type: 'select' as const, align: 'center' as const, options: [
+      { value: 'damage', label: 'Damage' },
+      { value: 'heal', label: 'Heal' },
+      { value: 'buff', label: 'Buff' },
+      { value: 'debuff', label: 'Debuff' },
+      { value: 'utility', label: 'Utility' },
+      { value: 'passive', label: 'Passive' }
+    ]},
+    { key: 'category', label: 'Category', width: '120px', type: 'select' as const, align: 'center' as const, options: [
+      { value: 'combat', label: 'Combat' },
+      { value: 'passive', label: 'Passive' },
+      { value: 'song', label: 'Song' },
+      { value: 'crafting', label: 'Crafting' }
+    ]},
+    { key: 'level', label: 'Level', width: '70px', type: 'number' as const, align: 'center' as const },
+    { key: 'base_id', label: 'Base ID', width: '70px', type: 'number' as const, align: 'center' as const },
+    { key: 'required_level', label: 'Lvl Req', width: '80px', type: 'number' as const, align: 'center' as const },
+    { key: 'required_strength', label: 'STR Req', width: '80px', type: 'number' as const, align: 'center' as const },
+    { key: 'required_dexterity', label: 'DEX Req', width: '80px', type: 'number' as const, align: 'center' as const },
+    { key: 'required_constitution', label: 'CON Req', width: '80px', type: 'number' as const, align: 'center' as const },
+    { key: 'required_intelligence', label: 'INT Req', width: '80px', type: 'number' as const, align: 'center' as const },
+    { key: 'required_wisdom', label: 'WIS Req', width: '80px', type: 'number' as const, align: 'center' as const },
+    { key: 'required_charisma', label: 'CHA Req', width: '80px', type: 'number' as const, align: 'center' as const },
+    { key: 'weapon_type_requirement', label: 'Weapon Type', width: '120px', type: 'select' as const, align: 'center' as const, options: [
+      { value: '', label: 'None' },
+      { value: 'sword', label: 'Sword' },
+      { value: 'dual_sword', label: 'Dual Sword' },
+      { value: 'greatsword', label: 'Greatsword' },
+      { value: 'axe', label: 'Axe' },
+      { value: 'greataxe', label: 'Greataxe' },
+      { value: 'mace', label: 'Mace' },
+      { value: 'dagger', label: 'Dagger' },
+      { value: 'dual_dagger', label: 'Dual Dagger' },
+      { value: 'spear', label: 'Spear' },
+      { value: 'bow', label: 'Bow' },
+      { value: 'staff', label: 'Staff' },
+      { value: 'wand', label: 'Wand' }
+    ]},
+    { key: 'offhand_type_requirement', label: 'Offhand Type', width: '120px', type: 'select' as const, align: 'center' as const, options: [
+      { value: '', label: 'None' },
+      { value: 'shield', label: 'Shield' },
+      { value: 'tome', label: 'Tome' },
+      { value: 'orb', label: 'Orb' },
+      { value: 'focus', label: 'Focus' },
+      { value: 'quiver', label: 'Quiver' },
+      { value: 'instrument', label: 'Instrument' },
+      { value: 'dagger', label: 'Dagger' }
+    ]},
+    { key: 'mana_cost', label: 'Mana', width: '80px', type: 'number' as const, align: 'right' as const },
+    { key: 'cooldown', label: 'Cooldown', width: '90px', type: 'number' as const, align: 'right' as const },
+    { key: 'primary_stat', label: 'Primary Stat', width: '120px', type: 'select' as const, align: 'center' as const, options: [
+      { value: '', label: 'None' },
+      { value: 'strength', label: 'Strength' },
+      { value: 'dexterity', label: 'Dexterity' },
+      { value: 'intelligence', label: 'Intelligence' },
+      { value: 'wisdom', label: 'Wisdom' },
+      { value: 'charisma', label: 'Charisma' }
+    ]},
+    { key: 'stat_scaling', label: 'Scaling %', width: '90px', type: 'number' as const, align: 'right' as const },
+    {
+      key: 'actions',
+      label: 'Actions',
+      width: '120px',
+      type: 'readonly' as const,
+      align: 'center' as const,
+      sortable: false,
+      render: (value: any, row: any) => (
+        <button
+          class="button primary"
+          style={{ padding: "0.25rem 0.5rem", "font-size": "0.8rem" }}
+          onClick={async () => {
+            setSelectedAbilityForEffects(row.id);
+            setEditingAbilityEffect({
+              ability_id: row.id,
+              effect_order: 0,
+              effect_type: 'damage',
+              target: 'enemy',
+              value_min: 0,
+              value_max: 0,
+              is_periodic: 0,
+              tick_interval: 2.0,
+              tick_count: 0,
+              tick_value: 0,
+              stat_affected: null,
+              stat_scaling: null,
+              scaling_factor: 0,
+              duration: 0,
+              chance: 1.0
+            });
+            setShowAbilityEffectModal(true);
+          }}
+        >
+          Add Effect
+        </button>
+      )
+    }
+  ];
+  
+  const abilityFilters = [
+    {
+      key: 'type',
+      label: 'Type',
+      type: 'multiselect' as const,
+      options: [
+        { value: 'damage', label: 'Damage' },
+        { value: 'heal', label: 'Heal' },
+        { value: 'buff', label: 'Buff' },
+        { value: 'debuff', label: 'Debuff' },
+        { value: 'utility', label: 'Utility' },
+        { value: 'passive', label: 'Passive' }
+      ]
+    },
+    {
+      key: 'category',
+      label: 'Category',
+      type: 'multiselect' as const,
+      options: [
+        { value: 'combat', label: 'Combat' },
+        { value: 'passive', label: 'Passive' },
+        { value: 'song', label: 'Song' },
+        { value: 'crafting', label: 'Crafting' }
+      ]
+    },
+    {
+      key: 'primary_stat',
+      label: 'Primary Stat',
+      type: 'multiselect' as const,
+      options: [
+        { value: 'strength', label: 'Strength' },
+        { value: 'dexterity', label: 'Dexterity' },
+        { value: 'intelligence', label: 'Intelligence' },
+        { value: 'wisdom', label: 'Wisdom' },
+        { value: 'charisma', label: 'Charisma' }
+      ]
+    }
+  ];
+  
+  // Bulk save handlers
+  const handleBulkSaveItems = async (changes: Map<number | string, Partial<any>>) => {
+    const promises = Array.from(changes.entries()).map(async ([id, fields]) => {
+      const item = items().find((i: any) => i.id === id);
+      if (!item) return;
+      const updated = { ...item, ...fields };
+      await updateItem(id as number, updated);
+    });
+    
+    await Promise.all(promises);
+    await reloadItems();
+  };
+  
+  const handleBulkSaveAbilities = async (changes: Map<number | string, Partial<any>>) => {
+    const promises = Array.from(changes.entries()).map(async ([id, fields]) => {
+      const ability = abilities().find((a: any) => a.id === id);
+      if (!ability) return;
+      const updated = { ...ability, ...fields };
+      await updateAbility(id as number, updated);
+    });
+    
+    await Promise.all(promises);
+    await reloadAbilities();
+  };
+  
+  // Ability effects columns and handlers
+  const abilityEffectColumns = [
+    { key: 'ability_name', label: 'Ability', width: '150px', type: 'readonly' as const, align: 'left' as const },
+    { key: 'effect_order', label: 'Order', width: '70px', type: 'number' as const, align: 'center' as const },
+    { key: 'effect_type', label: 'Type', width: '120px', type: 'select' as const, align: 'left' as const, options: [
+      { value: 'damage', label: 'Damage' },
+      { value: 'heal', label: 'Heal' },
+      { value: 'buff', label: 'Buff' },
+      { value: 'debuff', label: 'Debuff' },
+      { value: 'stun', label: 'Stun' },
+      { value: 'dot', label: 'DOT' },
+      { value: 'hot', label: 'HOT' },
+      { value: 'shield', label: 'Shield' },
+      { value: 'drain', label: 'Drain' }
+    ]},
+    { key: 'target', label: 'Target', width: '100px', type: 'select' as const, align: 'left' as const, options: [
+      { value: 'self', label: 'Self' },
+      { value: 'enemy', label: 'Enemy' },
+      { value: 'ally', label: 'Ally' },
+      { value: 'area', label: 'Area' }
+    ]},
+    { key: 'value_min', label: 'Min', width: '70px', type: 'number' as const, align: 'right' as const },
+    { key: 'value_max', label: 'Max', width: '70px', type: 'number' as const, align: 'right' as const },
+    { key: 'duration', label: 'Duration', width: '80px', type: 'number' as const, align: 'center' as const },
+    { key: 'stat_affected', label: 'Stat', width: '100px', type: 'select' as const, align: 'left' as const, options: [
+      { value: '', label: 'None' },
+      { value: 'strength', label: 'Strength' },
+      { value: 'dexterity', label: 'Dexterity' },
+      { value: 'constitution', label: 'Constitution' },
+      { value: 'intelligence', label: 'Intelligence' },
+      { value: 'wisdom', label: 'Wisdom' },
+      { value: 'charisma', label: 'Charisma' },
+      { value: 'attack', label: 'Attack' },
+      { value: 'defense', label: 'Defense' },
+      { value: 'speed', label: 'Speed' }
+    ]},
+    { 
+      key: 'stat_scaling', 
+      label: 'Scaling Stat', 
+      width: '120px', 
+      type: 'select' as const, 
+      align: 'left' as const, 
+      options: [
+        { value: '', label: 'None' },
+        { value: 'strength', label: 'Strength' },
+        { value: 'dexterity', label: 'Dexterity' },
+        { value: 'intelligence', label: 'Intelligence' },
+        { value: 'wisdom', label: 'Wisdom' },
+        { value: 'charisma', label: 'Charisma' }
+      ]
+    },
+    { key: 'scaling_factor', label: 'Factor', width: '70px', type: 'number' as const, align: 'right' as const },
+    { key: 'is_periodic', label: 'Periodic', width: '80px', type: 'select' as const, align: 'center' as const, options: [
+      { value: 0, label: 'No' },
+      { value: 1, label: 'Yes' }
+    ]},
+    { key: 'tick_count', label: 'Ticks', width: '70px', type: 'number' as const, align: 'right' as const },
+    { key: 'tick_value', label: 'Tick Val', width: '80px', type: 'number' as const, align: 'right' as const },
+    { key: 'chance', label: 'Chance', width: '70px', type: 'number' as const, align: 'right' as const }
+  ];
+  
+  const handleBulkSaveEffects = async (changes: Map<number | string, Partial<any>>) => {
+    const promises = Array.from(changes.entries()).map(async ([id, fields]) => {
+      const effect = allAbilityEffects().find((e: any) => e.id === id);
+      if (!effect) return;
+      const updated = { ...effect, ...fields };
+      await updateAbilityEffect(id as number, updated);
+    });
+    
+    await Promise.all(promises);
+    await loadSelectedAbilityEffects();
+  };
+  
+  const handleDeleteEffect = async (id: number | string) => {
+    if (!confirm('Are you sure you want to delete this effect?')) return;
+    try {
+      await deleteAbilityEffect(Number(id));
+      await loadSelectedAbilityEffects();
+    } catch (err) {
+      console.error('Error deleting effect:', err);
+      alert('Failed to delete effect');
+    }
+  };
+  
+  // Ability selection for effects editing
+  const [selectedAbilities, setSelectedAbilities] = createSignal<Set<number>>(new Set());
+  const [allAbilityEffects, setAllAbilityEffects] = createSignal<any[]>([]);
+  const [loadingEffects, setLoadingEffects] = createSignal(false);
+  
+  const toggleAbilitySelection = (abilityId: number) => {
+    const selected = new Set<number>(selectedAbilities());
+    if (selected.has(abilityId)) {
+      selected.delete(abilityId);
+    } else {
+      selected.add(abilityId);
+    }
+    setSelectedAbilities(selected);
+    loadSelectedAbilityEffects();
+  };
+  
+  const selectAllAbilities = () => {
+    const allIds = new Set<number>(abilities().map((a: any) => a.id));
+    setSelectedAbilities(allIds);
+    loadSelectedAbilityEffects();
+  };
+  
+  const clearAbilitySelection = () => {
+    setSelectedAbilities(new Set<number>());
+    setAllAbilityEffects([]);
+  };
+  
+  const loadSelectedAbilityEffects = async () => {
+    const selected = selectedAbilities();
+    if (selected.size === 0) {
+      setAllAbilityEffects([]);
+      return;
+    }
+    
+    setLoadingEffects(true);
+    try {
+      const effectsPromises = Array.from(selected).map(async (abilityId) => {
+        const effects = await getAbilityEffects(abilityId);
+        return effects.map((effect: any) => ({
+          ...effect,
+          ability_id: abilityId,
+          ability_name: abilities().find((a: any) => a.id === abilityId)?.name || `ID ${abilityId}`
+        }));
+      });
+      
+      const allEffects = await Promise.all(effectsPromises);
+      setAllAbilityEffects(allEffects.flat());
+    } catch (error) {
+      console.error('Failed to load effects:', error);
+    } finally {
+      setLoadingEffects(false);
+    }
+  };
+  
+
+  
   // Handle mob edit/delete
   const handleEditMob = (mob: any) => {
     setEditingMob(mob);
@@ -190,10 +646,10 @@ export default function GMPage() {
     setShowItemModal(true);
   };
   
-  const handleDeleteItem = async (id: number) => {
+  const handleDeleteItem = async (id: number | string) => {
     if (!confirm('Are you sure you want to delete this item?')) return;
     try {
-      await deleteItem(id);
+      await deleteItem(Number(id));
       await reloadItems();
     } catch (err) {
       console.error('Error deleting item:', err);
@@ -301,10 +757,10 @@ export default function GMPage() {
     setShowAbilityModal(true);
   };
   
-  const handleDeleteAbility = async (id: number) => {
+  const handleDeleteAbility = async (id: number | string) => {
     if (!confirm('Are you sure you want to delete this ability?')) return;
     try {
-      await deleteAbility(id);
+      await deleteAbility(Number(id));
       await reloadAbilities();
     } catch (err) {
       console.error('Error deleting ability:', err);
@@ -1070,244 +1526,201 @@ export default function GMPage() {
           
           {/* Items Tab */}
           <Show when={activeTab() === "items"}>
-            <div class="card">
-              <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center", "margin-bottom": "1rem" }}>
-                <h2>Items ({items()?.length || 0})</h2>
-                <button class="button primary" onClick={() => {
-                  setEditingItem({
-                    name: '', description: '', type: 'weapon', slot: 'weapon',
-                    rarity: 'common', level: 1, value: 1, damage: 0, armor: 0,
-                    strength_bonus: 0, dexterity_bonus: 0, constitution_bonus: 0,
-                    intelligence_bonus: 0, wisdom_bonus: 0, charisma_bonus: 0,
-                    attack_speed: 1.0, stackable: 0
-                  });
-                  setShowItemModal(true);
+            {/* Ability Lookup Helper */}
+            <div class="card" style={{ "margin-bottom": "1rem" }}>
+              <details>
+                <summary style={{ 
+                  cursor: "pointer", 
+                  "font-weight": "600",
+                  padding: "0.5rem",
+                  "user-select": "none",
+                  display: "flex",
+                  "align-items": "center",
+                  gap: "0.5rem"
                 }}>
-                  Add Item
-                </button>
-              </div>
-              <div style={{ "margin-bottom": "1rem" }}>
-                <input 
-                  type="text" 
-                  placeholder="Search by ID, name, or type..." 
-                  value={searchItems()}
-                  onInput={(e) => setSearchItems(e.currentTarget.value)}
-                  style={{ width: "100%", padding: "0.5rem" }}
-                />
-              </div>
-              <Show when={items()}>
-                <div style={{ overflow: "auto", "max-height": "600px" }}>
-                  <table style={{ width: "100%", "border-collapse": "collapse", "font-size": "0.85rem" }}>
-                    <thead style={{ position: "sticky", top: 0, background: "var(--bg-dark)" }}>
-                      <tr style={{ "border-bottom": "2px solid var(--bg-light)" }}>
-                        <th style={{ padding: "0.5rem", "text-align": "center" }}>ID</th>
-                        <th style={{ padding: "0.5rem", "text-align": "left" }}>Name</th>
-                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Type</th>
-                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Lvl</th>
-                        <th style={{ padding: "0.5rem", "text-align": "right" }}>Value</th>
-                        <th style={{ padding: "0.5rem", "text-align": "right" }}>Dmg</th>
-                        <th style={{ padding: "0.5rem", "text-align": "right" }}>Armor</th>
-                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Stats</th>
-                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <For each={items().filter((i: any) => {
-                        const search = searchItems().toLowerCase();
-                        if (!search) return true;
-                        return (
-                          i.name?.toLowerCase().includes(search) ||
-                          i.type?.toLowerCase().includes(search) ||
-                          i.id?.toString().includes(search)
-                        );
-                      })}>
-                        {(item: any) => (
-                          <tr style={{ "border-bottom": "1px solid var(--bg-light)" }}>
-                            <td style={{ padding: "0.5rem", "text-align": "center", "font-weight": "bold", color: "var(--accent)" }}>{item.id}</td>
-                            <td style={{ padding: "0.5rem" }}>{item.name}</td>
-                            <td style={{ padding: "0.5rem", "text-align": "center" }}>{item.type}</td>
-                            <td style={{ padding: "0.5rem", "text-align": "center" }}>{item.level}</td>
-                            <td style={{ padding: "0.5rem", "text-align": "right" }}>{item.value}g</td>
-                            <td style={{ padding: "0.5rem", "text-align": "right" }}>{item.damage || "-"}</td>
-                            <td style={{ padding: "0.5rem", "text-align": "right" }}>{item.armor || "-"}</td>
-                            <td style={{ padding: "0.5rem", "text-align": "center", "font-size": "0.75rem" }}>
-                              {[
-                                item.strength_bonus ? `STR+${item.strength_bonus}` : null,
-                                item.dexterity_bonus ? `DEX+${item.dexterity_bonus}` : null,
-                                item.constitution_bonus ? `CON+${item.constitution_bonus}` : null,
-                                item.intelligence_bonus ? `INT+${item.intelligence_bonus}` : null,
-                                item.wisdom_bonus ? `WIS+${item.wisdom_bonus}` : null,
-                                item.charisma_bonus ? `CHA+${item.charisma_bonus}` : null,
-                              ].filter(Boolean).join(", ") || "-"}
-                            </td>
-                            <td style={{ padding: "0.5rem", "text-align": "center" }}>
-                              <button 
-                                class="button secondary" 
-                                style={{ padding: "0.25rem 0.5rem", "font-size": "0.8rem", "margin-right": "0.25rem" }}
-                                onClick={() => handleEditItem(item)}
-                              >
-                                Edit
-                              </button>
-                              <button 
-                                class="button" 
-                                style={{ padding: "0.25rem 0.5rem", "font-size": "0.8rem", background: "var(--danger)" }}
-                                onClick={() => handleDeleteItem(item.id)}
-                              >
-                                Delete
-                              </button>
-                            </td>
-                          </tr>
-                        )}
-                      </For>
-                    </tbody>
-                  </table>
+                  <span>📖 Ability Lookup</span>
+                  <span style={{ 
+                    "font-size": "0.85rem", 
+                    color: "var(--text-secondary)",
+                    "font-weight": "normal"
+                  }}>
+                    (for "Teaches Ability ID" column)
+                  </span>
+                </summary>
+                <div style={{ padding: "1rem", "padding-top": "0.5rem" }}>
+                  <input
+                    type="text"
+                    placeholder="Search abilities by name..."
+                    value={searchAbilityLookup()}
+                    onInput={(e) => setSearchAbilityLookup(e.currentTarget.value)}
+                    style={{ 
+                      width: "100%", 
+                      padding: "0.5rem",
+                      "margin-bottom": "0.5rem"
+                    }}
+                  />
+                  <div style={{ 
+                    "max-height": "200px", 
+                    overflow: "auto",
+                    border: "1px solid var(--border)",
+                    "border-radius": "4px"
+                  }}>
+                    <For each={abilities().filter((a: any) => 
+                      !searchAbilityLookup() || 
+                      a.name?.toLowerCase().includes(searchAbilityLookup().toLowerCase()) ||
+                      a.id?.toString().includes(searchAbilityLookup())
+                    ).slice(0, 20)}>
+                      {(ability: any) => (
+                        <div 
+                          style={{ 
+                            padding: "0.5rem",
+                            display: "flex",
+                            "justify-content": "space-between",
+                            "align-items": "center",
+                            "border-bottom": "1px solid var(--border)",
+                            cursor: "pointer",
+                            background: "var(--bg-medium)"
+                          }}
+                          onClick={() => {
+                            navigator.clipboard.writeText(ability.id.toString());
+                            setCopiedAbilityId(ability.id);
+                            setTimeout(() => setCopiedAbilityId(null), 2000);
+                          }}
+                          title="Click to copy ID to clipboard"
+                        >
+                          <div>
+                            <span style={{ "font-weight": "600" }}>{ability.name}</span>
+                            <span style={{ 
+                              "margin-left": "0.5rem",
+                              color: "var(--text-secondary)",
+                              "font-size": "0.85rem"
+                            }}>
+                              ({ability.type})
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", "align-items": "center", gap: "0.5rem" }}>
+                            <span style={{ 
+                              padding: "0.2rem 0.5rem",
+                              background: "var(--accent)",
+                              "border-radius": "4px",
+                              "font-weight": "600",
+                              color: "var(--bg-dark)"
+                            }}>
+                              ID: {ability.id}
+                            </span>
+                            <Show when={copiedAbilityId() === ability.id}>
+                              <span style={{ color: "var(--success)", "font-size": "0.85rem" }}>
+                                ✓ Copied!
+                              </span>
+                            </Show>
+                          </div>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                  <p style={{ 
+                    "margin-top": "0.5rem",
+                    "font-size": "0.85rem",
+                    color: "var(--text-secondary)"
+                  }}>
+                    💡 Click any ability to copy its ID to clipboard, then paste into "Teaches" column
+                  </p>
                 </div>
-              </Show>
+              </details>
             </div>
+            
+            <BulkEditTable
+              data={items()}
+              columns={itemColumns}
+              filters={itemFilters}
+              onSave={handleBulkSaveItems}
+              onDelete={handleDeleteItem}
+              onCreate={() => {
+                setEditingItem({
+                  name: '', description: '', type: 'weapon', slot: 'weapon',
+                  rarity: 'common', level: 1, value: 1, damage_min: 0, damage_max: 0, armor: 0,
+                  strength_bonus: 0, dexterity_bonus: 0, constitution_bonus: 0,
+                  intelligence_bonus: 0, wisdom_bonus: 0, charisma_bonus: 0,
+                  attack_speed: 1.0, stackable: 0
+                });
+                setShowItemModal(true);
+              }}
+              getRowId={(row) => row.id}
+              title="Items"
+            />
           </Show>
           
           {/* Abilities Tab */}
           <Show when={activeTab() === "abilities"}>
-            <div class="card">
-              <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center", "margin-bottom": "1rem" }}>
-                <h2>Abilities ({abilities()?.length || 0})</h2>
-                <button class="button primary" onClick={() => {
-                  setEditingAbility({
-                    name: '', description: '', type: 'damage', category: 'combat',
-                    required_level: 1, mana_cost: 0, cooldown: 0, primary_stat: null,
-                    stat_scaling: 0,
-                    required_strength: 0, required_dexterity: 0, required_constitution: 0,
-                    required_intelligence: 0, required_wisdom: 0, required_charisma: 0
-                  });
-                  setShowAbilityModal(true);
+            <BulkEditTable
+              data={abilities()}
+              columns={abilityColumns}
+              filters={abilityFilters}
+              onSave={handleBulkSaveAbilities}
+              onDelete={handleDeleteAbility}
+              onCreate={() => {
+                setEditingAbility({
+                  name: '', description: '', type: 'damage', category: 'combat',
+                  required_level: 1, mana_cost: 0, cooldown: 0, primary_stat: null,
+                  stat_scaling: 0,
+                  required_strength: 0, required_dexterity: 0, required_constitution: 0,
+                  required_intelligence: 0, required_wisdom: 0, required_charisma: 0
+                });
+                setShowAbilityModal(true);
+              }}
+              getRowId={(row) => row.id}
+              title="Abilities"
+            />
+            
+            {/* Selected Abilities Effects Table */}
+            <Show when={selectedAbilities().size > 0}>
+              <div style={{ "margin-top": "1rem" }}>
+                <div style={{ 
+                  display: "flex", 
+                  "justify-content": "space-between", 
+                  "align-items": "center", 
+                  "margin-bottom": "0.5rem",
+                  padding: "0.5rem 1rem",
+                  background: "var(--bg-medium)",
+                  "border-radius": "4px"
                 }}>
-                  Add Ability
-                </button>
-              </div>
-              <div style={{ "margin-bottom": "1rem" }}>
-                <input 
-                  type="text" 
-                  placeholder="Search by ID, name, type, or category..." 
-                  value={searchAbilities()}
-                  onInput={(e) => setSearchAbilities(e.currentTarget.value)}
-                  style={{ width: "100%", padding: "0.5rem" }}
-                />
-              </div>
-              <Show when={abilities()}>
-                <div style={{ overflow: "auto", "max-height": "600px" }}>
-                  <table style={{ width: "100%", "border-collapse": "collapse", "font-size": "0.9rem" }}>
-                    <thead style={{ position: "sticky", top: 0, background: "var(--bg-dark)" }}>
-                      <tr style={{ "border-bottom": "2px solid var(--bg-light)" }}>
-                        <th style={{ padding: "0.5rem", "text-align": "center" }}>ID</th>
-                        <th style={{ padding: "0.5rem", "text-align": "left" }}>Name</th>
-                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Type</th>
-                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Category</th>
-                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Lvl Req</th>
-                        <th style={{ padding: "0.5rem", "text-align": "right" }}>Mana</th>
-                        <th style={{ padding: "0.5rem", "text-align": "right" }}>Cooldown</th>
-                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Primary Stat</th>
-                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Weapon Req</th>
-                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Offhand Req</th>
-                        <th style={{ padding: "0.5rem", "text-align": "center" }}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <For each={abilities().filter((a: any) => {
-                        const search = searchAbilities().toLowerCase();
-                        if (!search) return true;
-                        return (
-                          a.name?.toLowerCase().includes(search) ||
-                          a.type?.toLowerCase().includes(search) ||
-                          a.category?.toLowerCase().includes(search) ||
-                          a.id?.toString().includes(search)
-                        );
-                      })}>
-                        {(ability: any) => (
-                          <tr style={{ "border-bottom": "1px solid var(--bg-light)" }}>
-                            <td style={{ padding: "0.5rem", "text-align": "center", "font-weight": "bold", color: "var(--accent)" }}>{ability.id}</td>
-                            <td style={{ padding: "0.5rem" }}>{ability.name}</td>
-                            <td style={{ padding: "0.5rem", "text-align": "center" }}>{ability.type}</td>
-                            <td style={{ padding: "0.5rem", "text-align": "center" }}>{ability.category}</td>
-                            <td style={{ padding: "0.5rem", "text-align": "center" }}>{ability.required_level}</td>
-                            <td style={{ padding: "0.5rem", "text-align": "right" }}>{ability.mana_cost || 0}</td>
-                            <td style={{ padding: "0.5rem", "text-align": "right" }}>{ability.cooldown}s</td>
-                            <td style={{ padding: "0.5rem", "text-align": "center" }}>{ability.primary_stat || "-"}</td>
-                            <td style={{ padding: "0.5rem", "text-align": "center", "font-size": "0.85rem" }}>
-                              {ability.weapon_type_requirement ? (
-                                <div style={{ display: "flex", "flex-wrap": "wrap", gap: "0.25rem", "justify-content": "center" }}>
-                                  <For each={ability.weapon_type_requirement.split(',')}>
-                                    {(type: string) => (
-                                      <span style={{ 
-                                        padding: "0.2rem 0.4rem", 
-                                        background: "var(--accent)", 
-                                        "border-radius": "4px",
-                                        color: "var(--bg-dark)",
-                                        "font-weight": "600",
-                                        "white-space": "nowrap"
-                                      }}>
-                                        {type}
-                                      </span>
-                                    )}
-                                  </For>
-                                </div>
-                              ) : "-"}
-                            </td>
-                            <td style={{ padding: "0.5rem", "text-align": "center", "font-size": "0.85rem" }}>
-                              {ability.offhand_type_requirement ? (
-                                <div style={{ display: "flex", "flex-wrap": "wrap", gap: "0.25rem", "justify-content": "center" }}>
-                                  <For each={ability.offhand_type_requirement.split(',')}>
-                                    {(type: string) => (
-                                      <span style={{ 
-                                        padding: "0.2rem 0.4rem", 
-                                        background: "var(--success)", 
-                                        "border-radius": "4px",
-                                        color: "var(--bg-dark)",
-                                        "font-weight": "600",
-                                        "white-space": "nowrap"
-                                      }}>
-                                        {type}
-                                      </span>
-                                    )}
-                                  </For>
-                                </div>
-                              ) : "-"}
-                            </td>
-                            <td style={{ padding: "0.5rem", "text-align": "center" }}>
-                              <button 
-                                class="button secondary" 
-                                style={{ padding: "0.25rem 0.5rem", "font-size": "0.8rem", "margin-right": "0.25rem" }}
-                                onClick={() => handleEditAbility(ability)}
-                              >
-                                Edit
-                              </button>
-                              <button 
-                                class="button" 
-                                style={{ padding: "0.25rem 0.5rem", "font-size": "0.8rem", background: "var(--accent)", "margin-right": "0.25rem" }}
-                                onClick={async () => {
-                                  setSelectedAbilityForEffects(ability.id);
-                                  const effects = await getAbilityEffects(ability.id);
-                                  setAbilityEffects(effects as any);
-                                  setShowAbilityEffectModal(true);
-                                }}
-                              >
-                                Effects
-                              </button>
-                              <button 
-                                class="button" 
-                                style={{ padding: "0.25rem 0.5rem", "font-size": "0.8rem", background: "var(--danger)" }}
-                                onClick={() => handleDeleteAbility(ability.id)}
-                              >
-                                Delete
-                              </button>
-                            </td>
-                          </tr>
-                        )}
-                      </For>
-                    </tbody>
-                  </table>
+                  <h3 style={{ margin: 0 }}>
+                    Effects for Selected Abilities ({selectedAbilities().size})
+                  </h3>
+                  <button
+                    class="button secondary"
+                    onClick={clearAbilitySelection}
+                  >
+                    Clear Selection
+                  </button>
                 </div>
-              </Show>
-            </div>
+                
+                <Show when={loadingEffects()}>
+                  <div class="card">
+                    <p>Loading effects...</p>
+                  </div>
+                </Show>
+                
+                <Show when={!loadingEffects() && allAbilityEffects().length === 0}>
+                  <div class="card">
+                    <p style={{ color: "var(--text-secondary)", "font-style": "italic" }}>
+                      Selected abilities have no effects configured
+                    </p>
+                  </div>
+                </Show>
+                
+                <Show when={!loadingEffects() && allAbilityEffects().length > 0}>
+                  <BulkEditTable
+                    data={allAbilityEffects()}
+                    columns={abilityEffectColumns}
+                    onSave={handleBulkSaveEffects}
+                    onDelete={handleDeleteEffect}
+                    getRowId={(row) => row.id}
+                    title={`${allAbilityEffects().length} Effects`}
+                  />
+                </Show>
+              </div>
+            </Show>
           </Show>
           
           {/* Regions Tab */}
