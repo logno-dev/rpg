@@ -33,6 +33,7 @@ const wikiNavigation: WikiNavItem[] = [
     children: [
       { title: "Abilities & Spells", href: "/wiki/ability" },
       { title: "Equipment & Items", href: "/wiki/equipment" },
+      { title: "Crafting", href: "/wiki/crafting" },
     ],
   },
 ];

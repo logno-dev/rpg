@@ -134,8 +134,8 @@ export default function CraftingPage() {
   const currentCharacter = () => store.character;
   const maxCraftingLevel = () => {
     const charLevel = currentCharacter()?.level || 1;
-    // Level 1 characters can craft at level 1, otherwise level / 2
-    return charLevel === 1 ? 1 : Math.floor(charLevel / 2);
+    // Profession level can equal character level
+    return charLevel;
   };
 
   // XP per level formula (matches character XP formula: level * base XP)

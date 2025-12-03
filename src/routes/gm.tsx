@@ -1,7 +1,7 @@
 import { createSignal, Show, For, onMount } from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
 import { getUser } from "~/lib/auth";
-import { isGM, getAllPlayers, getAllMobs, getAllItems, getAllRegions, getAllAbilities, getAllMerchants, updateMob, deleteMob, createMob, updateItem, deleteItem, createItem, getAllMobLoot, getAllRegionRareLoot, createMobLoot, updateMobLoot, deleteMobLoot, createRegionRareLoot, updateRegionRareLoot, deleteRegionRareLoot, createAbility, updateAbility, deleteAbility, createRegion, updateRegion, deleteRegion, createMerchant, updateMerchant, deleteMerchant, getAllSubAreaMobs, createSubAreaMob, updateSubAreaMob, deleteSubAreaMob, getAllSubAreas, getAllMerchantInventory, createMerchantInventory, updateMerchantInventory, deleteMerchantInventory, getAbilityEffects, createAbilityEffect, updateAbilityEffect, deleteAbilityEffect, getCharacter, updateCharacter, getCharacterInventory, getCharacterAbilities, addItemToCharacter, removeItemFromCharacter, updateCharacterInventoryItem, addAbilityToCharacter, removeAbilityFromCharacter, getCharacterRegionUnlocks, unlockRegionForCharacter, lockRegionForCharacter } from "~/lib/gm";
+import { isGM, getAllPlayers, getAllMobs, getAllItems, getAllRegions, getAllAbilities, getAllMerchants, updateMob, deleteMob, createMob, updateItem, deleteItem, createItem, getAllMobLoot, getAllRegionRareLoot, createMobLoot, updateMobLoot, deleteMobLoot, createRegionRareLoot, updateRegionRareLoot, deleteRegionRareLoot, createAbility, updateAbility, deleteAbility, createRegion, updateRegion, deleteRegion, createMerchant, updateMerchant, deleteMerchant, getAllSubAreaMobs, createSubAreaMob, updateSubAreaMob, deleteSubAreaMob, getAllSubAreas, getAllMerchantInventory, createMerchantInventory, updateMerchantInventory, deleteMerchantInventory, getAbilityEffects, createAbilityEffect, updateAbilityEffect, deleteAbilityEffect, getCharacter, updateCharacter, getCharacterInventory, getCharacterAbilities, addItemToCharacter, removeItemFromCharacter, updateCharacterInventoryItem, addAbilityToCharacter, removeAbilityFromCharacter, getCharacterRegionUnlocks, unlockRegionForCharacter, lockRegionForCharacter, getCharacterProfessions, updateCharacterProfession } from "~/lib/gm";
 import { BulkEditTable } from "~/components/BulkEditTable";
 
 export default function GMPage() {
@@ -39,6 +39,7 @@ export default function GMPage() {
   const [characterInventory, setCharacterInventory] = createSignal<any[]>([]);
   const [characterAbilities, setCharacterAbilities] = createSignal<any[]>([]);
   const [characterRegionUnlocks, setCharacterRegionUnlocks] = createSignal<any[]>([]);
+  const [characterProfessions, setCharacterProfessions] = createSignal<any[]>([]);
   const [selectedAbilityForEffects, setSelectedAbilityForEffects] = createSignal<number | null>(null);
   const [showMobModal, setShowMobModal] = createSignal(false);
   const [showItemModal, setShowItemModal] = createSignal(false);
@@ -51,7 +52,7 @@ export default function GMPage() {
   const [showMerchantInvModal, setShowMerchantInvModal] = createSignal(false);
   const [showAbilityEffectModal, setShowAbilityEffectModal] = createSignal(false);
   const [showCharacterModal, setShowCharacterModal] = createSignal(false);
-  const [characterModalTab, setCharacterModalTab] = createSignal<'stats' | 'inventory' | 'abilities' | 'regions'>('stats');
+  const [characterModalTab, setCharacterModalTab] = createSignal<'stats' | 'inventory' | 'abilities' | 'regions' | 'professions'>('stats');
   const [showQuestModal, setShowQuestModal] = createSignal(false);
   const [editingQuest, setEditingQuest] = createSignal<any | null>(null);
   const [editingQuestObjectives, setEditingQuestObjectives] = createSignal<any[]>([]);
@@ -1002,11 +1003,13 @@ export default function GMPage() {
       const inventory = await getCharacterInventory(player.character_id);
       const abilities = await getCharacterAbilities(player.character_id);
       const regionUnlocks = await getCharacterRegionUnlocks(player.character_id);
+      const professions = await getCharacterProfessions(player.character_id);
       
       setEditingCharacter(charData);
       setCharacterInventory(inventory as any);
       setCharacterAbilities(abilities as any);
       setCharacterRegionUnlocks(regionUnlocks as any);
+      setCharacterProfessions(professions as any);
       setCharacterModalTab('stats');
       setShowCharacterModal(true);
     } catch (err) {
@@ -1145,6 +1148,26 @@ export default function GMPage() {
     } catch (err) {
       console.error('Error toggling region unlock:', err);
       alert('Failed to toggle region unlock');
+    }
+  };
+  
+  const handleSaveProfessions = async () => {
+    const char = editingCharacter();
+    if (!char) return;
+    
+    try {
+      // Update each profession
+      for (const profession of characterProfessions()) {
+        await updateCharacterProfession(char.id, profession.profession_type, {
+          level: profession.level,
+          experience: profession.experience
+        });
+      }
+      
+      alert('Professions saved successfully');
+    } catch (err) {
+      console.error('Error saving professions:', err);
+      alert('Failed to save professions');
     }
   };
 
@@ -4108,6 +4131,13 @@ export default function GMPage() {
               >
                 Region Unlocks
               </button>
+              <button
+                class={characterModalTab() === "professions" ? "button primary" : "button secondary"}
+                onClick={() => setCharacterModalTab("professions")}
+                style={{ padding: "0.5rem 1rem" }}
+              >
+                Professions ({characterProfessions().length})
+              </button>
             </div>
             
             {/* Stats Tab */}
@@ -4392,6 +4422,327 @@ export default function GMPage() {
                       </For>
                     </tbody>
                   </table>
+                </div>
+              </div>
+            </Show>
+            
+            {/* Professions Tab */}
+            <Show when={characterModalTab() === "professions"}>
+              <div>
+                <div style={{ "margin-bottom": "1rem" }}>
+                  <p style={{ color: "var(--text-secondary)" }}>
+                    Manage profession levels and experience. Max profession level equals character level ({editingCharacter()?.level || 1}).
+                  </p>
+                </div>
+                <div style={{ display: "grid", gap: "1rem" }}>
+                  {/* Blacksmithing */}
+                  <Show when={characterProfessions().find((p: any) => p.profession_type === 'blacksmithing')}>
+                    {(prof) => (
+                      <div style={{ 
+                        border: "1px solid var(--bg-medium)", 
+                        padding: "1rem", 
+                        "border-radius": "6px",
+                        background: "var(--bg-light)"
+                      }}>
+                        <h4 style={{ 
+                          "margin-top": "0", 
+                          "margin-bottom": "1rem",
+                          color: "var(--accent)"
+                        }}>
+                          Blacksmithing
+                        </h4>
+                        <div style={{ display: "grid", gap: "0.75rem", "grid-template-columns": "1fr 1fr" }}>
+                          <div>
+                            <label style={{ "font-size": "0.9rem", color: "var(--text-secondary)" }}>Level</label>
+                            <input 
+                              type="number" 
+                              min="1" 
+                              max={editingCharacter()?.level || 1}
+                              value={prof().level} 
+                              onInput={(e) => {
+                                const newProfs = characterProfessions().map((p: any) => 
+                                  p.profession_type === 'blacksmithing' 
+                                    ? {...p, level: parseInt(e.currentTarget.value) || 1}
+                                    : p
+                                );
+                                setCharacterProfessions(newProfs);
+                              }}
+                              style={{ width: "100%", padding: "0.5rem" }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ "font-size": "0.9rem", color: "var(--text-secondary)" }}>Experience</label>
+                            <input 
+                              type="number" 
+                              min="0"
+                              value={prof().experience} 
+                              onInput={(e) => {
+                                const newProfs = characterProfessions().map((p: any) => 
+                                  p.profession_type === 'blacksmithing' 
+                                    ? {...p, experience: parseInt(e.currentTarget.value) || 0}
+                                    : p
+                                );
+                                setCharacterProfessions(newProfs);
+                              }}
+                              style={{ width: "100%", padding: "0.5rem" }}
+                            />
+                          </div>
+                        </div>
+                        <div style={{ "margin-top": "0.75rem", "font-size": "0.85rem", color: "var(--text-secondary)" }}>
+                          XP needed for next level: {prof().level * 125}
+                        </div>
+                      </div>
+                    )}
+                  </Show>
+                  
+                  {/* Leatherworking */}
+                  <Show when={characterProfessions().find((p: any) => p.profession_type === 'leatherworking')}>
+                    {(prof) => (
+                      <div style={{ 
+                        border: "1px solid var(--bg-medium)", 
+                        padding: "1rem", 
+                        "border-radius": "6px",
+                        background: "var(--bg-light)"
+                      }}>
+                        <h4 style={{ 
+                          "margin-top": "0", 
+                          "margin-bottom": "1rem",
+                          color: "var(--accent)"
+                        }}>
+                          Leatherworking
+                        </h4>
+                        <div style={{ display: "grid", gap: "0.75rem", "grid-template-columns": "1fr 1fr" }}>
+                          <div>
+                            <label style={{ "font-size": "0.9rem", color: "var(--text-secondary)" }}>Level</label>
+                            <input 
+                              type="number" 
+                              min="1" 
+                              max={editingCharacter()?.level || 1}
+                              value={prof().level} 
+                              onInput={(e) => {
+                                const newProfs = characterProfessions().map((p: any) => 
+                                  p.profession_type === 'leatherworking' 
+                                    ? {...p, level: parseInt(e.currentTarget.value) || 1}
+                                    : p
+                                );
+                                setCharacterProfessions(newProfs);
+                              }}
+                              style={{ width: "100%", padding: "0.5rem" }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ "font-size": "0.9rem", color: "var(--text-secondary)" }}>Experience</label>
+                            <input 
+                              type="number" 
+                              min="0"
+                              value={prof().experience} 
+                              onInput={(e) => {
+                                const newProfs = characterProfessions().map((p: any) => 
+                                  p.profession_type === 'leatherworking' 
+                                    ? {...p, experience: parseInt(e.currentTarget.value) || 0}
+                                    : p
+                                );
+                                setCharacterProfessions(newProfs);
+                              }}
+                              style={{ width: "100%", padding: "0.5rem" }}
+                            />
+                          </div>
+                        </div>
+                        <div style={{ "margin-top": "0.75rem", "font-size": "0.85rem", color: "var(--text-secondary)" }}>
+                          XP needed for next level: {prof().level * 125}
+                        </div>
+                      </div>
+                    )}
+                  </Show>
+                  
+                  {/* Tailoring */}
+                  <Show when={characterProfessions().find((p: any) => p.profession_type === 'tailoring')}>
+                    {(prof) => (
+                      <div style={{ 
+                        border: "1px solid var(--bg-medium)", 
+                        padding: "1rem", 
+                        "border-radius": "6px",
+                        background: "var(--bg-light)"
+                      }}>
+                        <h4 style={{ 
+                          "margin-top": "0", 
+                          "margin-bottom": "1rem",
+                          color: "var(--accent)"
+                        }}>
+                          Tailoring
+                        </h4>
+                        <div style={{ display: "grid", gap: "0.75rem", "grid-template-columns": "1fr 1fr" }}>
+                          <div>
+                            <label style={{ "font-size": "0.9rem", color: "var(--text-secondary)" }}>Level</label>
+                            <input 
+                              type="number" 
+                              min="1" 
+                              max={editingCharacter()?.level || 1}
+                              value={prof().level} 
+                              onInput={(e) => {
+                                const newProfs = characterProfessions().map((p: any) => 
+                                  p.profession_type === 'tailoring' 
+                                    ? {...p, level: parseInt(e.currentTarget.value) || 1}
+                                    : p
+                                );
+                                setCharacterProfessions(newProfs);
+                              }}
+                              style={{ width: "100%", padding: "0.5rem" }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ "font-size": "0.9rem", color: "var(--text-secondary)" }}>Experience</label>
+                            <input 
+                              type="number" 
+                              min="0"
+                              value={prof().experience} 
+                              onInput={(e) => {
+                                const newProfs = characterProfessions().map((p: any) => 
+                                  p.profession_type === 'tailoring' 
+                                    ? {...p, experience: parseInt(e.currentTarget.value) || 0}
+                                    : p
+                                );
+                                setCharacterProfessions(newProfs);
+                              }}
+                              style={{ width: "100%", padding: "0.5rem" }}
+                            />
+                          </div>
+                        </div>
+                        <div style={{ "margin-top": "0.75rem", "font-size": "0.85rem", color: "var(--text-secondary)" }}>
+                          XP needed for next level: {prof().level * 125}
+                        </div>
+                      </div>
+                    )}
+                  </Show>
+                  
+                  {/* Fletching */}
+                  <Show when={characterProfessions().find((p: any) => p.profession_type === 'fletching')}>
+                    {(prof) => (
+                      <div style={{ 
+                        border: "1px solid var(--bg-medium)", 
+                        padding: "1rem", 
+                        "border-radius": "6px",
+                        background: "var(--bg-light)"
+                      }}>
+                        <h4 style={{ 
+                          "margin-top": "0", 
+                          "margin-bottom": "1rem",
+                          color: "var(--accent)"
+                        }}>
+                          Fletching
+                        </h4>
+                        <div style={{ display: "grid", gap: "0.75rem", "grid-template-columns": "1fr 1fr" }}>
+                          <div>
+                            <label style={{ "font-size": "0.9rem", color: "var(--text-secondary)" }}>Level</label>
+                            <input 
+                              type="number" 
+                              min="1" 
+                              max={editingCharacter()?.level || 1}
+                              value={prof().level} 
+                              onInput={(e) => {
+                                const newProfs = characterProfessions().map((p: any) => 
+                                  p.profession_type === 'fletching' 
+                                    ? {...p, level: parseInt(e.currentTarget.value) || 1}
+                                    : p
+                                );
+                                setCharacterProfessions(newProfs);
+                              }}
+                              style={{ width: "100%", padding: "0.5rem" }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ "font-size": "0.9rem", color: "var(--text-secondary)" }}>Experience</label>
+                            <input 
+                              type="number" 
+                              min="0"
+                              value={prof().experience} 
+                              onInput={(e) => {
+                                const newProfs = characterProfessions().map((p: any) => 
+                                  p.profession_type === 'fletching' 
+                                    ? {...p, experience: parseInt(e.currentTarget.value) || 0}
+                                    : p
+                                );
+                                setCharacterProfessions(newProfs);
+                              }}
+                              style={{ width: "100%", padding: "0.5rem" }}
+                            />
+                          </div>
+                        </div>
+                        <div style={{ "margin-top": "0.75rem", "font-size": "0.85rem", color: "var(--text-secondary)" }}>
+                          XP needed for next level: {prof().level * 125}
+                        </div>
+                      </div>
+                    )}
+                  </Show>
+                  
+                  {/* Alchemy */}
+                  <Show when={characterProfessions().find((p: any) => p.profession_type === 'alchemy')}>
+                    {(prof) => (
+                      <div style={{ 
+                        border: "1px solid var(--bg-medium)", 
+                        padding: "1rem", 
+                        "border-radius": "6px",
+                        background: "var(--bg-light)"
+                      }}>
+                        <h4 style={{ 
+                          "margin-top": "0", 
+                          "margin-bottom": "1rem",
+                          color: "var(--accent)"
+                        }}>
+                          Alchemy
+                        </h4>
+                        <div style={{ display: "grid", gap: "0.75rem", "grid-template-columns": "1fr 1fr" }}>
+                          <div>
+                            <label style={{ "font-size": "0.9rem", color: "var(--text-secondary)" }}>Level</label>
+                            <input 
+                              type="number" 
+                              min="1" 
+                              max={editingCharacter()?.level || 1}
+                              value={prof().level} 
+                              onInput={(e) => {
+                                const newProfs = characterProfessions().map((p: any) => 
+                                  p.profession_type === 'alchemy' 
+                                    ? {...p, level: parseInt(e.currentTarget.value) || 1}
+                                    : p
+                                );
+                                setCharacterProfessions(newProfs);
+                              }}
+                              style={{ width: "100%", padding: "0.5rem" }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ "font-size": "0.9rem", color: "var(--text-secondary)" }}>Experience</label>
+                            <input 
+                              type="number" 
+                              min="0"
+                              value={prof().experience} 
+                              onInput={(e) => {
+                                const newProfs = characterProfessions().map((p: any) => 
+                                  p.profession_type === 'alchemy' 
+                                    ? {...p, experience: parseInt(e.currentTarget.value) || 0}
+                                    : p
+                                );
+                                setCharacterProfessions(newProfs);
+                              }}
+                              style={{ width: "100%", padding: "0.5rem" }}
+                            />
+                          </div>
+                        </div>
+                        <div style={{ "margin-top": "0.75rem", "font-size": "0.85rem", color: "var(--text-secondary)" }}>
+                          XP needed for next level: {prof().level * 125}
+                        </div>
+                      </div>
+                    )}
+                  </Show>
+                </div>
+                <div style={{ "margin-top": "1.5rem" }}>
+                  <button 
+                    class="button primary" 
+                    style={{ width: "100%" }}
+                    onClick={handleSaveProfessions}
+                  >
+                    Save Professions
+                  </button>
                 </div>
               </div>
             </Show>

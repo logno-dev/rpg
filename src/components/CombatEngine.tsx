@@ -986,7 +986,7 @@ export function CombatEngine(props: CombatEngineProps) {
 
   // Keyboard shortcuts for hotbar (1-8)
   onMount(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
+    const handleKeyPress = async (e: KeyboardEvent) => {
       // Only handle if combat is active and not typing in an input
       if (!state().isActive) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -1003,7 +1003,30 @@ export function CombatEngine(props: CombatEngineProps) {
             }
           } else if (action.type === 'consumable' && action.item && props.onUseConsumable) {
             if (action.item.quantity > 0) {
-              props.onUseConsumable(action.item.id);
+              const result = await props.onUseConsumable(action.item.id);
+              
+              // Apply potion effects if returned
+              if (result) {
+                const maxHealth = getActualMaxHealth();
+                const maxMana = getActualMaxMana();
+                
+                const newHealth = Math.min(maxHealth, state().characterHealth + result.healthRestore);
+                const newMana = Math.min(maxMana, currentMana() + result.manaRestore);
+                
+                // Update internal HP/mana
+                setState((currentState) => ({
+                  ...currentState,
+                  characterHealth: newHealth,
+                  characterMana: newMana
+                }));
+                
+                setCurrentMana(newMana);
+                
+                // Notify parent so UI updates
+                props.onHealthChange(newHealth, newMana);
+                
+                console.log('[POTION] Restored', result.healthRestore, 'HP and', result.manaRestore, 'mana');
+              }
             }
           }
         }
@@ -1228,10 +1251,17 @@ export function CombatEngine(props: CombatEngineProps) {
                 
                 // Determine action color based on type
                 const getActionColor = () => {
-                  if (action.type === 'consumable') return 'var(--success)';
-                  if (action.ability?.category === 'damage') return 'var(--danger)';
-                  if (action.ability?.category === 'heal') return 'var(--success)';
-                  return 'var(--accent)';
+                  if (action.type === 'consumable') return 'var(--success)';  // Green for potions
+                  if (!action.ability) return 'var(--accent)';
+                  
+                  // Color by ability type
+                  switch (action.ability.type) {
+                    case 'damage': return 'var(--danger)';   // Red for damage abilities
+                    case 'heal': return 'var(--success)';     // Green for heals
+                    case 'buff': return 'var(--warning)';     // Yellow/orange for buffs
+                    case 'utility': return 'var(--accent)';   // Blue/purple for utility
+                    default: return 'var(--accent)';          // Default blue/purple
+                  }
                 };
                 
                 const handleClick = async () => {

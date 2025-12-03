@@ -785,6 +785,19 @@ export default function DungeonRoute() {
                 onUseConsumable={async (itemId) => {
                   const item = store.inventory?.find((i: any) => i.id === itemId);
                   
+                  console.log('[DUNGEON] Using consumable:', itemId, 'Item found:', item);
+                  
+                  if (!item) {
+                    console.error('[DUNGEON] Item not found in inventory:', itemId);
+                    return;
+                  }
+                  
+                  // Store restoration values before API call
+                  const healthRestore = item.health_restore || 0;
+                  const manaRestore = item.mana_restore || 0;
+                  
+                  console.log('[DUNGEON] Potion values - HP:', healthRestore, 'MP:', manaRestore);
+                  
                   // Update inventory via API
                   const response = await fetch('/api/game/use-item', {
                     method: 'POST',
@@ -792,15 +805,19 @@ export default function DungeonRoute() {
                     body: JSON.stringify({ characterId: characterId(), inventoryItemId: itemId }),
                   });
                   const result = await response.json();
+                  
+                  if (result.error) {
+                    console.error('[DUNGEON] Error using item:', result.error);
+                    return;
+                  }
+                  
                   actions.setInventory(result.inventory);
                   
                   // Return restoration values so CombatEngine can apply them internally
-                  if (item) {
-                    return {
-                      healthRestore: item.health_restore || 0,
-                      manaRestore: item.mana_restore || 0
-                    };
-                  }
+                  return {
+                    healthRestore,
+                    manaRestore
+                  };
                 }}
               />
           </Show>

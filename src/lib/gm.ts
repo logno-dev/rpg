@@ -51,18 +51,43 @@ export async function getAllPlayers() {
   return result.rows;
 }
 
-// Mobs Management
-export async function getAllMobs() {
+export async function getCharacterProfessions(characterId: number) {
   await requireGM();
   
   const result = await db.execute({
     sql: `SELECT 
-            id, name, level, area, max_health, 
-            damage_min as attack, defense, 
-            experience_reward as experience, 
-            gold_min, gold_max, attack_speed, region_id
-          FROM mobs 
-          ORDER BY level, name`,
+            id,
+            character_id,
+            profession_type,
+            level,
+            experience
+          FROM character_professions
+          WHERE character_id = ?
+          ORDER BY profession_type`,
+    args: [characterId],
+  });
+  
+  return result.rows;
+}
+
+export async function updateCharacterProfession(characterId: number, professionType: string, data: any) {
+  await requireGM();
+  
+  await db.execute({
+    sql: `UPDATE character_professions 
+          SET level = ?, experience = ?
+          WHERE character_id = ? AND profession_type = ?`,
+    args: [data.level, data.experience, characterId, professionType],
+  });
+}
+
+export async function getAllMobs() {
+  await requireGM();
+  
+  const result = await db.execute({
+    sql: `SELECT id, name, level, area, max_health, damage_min, damage_max, defense, experience_reward, gold_min, gold_max, attack_speed, region_id
+          FROM mobs
+          ORDER BY region_id, level, name`,
     args: [],
   });
   

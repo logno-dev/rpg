@@ -294,13 +294,12 @@ export default function StatsRoute() {
                         {stat.desc}
                       </div>
                     </div>
-                    <div style={{ "text-align": "center", "font-size": "1.25rem" }}>
-                      {baseStat()}
-                      <Show when={pending() > 0}>
-                        <span style={{ color: "var(--success)", "font-size": "0.875rem", "margin-left": "0.25rem" }}>
-                          +{pending()}
-                        </span>
-                      </Show>
+                    <div style={{ 
+                      "text-align": "center", 
+                      "font-size": "1.25rem",
+                      color: pending() > 0 ? "var(--success)" : "inherit"
+                    }}>
+                      {baseStat() + pending()}
                     </div>
                     <div style={{ "text-align": "center", "font-size": "1.25rem", color: equipBonus() > 0 ? "var(--success)" : "var(--text-secondary)" }}>
                       {equipBonus() > 0 ? `+${equipBonus()}` : "—"}

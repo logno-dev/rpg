@@ -383,6 +383,9 @@ export default function GamePage() {
       
       setIsInitialized(true);
       
+      // Update staleness timestamp on initial load
+      setLastDataSyncTimestamp(Date.now());
+      
       // Lazy load merchants and dungeons after initial render
       if (gameData.currentRegion) {
         loadRegionalData(gameData.currentRegion.id);
@@ -400,6 +403,9 @@ export default function GamePage() {
         updatedChar.max_mana = gameData.character.max_mana;
         actions.setCharacter(updatedChar);
       }
+      
+      // Update staleness timestamp when data is refreshed
+      setLastDataSyncTimestamp(Date.now());
     }
   });
   
@@ -434,6 +440,10 @@ export default function GamePage() {
   let lastSyncedManaValue = 0;
   const [syncTimer, setSyncTimer] = createSignal<number | null>(null);
   let isSyncing = false;
+  
+  // Staleness detection: Track when data was last synced from server
+  const [lastDataSyncTimestamp, setLastDataSyncTimestamp] = createSignal<number>(Date.now());
+  const STALENESS_THRESHOLD_MS = 60000; // 1 minute - data older than this triggers refresh on tab reactivation
 
   // Watch for health/mana changes and sync to server with debouncing
   // Use on() to explicitly track only these values
@@ -1827,6 +1837,34 @@ export default function GamePage() {
       // Restore health/mana to the saved values
       actions.updateHealth(saved.characterHealth, saved.characterMana);
     }
+    
+    // Staleness detection: Handle tab visibility changes
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // Tab became visible
+        const timeSinceLastSync = Date.now() - lastDataSyncTimestamp();
+        
+        if (timeSinceLastSync > STALENESS_THRESHOLD_MS) {
+          console.log(`[STALENESS] Tab reactivated after ${Math.round(timeSinceLastSync / 1000)}s - data may be stale, refetching...`);
+          refetchData().then(() => {
+            console.log('[STALENESS] Data refreshed successfully');
+            // Update the timestamp after successful refresh
+            setLastDataSyncTimestamp(Date.now());
+          }).catch(err => {
+            console.error('[STALENESS] Failed to refresh data:', err);
+          });
+        } else {
+          console.log(`[STALENESS] Tab reactivated after ${Math.round(timeSinceLastSync / 1000)}s - data is fresh`);
+        }
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Cleanup on unmount
+    onCleanup(() => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    });
   });
   
   // Regen should not be paused on the game route itself (combat is active here)

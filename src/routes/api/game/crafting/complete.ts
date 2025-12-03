@@ -46,8 +46,8 @@ export async function POST(event: APIEvent) {
       args: [characterId]
     });
     const characterLevel = (charResult.rows[0] as any).level;
-    // Level 1 characters can craft at level 1, otherwise level / 2
-    const maxCraftingLevel = characterLevel === 1 ? 1 : Math.floor(characterLevel / 2);
+    // Profession level can equal character level
+    const maxCraftingLevel = characterLevel;
 
     // Calculate XP gained (100% on success, 25% on failure)
     const xpMultiplier = success ? 1.0 : 0.25;

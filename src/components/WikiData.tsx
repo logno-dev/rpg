@@ -214,8 +214,15 @@ export function RegionTable(props: RegionTableProps) {
       <tbody>
         <For each={props.data}>
           {(region) => (
-            <tr>
-              <td><strong>{region.name}</strong></td>
+            <tr style={{ cursor: "pointer", transition: "background 0.2s" }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-medium)"}
+                onMouseLeave={(e) => e.currentTarget.style.background = ""}
+                onClick={() => window.location.href = `/wiki/region/${region.id}`}>
+              <td>
+                <A href={`/wiki/region/${region.id}`} style={{ color: "var(--accent)", "text-decoration": "none", "font-weight": "bold" }}>
+                  {region.name}
+                </A>
+              </td>
               <td>Level {region.min_level} - {region.max_level}</td>
               <td>{region.description || "No description available"}</td>
             </tr>

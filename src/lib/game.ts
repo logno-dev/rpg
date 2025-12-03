@@ -1345,11 +1345,11 @@ async function checkRegionUnlockRequirements(
       if (region.unlock_requirement.toLowerCase().includes(dungeon.name.toLowerCase())) {
         // Check if character has completed this dungeon
         const progressResult = await db.execute({
-          sql: 'SELECT completed FROM character_dungeon_progress WHERE character_id = ? AND dungeon_id = ?',
+          sql: 'SELECT status FROM character_dungeon_progress WHERE character_id = ? AND dungeon_id = ?',
           args: [characterId, dungeon.id],
         });
         
-        if (progressResult.rows.length > 0 && (progressResult.rows[0] as any).completed === 1) {
+        if (progressResult.rows.length > 0 && (progressResult.rows[0] as any).status === 'completed') {
           return true;
         }
       }

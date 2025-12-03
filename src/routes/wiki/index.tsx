@@ -80,6 +80,16 @@ export default function WikiHome() {
               View Equipment
             </A>
           </div>
+
+          <div class="card">
+            <h3 style={{ "margin-top": "0" }}>Crafting</h3>
+            <p style={{ "font-size": "0.95rem", "margin-bottom": "1rem" }}>
+              Learn about crafting professions, materials, and how to create powerful items.
+            </p>
+            <A href="/wiki/crafting" class="button secondary" style={{ display: "inline-block", "font-size": "0.9rem" }}>
+              Crafting Guide
+            </A>
+          </div>
         </div>
 
         <h2 style={{ "margin-top": "3rem" }}>About This Wiki</h2>
@@ -112,6 +122,7 @@ export default function WikiHome() {
           <li><A href="/wiki/world">Regions & Areas</A> - World exploration</li>
           <li><A href="/wiki/ability">Abilities & Spells</A> - Complete ability database</li>
           <li><A href="/wiki/equipment">Equipment & Items</A> - Gear and loot information</li>
+          <li><A href="/wiki/crafting">Crafting</A> - Materials, recipes, and probabilities</li>
         </ul>
 
         <div style={{ "margin-top": "3rem", padding: "1.5rem", background: "var(--bg-medium)", "border-radius": "8px", "border-left": "4px solid var(--accent)" }}>
