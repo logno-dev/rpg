@@ -1,5 +1,6 @@
 import { APIEvent } from "@solidjs/start/server";
 import { db } from "~/lib/db";
+import { getInventory } from "~/lib/game";
 
 export async function POST(event: APIEvent) {
   try {
@@ -49,45 +50,13 @@ export async function POST(event: APIEvent) {
     // Profession level can equal character level
     const maxCraftingLevel = characterLevel;
 
-    // Calculate XP gained (100% on success, 25% on failure)
+    // Calculate base XP - will be scaled by item level if successful
     const xpMultiplier = success ? 1.0 : 0.25;
-    const xpGained = Math.floor(session.base_experience * xpMultiplier);
-
-    // Update profession XP
-    let newProfessionExp = session.profession_exp + xpGained;
+    let baseXP = Math.floor(session.base_experience * xpMultiplier);
     
-    // Check for level up (matches character XP formula: level * 125)
-    const CRAFTING_XP_BASE = 125;
-    let newProfessionLevel = session.profession_level;
-    let levelUp = false;
-    let finalExp = newProfessionExp;
-
-    if (newProfessionExp >= CRAFTING_XP_BASE * session.profession_level) {
-      // Only level up if not at max
-      if (session.profession_level < maxCraftingLevel) {
-        newProfessionLevel = session.profession_level + 1;
-        finalExp = newProfessionExp - (CRAFTING_XP_BASE * session.profession_level);
-        levelUp = true;
-      }
-    }
-
-    // Cap experience at max level
-    if (newProfessionLevel >= maxCraftingLevel) {
-      const maxExp = CRAFTING_XP_BASE * maxCraftingLevel;
-      if (finalExp > maxExp) {
-        finalExp = maxExp;
-      }
-    }
-
-    await db.execute({
-      sql: `UPDATE character_professions 
-            SET level = ?, experience = ?
-            WHERE character_id = ? AND profession_type = ?`,
-      args: [newProfessionLevel, finalExp, characterId, session.profession_type]
-    });
-
     let craftedItem = null;
     let selectedItemId = null;
+    let xpGained = baseXP;
 
     // If successful, select item from probability pool
     if (success && itemQuality) {
@@ -204,20 +173,56 @@ export async function POST(event: APIEvent) {
       }
     }
 
+    // Calculate XP based on crafted item level (if successful) or base XP (if failed)
+    if (success && craftedItem) {
+      const itemLevel = (craftedItem as any).required_level || 1;
+      // Scale XP: base (100) + (item_level * 10)
+      // Quality bonus: Normal=1.0x, Superior=1.25x, Masterwork=1.5x
+      const qualityMultiplier = itemQuality === 'Masterwork' ? 1.5 : itemQuality === 'Superior' ? 1.25 : 1.0;
+      xpGained = Math.floor((100 + (itemLevel * 10)) * qualityMultiplier);
+    }
+
+    // Update profession XP
+    let newProfessionExp = session.profession_exp + xpGained;
+    
+    // Check for level up (matches character XP formula: level * 125)
+    const CRAFTING_XP_BASE = 125;
+    let newProfessionLevel = session.profession_level;
+    let levelUp = false;
+    let finalExp = newProfessionExp;
+
+    if (newProfessionExp >= CRAFTING_XP_BASE * session.profession_level) {
+      // Only level up if not at max
+      if (session.profession_level < maxCraftingLevel) {
+        newProfessionLevel = session.profession_level + 1;
+        finalExp = newProfessionExp - (CRAFTING_XP_BASE * session.profession_level);
+        levelUp = true;
+      }
+    }
+
+    // Cap experience at max level
+    if (newProfessionLevel >= maxCraftingLevel) {
+      const maxExp = CRAFTING_XP_BASE * maxCraftingLevel;
+      if (finalExp > maxExp) {
+        finalExp = maxExp;
+      }
+    }
+
+    await db.execute({
+      sql: `UPDATE character_professions 
+            SET level = ?, experience = ?
+            WHERE character_id = ? AND profession_type = ?`,
+      args: [newProfessionLevel, finalExp, characterId, session.profession_type]
+    });
+
     // Delete crafting session
     await db.execute({
       sql: `DELETE FROM crafting_sessions WHERE id = ?`,
       args: [session.id]
     });
 
-    // Get updated inventory for client
-    const inventoryResult = await db.execute({
-      sql: `SELECT ci.*, i.* FROM character_inventory ci
-            JOIN items i ON ci.item_id = i.id
-            WHERE ci.character_id = ?
-            ORDER BY i.type, i.name`,
-      args: [characterId]
-    });
+    // Get updated inventory for client using standard function
+    const inventory = await getInventory(characterId);
 
     // Apply quality multipliers to stats for display
     let fullItemWithQuality = null;
@@ -257,7 +262,7 @@ export async function POST(event: APIEvent) {
         } : null,
         fullItem: fullItemWithQuality,
         recipeName: session.recipe_name,
-        inventory: inventoryResult.rows
+        inventory
       }),
       {
         status: 200,

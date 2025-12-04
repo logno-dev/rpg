@@ -2019,69 +2019,131 @@ export default function GamePage() {
             gap: "0.75rem"
           }}>
             {/* Main Stats Row */}
-            <div style={{
-              display: "grid",
-              "grid-template-columns": "auto 1fr 1fr auto",
-              gap: "1rem",
-              "align-items": "center"
-            }}>
-              {/* Character Name & Level */}
-              <div style={{ 
-                "white-space": "nowrap",
-                "font-weight": "bold"
-              }}>
-                {currentCharacter()?.name} <span style={{ color: "var(--text-secondary)" }}>Lv.{currentCharacter()?.level}</span>
-              </div>
-
-              {/* Health Bar */}
-              <div>
+            <Show when={window.innerWidth < 450}>
+              {/* Mobile Layout: Character row, then HP/Mana row */}
+              <div style={{ display: "flex", "flex-direction": "column", gap: "0.5rem" }}>
+                {/* Character Name, Level, and Gold */}
                 <div style={{ 
-                  "font-size": "0.75rem", 
-                  color: "var(--text-secondary)", 
-                  "margin-bottom": "0.25rem",
                   display: "flex",
-                  "justify-content": "space-between"
+                  "justify-content": "space-between",
+                  "align-items": "center",
+                  "font-weight": "bold"
                 }}>
-                  <span>HP</span>
-                  <span>{currentHealth()}/{currentMaxHealth()}</span>
+                  <span>{currentCharacter()?.name} <span style={{ color: "var(--text-secondary)" }}>Lv.{currentCharacter()?.level}</span></span>
+                  <span style={{ color: "var(--warning)" }}>{currentGold()}</span>
                 </div>
-                <div class="progress-bar" style={{ height: "8px" }}>
-                  <div
-                    class="progress-fill health"
-                    style={{ width: `${(currentHealth() / currentMaxHealth()) * 100}%` }}
-                  />
+                
+                {/* HP and Mana Bars Side by Side */}
+                <div style={{ display: "grid", "grid-template-columns": "1fr 1fr", gap: "0.75rem" }}>
+                  {/* Health Bar */}
+                  <div>
+                    <div style={{ 
+                      "font-size": "0.75rem", 
+                      color: "var(--text-secondary)", 
+                      "margin-bottom": "0.25rem",
+                      display: "flex",
+                      "justify-content": "space-between"
+                    }}>
+                      <span>HP</span>
+                      <span>{currentHealth()}/{currentMaxHealth()}</span>
+                    </div>
+                    <div class="progress-bar" style={{ height: "8px" }}>
+                      <div
+                        class="progress-fill health"
+                        style={{ width: `${(currentHealth() / currentMaxHealth()) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Mana Bar */}
+                  <div>
+                    <div style={{ 
+                      "font-size": "0.75rem", 
+                      color: "var(--text-secondary)", 
+                      "margin-bottom": "0.25rem",
+                      display: "flex",
+                      "justify-content": "space-between"
+                    }}>
+                      <span>MP</span>
+                      <span>{currentMana()}/{currentMaxMana()}</span>
+                    </div>
+                    <div class="progress-bar" style={{ height: "8px" }}>
+                      <div
+                        class="progress-fill mana"
+                        style={{ width: `${(currentMana() / currentMaxMana()) * 100}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              {/* Mana Bar */}
-              <div>
-                <div style={{ 
-                  "font-size": "0.75rem", 
-                  color: "var(--text-secondary)", 
-                  "margin-bottom": "0.25rem",
-                  display: "flex",
-                  "justify-content": "space-between"
-                }}>
-                  <span>MP</span>
-                  <span>{currentMana()}/{currentMaxMana()}</span>
-                </div>
-                <div class="progress-bar" style={{ height: "8px" }}>
-                  <div
-                    class="progress-fill mana"
-                    style={{ width: `${(currentMana() / currentMaxMana()) * 100}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Gold */}
-              <div style={{ 
-                "white-space": "nowrap",
-                "font-weight": "bold",
-                color: "var(--warning)"
+            </Show>
+            
+            <Show when={window.innerWidth >= 450}>
+              {/* Desktop Layout: All in one row */}
+              <div style={{
+                display: "grid",
+                "grid-template-columns": "auto 1fr 1fr auto",
+                gap: "1rem",
+                "align-items": "center"
               }}>
-                {currentGold()}
+                {/* Character Name & Level */}
+                <div style={{ 
+                  "white-space": "nowrap",
+                  "font-weight": "bold"
+                }}>
+                  {currentCharacter()?.name} <span style={{ color: "var(--text-secondary)" }}>Lv.{currentCharacter()?.level}</span>
+                </div>
+
+                {/* Health Bar */}
+                <div>
+                  <div style={{ 
+                    "font-size": "0.75rem", 
+                    color: "var(--text-secondary)", 
+                    "margin-bottom": "0.25rem",
+                    display: "flex",
+                    "justify-content": "space-between"
+                  }}>
+                    <span>HP</span>
+                    <span>{currentHealth()}/{currentMaxHealth()}</span>
+                  </div>
+                  <div class="progress-bar" style={{ height: "8px" }}>
+                    <div
+                      class="progress-fill health"
+                      style={{ width: `${(currentHealth() / currentMaxHealth()) * 100}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Mana Bar */}
+                <div>
+                  <div style={{ 
+                    "font-size": "0.75rem", 
+                    color: "var(--text-secondary)", 
+                    "margin-bottom": "0.25rem",
+                    display: "flex",
+                    "justify-content": "space-between"
+                  }}>
+                    <span>MP</span>
+                    <span>{currentMana()}/{currentMaxMana()}</span>
+                  </div>
+                  <div class="progress-bar" style={{ height: "8px" }}>
+                    <div
+                      class="progress-fill mana"
+                      style={{ width: `${(currentMana() / currentMaxMana()) * 100}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Gold */}
+                <div style={{ 
+                  "white-space": "nowrap",
+                  "font-weight": "bold",
+                  color: "var(--warning)"
+                }}>
+                  {currentGold()}
+                </div>
               </div>
-            </div>
+            </Show>
             
             {/* Enemy Health Bar (shown during combat) */}
             <Show when={activeMob()}>

@@ -239,24 +239,26 @@ export default function StatsRoute() {
           </div>
         </Show>
 
-        {/* Stats Legend */}
-        <div style={{ 
-          display: "grid", 
-          "grid-template-columns": "1fr auto auto auto", 
-          gap: "0.5rem",
-          padding: "0.75rem",
-          background: "var(--bg-dark)",
-          "border-radius": "6px",
-          "margin-bottom": "1rem",
-          "font-size": "0.875rem",
-          "font-weight": "bold",
-          color: "var(--text-secondary)"
-        }}>
-          <div>Attribute</div>
-          <div style={{ "text-align": "center" }}>Base</div>
-          <div style={{ "text-align": "center" }}>Equipment</div>
-          <div style={{ "text-align": "center" }}>Total</div>
-        </div>
+        {/* Stats Legend - Hidden on mobile */}
+        <Show when={window.innerWidth >= 450}>
+          <div style={{ 
+            display: "grid", 
+            "grid-template-columns": "1fr auto auto auto", 
+            gap: "0.5rem",
+            padding: "0.75rem",
+            background: "var(--bg-dark)",
+            "border-radius": "6px",
+            "margin-bottom": "1rem",
+            "font-size": "0.875rem",
+            "font-weight": "bold",
+            color: "var(--text-secondary)"
+          }}>
+            <div>Attribute</div>
+            <div style={{ "text-align": "center" }}>Base</div>
+            <div style={{ "text-align": "center" }}>Equipment</div>
+            <div style={{ "text-align": "center" }}>Total</div>
+          </div>
+        </Show>
 
         <div style={{ display: "grid", gap: "1rem" }}>
           <For each={[
@@ -278,54 +280,98 @@ export default function StatsRoute() {
               
               return (
                 <div style={{ 
-                  padding: "1rem", 
+                  padding: window.innerWidth < 450 ? "0.75rem" : "1rem", 
                   background: "var(--bg-light)", 
                   "border-radius": "6px"
                 }}>
                   <div style={{ 
-                    display: "grid", 
-                    "grid-template-columns": "1fr auto auto auto auto", 
-                    gap: "1rem",
-                    "align-items": "center"
+                    display: window.innerWidth < 450 ? "flex" : "grid", 
+                    "flex-direction": window.innerWidth < 450 ? "column" : undefined,
+                    "grid-template-columns": window.innerWidth >= 450 ? "1fr auto auto auto auto" : undefined, 
+                    gap: window.innerWidth < 450 ? "0.5rem" : "1rem",
+                    "align-items": window.innerWidth < 450 ? "stretch" : "center"
                   }}>
                     <div>
-                      <div style={{ "font-weight": "bold", "font-size": "1.1rem" }}>{stat.name}</div>
+                      <div style={{ "font-weight": "bold", "font-size": window.innerWidth < 450 ? "1rem" : "1.1rem" }}>{stat.name}</div>
                       <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
                         {stat.desc}
                       </div>
                     </div>
-                    <div style={{ 
-                      "text-align": "center", 
-                      "font-size": "1.25rem",
-                      color: pending() > 0 ? "var(--success)" : "inherit"
-                    }}>
-                      {baseStat() + pending()}
-                    </div>
-                    <div style={{ "text-align": "center", "font-size": "1.25rem", color: equipBonus() > 0 ? "var(--success)" : "var(--text-secondary)" }}>
-                      {equipBonus() > 0 ? `+${equipBonus()}` : "—"}
-                    </div>
-                    <div style={{ "text-align": "center", "font-size": "1.5rem", "font-weight": "bold", color: "var(--accent)" }}>
-                      {total()}
-                    </div>
-                    <Show when={currentCharacter()!.available_points > 0}>
-                      <div style={{ display: "flex", gap: "0.5rem" }}>
-                        <button
-                          class="button secondary"
-                          onClick={() => adjustPendingStat(stat.key, -1)}
-                          disabled={pending() === 0}
-                          style={{ padding: "0.5rem 0.75rem", "font-size": "0.875rem" }}
-                        >
-                          −
-                        </button>
-                        <button
-                          class="button"
-                          onClick={() => adjustPendingStat(stat.key, 1)}
-                          disabled={availablePoints() === 0}
-                          style={{ padding: "0.5rem 0.75rem", "font-size": "0.875rem" }}
-                        >
-                          +
-                        </button>
+                    <Show when={window.innerWidth < 450}>
+                      <div style={{ 
+                        display: "flex", 
+                        "justify-content": "space-between",
+                        "align-items": "center",
+                        gap: "0.5rem",
+                        "padding-top": "0.25rem"
+                      }}>
+                        <div style={{ display: "flex", gap: "1rem", "font-size": "1.1rem" }}>
+                          <div style={{ color: pending() > 0 ? "var(--success)" : "inherit" }}>
+                            Base: {baseStat() + pending()}
+                          </div>
+                          <div style={{ color: equipBonus() > 0 ? "var(--success)" : "var(--text-secondary)" }}>
+                            Equip: {equipBonus() > 0 ? `+${equipBonus()}` : "—"}
+                          </div>
+                          <div style={{ "font-weight": "bold", color: "var(--accent)" }}>
+                            Total: {total()}
+                          </div>
+                        </div>
+                        <Show when={currentCharacter()!.available_points > 0}>
+                          <div style={{ display: "flex", gap: "0.5rem" }}>
+                            <button
+                              class="button secondary"
+                              onClick={() => adjustPendingStat(stat.key, -1)}
+                              disabled={pending() === 0}
+                              style={{ padding: "0.4rem 0.7rem", "font-size": "0.875rem" }}
+                            >
+                              −
+                            </button>
+                            <button
+                              class="button"
+                              onClick={() => adjustPendingStat(stat.key, 1)}
+                              disabled={availablePoints() === 0}
+                              style={{ padding: "0.4rem 0.7rem", "font-size": "0.875rem" }}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </Show>
                       </div>
+                    </Show>
+                    <Show when={window.innerWidth >= 450}>
+                      <div style={{ 
+                        "text-align": "center", 
+                        "font-size": "1.25rem",
+                        color: pending() > 0 ? "var(--success)" : "inherit"
+                      }}>
+                        {baseStat() + pending()}
+                      </div>
+                      <div style={{ "text-align": "center", "font-size": "1.25rem", color: equipBonus() > 0 ? "var(--success)" : "var(--text-secondary)" }}>
+                        {equipBonus() > 0 ? `+${equipBonus()}` : "—"}
+                      </div>
+                      <div style={{ "text-align": "center", "font-size": "1.5rem", "font-weight": "bold", color: "var(--accent)" }}>
+                        {total()}
+                      </div>
+                      <Show when={currentCharacter()!.available_points > 0}>
+                        <div style={{ display: "flex", gap: "0.5rem" }}>
+                          <button
+                            class="button secondary"
+                            onClick={() => adjustPendingStat(stat.key, -1)}
+                            disabled={pending() === 0}
+                            style={{ padding: "0.5rem 0.75rem", "font-size": "0.875rem" }}
+                          >
+                            −
+                          </button>
+                          <button
+                            class="button"
+                            onClick={() => adjustPendingStat(stat.key, 1)}
+                            disabled={availablePoints() === 0}
+                            style={{ padding: "0.5rem 0.75rem", "font-size": "0.875rem" }}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </Show>
                     </Show>
                   </div>
                 </div>

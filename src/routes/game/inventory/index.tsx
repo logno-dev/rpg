@@ -27,7 +27,7 @@ export default function InventoryPage() {
   
   const [store, actions] = useCharacter();
 
-  // Initialize context with basic data when it arrives
+  // Initialize context with basic data when it arrives (ONCE)
   createEffect(() => {
     const data = basicData();
     if (data) {
@@ -38,17 +38,18 @@ export default function InventoryPage() {
         inventory: data.inventory?.length
       });
       
-      // Only set character if not already set
+      // Only set if context is empty (first load)
+      // Don't overwrite context with server data if it already has data
+      // because the context may have fresher data from recent actions
       if (!store.character) {
         actions.setCharacter(data.character);
+        actions.setInventory(data.inventory as any);
+        actions.setAbilities(data.abilities);
+        actions.setHotbar(data.hotbar);
+        console.log('[Inventory] Context initialized from server');
+      } else {
+        console.log('[Inventory] Context already has data, skipping server sync');
       }
-      
-      // Always sync abilities, hotbar, and inventory (they may have changed)
-      actions.setInventory(data.inventory as any);
-      actions.setAbilities(data.abilities);
-      actions.setHotbar(data.hotbar);
-      
-      console.log('[Inventory] Context updated');
     }
   });
 

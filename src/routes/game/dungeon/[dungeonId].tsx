@@ -541,43 +541,87 @@ export default function DungeonRoute() {
             gap: "0.75rem"
           }}>
             {/* Main Stats Row */}
-            <div style={{
-              display: "grid",
-              "grid-template-columns": "auto 1fr 1fr auto",
-              gap: "1rem",
-              "align-items": "center"
-            }}>
-              <div style={{ "white-space": "nowrap", "font-weight": "bold" }}>
-                {store.character.name} <span style={{ color: "var(--text-secondary)" }}>Lv.{store.character.level}</span>
-              </div>
-              
-              {/* Health Bar */}
-              <div>
-                <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "margin-bottom": "0.25rem", display: "flex", "justify-content": "space-between" }}>
-                  <span>HP</span>
-                  <span>{currentHealth()}/{currentMaxHealth()}</span>
+            <Show when={window.innerWidth < 450}>
+              {/* Mobile Layout: Character row, then HP/Mana row */}
+              <div style={{ display: "flex", "flex-direction": "column", gap: "0.5rem" }}>
+                {/* Character Name, Level, and Progress */}
+                <div style={{ 
+                  display: "flex",
+                  "justify-content": "space-between",
+                  "align-items": "center",
+                  "font-weight": "bold"
+                }}>
+                  <span>{store.character.name} <span style={{ color: "var(--text-secondary)" }}>Lv.{store.character.level}</span></span>
+                  <span style={{ color: "var(--accent)" }}>{progress()?.current_encounter}/{dungeon()?.total_encounters}</span>
                 </div>
-                <div class="progress-bar" style={{ height: "8px" }}>
-                  <div class="progress-fill health" style={{ width: `${(currentHealth() / currentMaxHealth()) * 100}%` }} />
+                
+                {/* HP and Mana Bars Side by Side */}
+                <div style={{ display: "grid", "grid-template-columns": "1fr 1fr", gap: "0.75rem" }}>
+                  {/* Health Bar */}
+                  <div>
+                    <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "margin-bottom": "0.25rem", display: "flex", "justify-content": "space-between" }}>
+                      <span>HP</span>
+                      <span>{currentHealth()}/{currentMaxHealth()}</span>
+                    </div>
+                    <div class="progress-bar" style={{ height: "8px" }}>
+                      <div class="progress-fill health" style={{ width: `${(currentHealth() / currentMaxHealth()) * 100}%` }} />
+                    </div>
+                  </div>
+                  
+                  {/* Mana Bar */}
+                  <div>
+                    <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "margin-bottom": "0.25rem", display: "flex", "justify-content": "space-between" }}>
+                      <span>MP</span>
+                      <span>{currentMana()}/{currentMaxMana()}</span>
+                    </div>
+                    <div class="progress-bar" style={{ height: "8px" }}>
+                      <div class="progress-fill mana" style={{ width: `${(currentMana() / currentMaxMana()) * 100}%` }} />
+                    </div>
+                  </div>
                 </div>
               </div>
-              
-              {/* Mana Bar */}
-              <div>
-                <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "margin-bottom": "0.25rem", display: "flex", "justify-content": "space-between" }}>
-                  <span>MP</span>
-                  <span>{currentMana()}/{currentMaxMana()}</span>
+            </Show>
+            
+            <Show when={window.innerWidth >= 450}>
+              {/* Desktop Layout: All in one row */}
+              <div style={{
+                display: "grid",
+                "grid-template-columns": "auto 1fr 1fr auto",
+                gap: "1rem",
+                "align-items": "center"
+              }}>
+                <div style={{ "white-space": "nowrap", "font-weight": "bold" }}>
+                  {store.character.name} <span style={{ color: "var(--text-secondary)" }}>Lv.{store.character.level}</span>
                 </div>
-                <div class="progress-bar" style={{ height: "8px" }}>
-                  <div class="progress-fill mana" style={{ width: `${(currentMana() / currentMaxMana()) * 100}%` }} />
+                
+                {/* Health Bar */}
+                <div>
+                  <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "margin-bottom": "0.25rem", display: "flex", "justify-content": "space-between" }}>
+                    <span>HP</span>
+                    <span>{currentHealth()}/{currentMaxHealth()}</span>
+                  </div>
+                  <div class="progress-bar" style={{ height: "8px" }}>
+                    <div class="progress-fill health" style={{ width: `${(currentHealth() / currentMaxHealth()) * 100}%` }} />
+                  </div>
+                </div>
+                
+                {/* Mana Bar */}
+                <div>
+                  <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "margin-bottom": "0.25rem", display: "flex", "justify-content": "space-between" }}>
+                    <span>MP</span>
+                    <span>{currentMana()}/{currentMaxMana()}</span>
+                  </div>
+                  <div class="progress-bar" style={{ height: "8px" }}>
+                    <div class="progress-fill mana" style={{ width: `${(currentMana() / currentMaxMana()) * 100}%` }} />
+                  </div>
+                </div>
+                
+                {/* Dungeon Progress */}
+                <div style={{ "white-space": "nowrap", "font-weight": "bold", color: "var(--accent)" }}>
+                  {progress()?.current_encounter}/{dungeon()?.total_encounters}
                 </div>
               </div>
-              
-              {/* Dungeon Progress */}
-              <div style={{ "white-space": "nowrap", "font-weight": "bold", color: "var(--accent)" }}>
-                {progress()?.current_encounter}/{dungeon()?.total_encounters}
-              </div>
-            </div>
+            </Show>
             
             {/* Enemy Health Bar (shown during combat) */}
             <Show when={activeMob()}>

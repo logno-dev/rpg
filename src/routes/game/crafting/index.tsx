@@ -339,7 +339,11 @@ export default function CraftingPage() {
         
         // Update inventory in character context if provided
         if (data.inventory) {
+          console.log('[Crafting] Updating inventory with', data.inventory.length, 'items');
           actions.setInventory(data.inventory);
+          console.log('[Crafting] Inventory updated in context');
+        } else {
+          console.warn('[Crafting] No inventory in response');
         }
         
         // Return the result data to display in modal immediately
