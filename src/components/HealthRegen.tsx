@@ -50,31 +50,39 @@ export function HealthRegen(props: HealthRegenProps) {
     }
 
     healthIntervalId = window.setInterval(() => {
-      const currentHealth = props.currentHealth();
-      const maxHealth = props.maxHealth();
-      const constitution = props.constitution();
-      const isInCombat = props.isInCombat();
-      const currentMana = props.currentMana();
+      try {
+        const currentHealth = props.currentHealth();
+        const maxHealth = props.maxHealth();
+        const constitution = props.constitution();
+        const isInCombat = props.isInCombat();
+        const currentMana = props.currentMana();
 
-      // Stop if health is full
-      if (currentHealth >= maxHealth) {
+        // Stop if health is full
+        if (currentHealth >= maxHealth) {
+          if (healthIntervalId !== undefined) {
+            clearInterval(healthIntervalId);
+            healthIntervalId = undefined;
+          }
+          return;
+        }
+
+        // Calculate health regen
+        const baseHealthRegen = isInCombat ? BASE_HP_REGEN_IN_COMBAT : BASE_HP_REGEN_OUT_OF_COMBAT;
+        const constitutionBonusMultiplier = isInCombat ? 0.01 : 0.2;
+        const constitutionBonus = (constitution - 10) * constitutionBonusMultiplier;
+        const healthRegenRate = baseHealthRegen + constitutionBonus;
+
+        const newHealth = Math.min(maxHealth, currentHealth + healthRegenRate);
+
+        // Update health (keep mana the same)
+        props.onRegenTick(Math.round(newHealth), currentMana);
+      } catch (error) {
+        // Component has unmounted, clean up the interval
         if (healthIntervalId !== undefined) {
           clearInterval(healthIntervalId);
           healthIntervalId = undefined;
         }
-        return;
       }
-
-      // Calculate health regen
-      const baseHealthRegen = isInCombat ? BASE_HP_REGEN_IN_COMBAT : BASE_HP_REGEN_OUT_OF_COMBAT;
-      const constitutionBonusMultiplier = isInCombat ? 0.01 : 0.2;
-      const constitutionBonus = (constitution - 10) * constitutionBonusMultiplier;
-      const healthRegenRate = baseHealthRegen + constitutionBonus;
-
-      const newHealth = Math.min(maxHealth, currentHealth + healthRegenRate);
-
-      // Update health (keep mana the same)
-      props.onRegenTick(Math.round(newHealth), currentMana);
     }, REGEN_TICK_INTERVAL);
   });
 
@@ -102,31 +110,39 @@ export function HealthRegen(props: HealthRegenProps) {
     }
 
     manaIntervalId = window.setInterval(() => {
-      const currentMana = props.currentMana();
-      const maxMana = props.maxMana();
-      const wisdom = props.wisdom();
-      const isInCombat = props.isInCombat();
-      const currentHealth = props.currentHealth();
+      try {
+        const currentMana = props.currentMana();
+        const maxMana = props.maxMana();
+        const wisdom = props.wisdom();
+        const isInCombat = props.isInCombat();
+        const currentHealth = props.currentHealth();
 
-      // Stop if mana is full
-      if (currentMana >= maxMana) {
+        // Stop if mana is full
+        if (currentMana >= maxMana) {
+          if (manaIntervalId !== undefined) {
+            clearInterval(manaIntervalId);
+            manaIntervalId = undefined;
+          }
+          return;
+        }
+
+        // Calculate mana regen (works in and out of combat now)
+        const baseManaRegen = isInCombat ? BASE_MANA_REGEN_IN_COMBAT : BASE_MANA_REGEN_OUT_OF_COMBAT;
+        const wisdomBonusMultiplier = isInCombat ? 0.1 : 0.3;
+        const wisdomBonus = (wisdom - 10) * wisdomBonusMultiplier;
+        const manaRegenRate = baseManaRegen + wisdomBonus;
+
+        const newMana = Math.min(maxMana, currentMana + manaRegenRate);
+
+        // Update mana (keep health the same)
+        props.onRegenTick(currentHealth, Math.round(newMana));
+      } catch (error) {
+        // Component has unmounted, clean up the interval
         if (manaIntervalId !== undefined) {
           clearInterval(manaIntervalId);
           manaIntervalId = undefined;
         }
-        return;
       }
-
-      // Calculate mana regen (works in and out of combat now)
-      const baseManaRegen = isInCombat ? BASE_MANA_REGEN_IN_COMBAT : BASE_MANA_REGEN_OUT_OF_COMBAT;
-      const wisdomBonusMultiplier = isInCombat ? 0.1 : 0.3;
-      const wisdomBonus = (wisdom - 10) * wisdomBonusMultiplier;
-      const manaRegenRate = baseManaRegen + wisdomBonus;
-
-      const newMana = Math.min(maxMana, currentMana + manaRegenRate);
-
-      // Update mana (keep health the same)
-      props.onRegenTick(currentHealth, Math.round(newMana));
     }, REGEN_TICK_INTERVAL);
   });
 

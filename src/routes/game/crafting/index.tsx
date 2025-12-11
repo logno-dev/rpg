@@ -62,17 +62,20 @@ export default function CraftingPage() {
   const basicData = useBasicCharacterData();
   const [store, actions] = useCharacter();
   
-  // Initialize context with basic data
+  // Initialize context with basic data - defer until after hydration
   createEffect(() => {
-    const data = basicData();
-    if (data) {
-      if (!store.character) {
-        actions.setCharacter(data.character);
+    // Use queueMicrotask to defer until after hydration
+    queueMicrotask(() => {
+      const data = basicData();
+      if (data) {
+        if (!store.character) {
+          actions.setCharacter(data.character);
+        }
+        actions.setInventory(data.inventory as any);
+        actions.setAbilities(data.abilities);
+        actions.setHotbar(data.hotbar);
       }
-      actions.setInventory(data.inventory as any);
-      actions.setAbilities(data.abilities);
-      actions.setHotbar(data.hotbar);
-    }
+    });
   });
 
   const [selectedProfession, setSelectedProfession] = createSignal<Profession | null>(null);
@@ -232,15 +235,18 @@ export default function CraftingPage() {
       return;
     }
     
-    // Only auto-expand once when profession is first selected
-    if (!initialExpansionDone()) {
-      const groups = groupRecipesByCategory();
-      if (groups.length > 0) {
-        const firstCategory = groups[0][0] as string;
-        setExpandedBrackets(new Set([firstCategory]));
-        setInitialExpansionDone(true);
+    // Defer to avoid hydration mismatch
+    queueMicrotask(() => {
+      // Only auto-expand once when profession is first selected
+      if (!initialExpansionDone()) {
+        const groups = groupRecipesByCategory();
+        if (groups.length > 0) {
+          const firstCategory = groups[0][0] as string;
+          setExpandedBrackets(new Set([firstCategory]));
+          setInitialExpansionDone(true);
+        }
       }
-    }
+    });
   });
 
   // Check if player has enough materials for a recipe
@@ -462,7 +468,7 @@ export default function CraftingPage() {
                 <For each={Object.entries(PROFESSION_INFO)}>
                   {([key, info]) => {
                     const profession = key as Profession;
-                    const profData = createMemo(() => getProfession(profession));
+                    const profData = () => getProfession(profession);
                     
                     return (
                       <div 
@@ -609,7 +615,7 @@ export default function CraftingPage() {
                                     }}>
                                       <For each={categoryRecipes as any[]}>
                                         {(recipe: Recipe) => {
-                                          const hasMateriels = createMemo(() => canCraft(recipe));
+                                          const hasMateriels = () => canCraft(recipe);
                                           
                                           return (
                                             <details 
@@ -679,13 +685,11 @@ export default function CraftingPage() {
                                                   <div style={{ display: "flex", gap: "0.5rem", "flex-wrap": "wrap" }}>
                                                     <For each={recipe.materials}>
                                                       {(rm) => {
-                                                        const material = createMemo(() => 
-                                                          materials().find((m: Material) => m.id === rm.material_id)
-                                                        );
-                                                        const hasEnough = createMemo(() => {
+                                                        const material = () => materials().find((m: Material) => m.id === rm.material_id);
+                                                        const hasEnough = () => {
                                                           const mat = material();
                                                           return mat && mat.quantity >= rm.quantity;
-                                                        });
+                                                        };
                                                         
                                                         return (
                                                           <div style={{ 

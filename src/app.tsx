@@ -1,7 +1,7 @@
 import { MetaProvider } from "@solidjs/meta";
 import { Router } from "@solidjs/router";
 import { FileRoutes } from "@solidjs/start/router";
-import { Suspense, createSignal, Show } from "solid-js";
+import { Suspense, createSignal, Show, ErrorBoundary } from "solid-js";
 import { CharacterProvider } from "~/lib/CharacterContext";
 import { ActiveEffectsProvider } from "~/lib/ActiveEffectsContext";
 import "./styles/global.css";
@@ -38,9 +38,53 @@ export default function App() {
         <MetaProvider>
           <CharacterProvider>
             <ActiveEffectsProvider>
-              <Suspense fallback={<GlobalLoadingIndicator />}>
-                {props.children}
-              </Suspense>
+              <ErrorBoundary
+                fallback={(err, reset) => {
+                  // Log error details for debugging
+                  console.error("[App ErrorBoundary]", err);
+                  
+                  return (
+                    <div style={{
+                      padding: "2rem",
+                      "text-align": "center",
+                      "max-width": "600px",
+                      margin: "2rem auto"
+                    }}>
+                      <div class="card">
+                        <h2 style={{ color: "var(--danger)" }}>Something went wrong</h2>
+                        <p style={{ color: "var(--text-secondary)", "margin": "1rem 0" }}>
+                          An error occurred while loading this page. Please try refreshing.
+                        </p>
+                        <details style={{ "margin-top": "1rem", "text-align": "left" }}>
+                          <summary style={{ cursor: "pointer", "margin-bottom": "0.5rem" }}>
+                            Error Details
+                          </summary>
+                          <pre style={{ 
+                            "background": "var(--bg-dark)", 
+                            padding: "1rem", 
+                            "border-radius": "4px",
+                            "overflow-x": "auto",
+                            "font-size": "0.875rem"
+                          }}>
+                            {err?.toString()}
+                          </pre>
+                        </details>
+                        <button 
+                          class="button primary" 
+                          onClick={() => window.location.reload()}
+                          style={{ "margin-top": "1rem" }}
+                        >
+                          Reload Page
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }}
+              >
+                <Suspense fallback={<GlobalLoadingIndicator />}>
+                  {props.children}
+                </Suspense>
+              </ErrorBoundary>
             </ActiveEffectsProvider>
           </CharacterProvider>
         </MetaProvider>
