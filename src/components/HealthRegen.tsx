@@ -73,9 +73,12 @@ export function HealthRegen(props: HealthRegenProps) {
         const healthRegenRate = baseHealthRegen + constitutionBonus;
 
         const newHealth = Math.min(maxHealth, currentHealth + healthRegenRate);
+        const roundedNewHealth = Math.round(newHealth);
 
-        // Update health (keep mana the same)
-        props.onRegenTick(Math.round(newHealth), currentMana);
+        // Only update if health actually changed
+        if (roundedNewHealth !== currentHealth) {
+          props.onRegenTick(roundedNewHealth, currentMana);
+        }
       } catch (error) {
         // Component has unmounted, clean up the interval
         if (healthIntervalId !== undefined) {
@@ -133,9 +136,12 @@ export function HealthRegen(props: HealthRegenProps) {
         const manaRegenRate = baseManaRegen + wisdomBonus;
 
         const newMana = Math.min(maxMana, currentMana + manaRegenRate);
+        const roundedNewMana = Math.round(newMana);
 
-        // Update mana (keep health the same)
-        props.onRegenTick(currentHealth, Math.round(newMana));
+        // Only update if mana actually changed
+        if (roundedNewMana !== currentMana) {
+          props.onRegenTick(currentHealth, roundedNewMana);
+        }
       } catch (error) {
         // Component has unmounted, clean up the interval
         if (manaIntervalId !== undefined) {
