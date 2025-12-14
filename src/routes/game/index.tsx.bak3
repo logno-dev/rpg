@@ -3639,8 +3639,8 @@ export default function GamePage() {
                           </div>
                           <button
                             class="button secondary"
-                            onClick={() => setSellQuantity(Math.min(data().maxQuantity, sellQuantity() + 1))}
-                            disabled={sellQuantity() >= data().maxQuantity}
+                            onClick={() => setSellQuantity(Math.min(sellItemData()!.maxQuantity, sellQuantity() + 1))}
+                            disabled={sellQuantity() >= sellItemData()!.maxQuantity}
                             style={{ padding: "0.5rem 1rem", "font-size": "1.25rem" }}
                           >
                             +
@@ -3666,7 +3666,7 @@ export default function GamePage() {
                           "font-weight": "bold",
                           color: "var(--warning)"
                         }}>
-                          {Math.floor(data().value * 0.4) * sellQuantity()}
+                          {Math.floor(sellItemData()!.value * 0.4) * sellQuantity()}
                         </div>
                         <div style={{ 
                           "font-size": "1rem",
@@ -3795,8 +3795,8 @@ export default function GamePage() {
                           </div>
                           <button
                             class="button secondary"
-                            onClick={() => setDropQuantity(Math.min(data().maxQuantity, dropQuantity() + 1))}
-                            disabled={dropQuantity() >= data().maxQuantity}
+                            onClick={() => setDropQuantity(Math.min(dropItemData()!.maxQuantity, dropQuantity() + 1))}
+                            disabled={dropQuantity() >= dropItemData()!.maxQuantity}
                             style={{ padding: "0.5rem 1rem", "font-size": "1.25rem" }}
                           >
                             +
@@ -3900,13 +3900,13 @@ export default function GamePage() {
                         color: "var(--accent)",
                         "margin-bottom": "0.5rem"
                       }}>
-                        {data().abilityName}
+                        {learnAbilityData()!.abilityName}
                       </div>
                       <div style={{ 
                         "font-size": "1rem",
                         color: "var(--text-secondary)"
                       }}>
-                        {data().message}
+                        {learnAbilityData()!.message}
                       </div>
                     </div>
 

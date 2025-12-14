@@ -389,13 +389,20 @@ export function BulkEditTable<T extends Record<string, any>>(props: BulkEditTabl
                                 when={col.type === 'select'}
                                 fallback={
                                   <input
-                                    type={col.type === 'number' ? 'number' : 'text'}
+                                    type="text"
+                                    inputmode={col.type === 'number' ? 'decimal' : undefined}
                                     value={value ?? ""}
-                                    onInput={(e) => {
-                                      const newValue = col.type === 'number' 
-                                        ? parseFloat(e.currentTarget.value) || 0
-                                        : e.currentTarget.value;
-                                      updateCell(rowId, col.key, newValue);
+                                    onChange={(e) => {
+                                      if (col.type === 'number') {
+                                        const parsed = parseFloat(e.currentTarget.value);
+                                        if (!isNaN(parsed)) {
+                                          updateCell(rowId, col.key, parsed);
+                                        } else if (e.currentTarget.value === '') {
+                                          updateCell(rowId, col.key, '');
+                                        }
+                                      } else {
+                                        updateCell(rowId, col.key, e.currentTarget.value);
+                                      }
                                     }}
                                     style={{
                                       width: "100%",

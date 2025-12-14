@@ -3214,7 +3214,7 @@ export default function GMPage() {
                 <div>
                   <label>Drop Chance (0-1, e.g. 0.001 = 0.1%)</label>
                   <input type="number" step="any" min="0" max="1" value={editingRegionLoot()?.drop_chance || 0.001} 
-                         onChange={(e) => { const val = parseFloat(e.currentTarget.value); if (!isNaN(val)) setEditingRegionLoot({...editingRegionLoot()!, drop_chance: val}); }} required />
+                         onChange={(e) => { const val = parseFloat(e.currentTarget.value); if (!isNaN(val)) setEditingRegionLoot({...editingRegionLoot()!, drop_chance: val}); }}} required />
                 </div>
                 <div>
                   <label>Minimum Mob Level</label>
@@ -4241,7 +4241,7 @@ export default function GMPage() {
                 <div>
                   <label>Price Multiplier</label>
                   <input type="number" step="any" min="0.1" value={editingMerchantInv()?.price_multiplier || 1.0} 
-                         onChange={(e) => { const val = parseFloat(e.currentTarget.value); if (!isNaN(val)) setEditingMerchantInv({...editingMerchantInv()!, price_multiplier: val}); }} required />
+                         onChange={(e) => { const val = parseFloat(e.currentTarget.value); if (!isNaN(val)) setEditingMerchantInv({...editingMerchantInv()!, price_multiplier: val}); }}} required />
                   <small style={{ display: "block", "margin-top": "0.25rem", color: "var(--text-secondary)" }}>
                     1.0 = normal price, 0.5 = half price, 2.0 = double price
                   </small>

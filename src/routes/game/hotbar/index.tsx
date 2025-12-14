@@ -37,17 +37,23 @@ export default function HotbarPage() {
         inventory: data.inventory?.length
       });
       
-      // Only set character if not already set
-      if (!store.character) {
+      // Only initialize context if not already initialized
+      if (!store.isInitialized) {
+        console.log('[Hotbar] Initializing context from server data');
         actions.setCharacter(data.character);
+        actions.setInventory(data.inventory as any);
+        actions.setAbilities(data.abilities);
+        actions.setHotbar(data.hotbar);
+        actions.setInitialized(true);
+        actions.updateSyncTimestamp();
+      } else {
+        console.log('[Hotbar] Context already initialized, skipping overwrite. Abilities:', store.abilities?.length);
+        // Only sync hotbar since it's what this page manages
+        // Don't overwrite abilities/inventory as they may have been updated optimistically
+        actions.setHotbar(data.hotbar);
       }
       
-      // Always sync abilities, hotbar, and inventory (they may have changed)
-      actions.setInventory(data.inventory as any);
-      actions.setAbilities(data.abilities);
-      actions.setHotbar(data.hotbar);
-      
-      console.log('[Hotbar] Context updated, abilities count:', store.abilities?.length);
+      console.log('[Hotbar] Context abilities count:', store.abilities?.length);
     }
   });
 

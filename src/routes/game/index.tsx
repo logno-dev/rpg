@@ -73,8 +73,14 @@ const getGameData = cache(async () => {
 
 export default function GamePage() {
   const navigate = useNavigate();
+  const [store, actions, computed] = useCharacter();
   
-  // Fetch data from session
+  // Staleness threshold - data older than this will trigger a refetch
+  const STALENESS_THRESHOLD_MS = 60000; // 1 minute
+  
+  // Conditionally fetch data from server
+  // Always call getGameData, but it will be cached by SolidStart
+  // The key optimization is that we only initialize context once
   const data = createAsync(() => getGameData());
   
   // Redirect to dungeon if active dungeon session exists
@@ -86,9 +92,8 @@ export default function GamePage() {
     }
   });
   
-  // Get character ID from loaded data (for client-side API calls)
-  const characterId = () => data()?.character?.id ?? null;
-  const [store, actions, computed] = useCharacter();
+  // Get character ID from context or loaded data (for client-side API calls)
+  const characterId = () => store.character?.id ?? data()?.character?.id ?? null;
   const [effectsStore, effectsActions] = useActiveEffects();
   const [availableMobs, setAvailableMobs] = createSignal<Mob[]>([]);
   const [activeMob, setActiveMob] = createSignal<Mob | null>(null);
@@ -341,10 +346,6 @@ export default function GamePage() {
   const currentAbilities = () => store.abilities ?? data()?.abilities ?? [];
   const currentHotbar = () => store.hotbar ?? data()?.hotbar ?? [];
   
-  // Initialize CharacterContext from server data ONLY on first load
-  // After that, we update CharacterContext directly from API responses
-  const [isInitialized, setIsInitialized] = createSignal(false);
-  
   // Lazy load merchants and dungeons for a region
   const loadRegionalData = async (regionId: number) => {
     try {
@@ -360,8 +361,15 @@ export default function GamePage() {
   
   createEffect(() => {
     const gameData = data();
-    if (gameData && !isInitialized()) {
-      console.log('[DATA] Initial load - initializing CharacterContext');
+    
+    // Guard: only proceed if we have data
+    if (!gameData) {
+      console.log('[DATA] Waiting for game data to load...');
+      return;
+    }
+    
+    if (!store.isInitialized) {
+      console.log('[DATA] Initial load - initializing CharacterContext from server');
       
       // On initial load, use all server data as-is
       // NOTE: If there's an active dungeon, client-side effect redirects before we initialize
@@ -383,31 +391,18 @@ export default function GamePage() {
         abilities: gameData.abilities.length
       });
       
-      setIsInitialized(true);
-      
-      // Update staleness timestamp on initial load
-      setLastDataSyncTimestamp(Date.now());
+      // Mark context as initialized and update sync timestamp
+      actions.setInitialized(true);
+      actions.updateSyncTimestamp();
       
       // Lazy load merchants and dungeons after initial render
       if (gameData.currentRegion) {
         loadRegionalData(gameData.currentRegion.id);
       }
-    } else if (gameData && isInitialized()) {
-      console.log('[DATA] Route data updated but already initialized - preserving CharacterContext');
-      // After initial load, CharacterContext is the source of truth
-      // We only update it directly via API responses, not from stale route cache
-      
-      // Sync server's max_health/max_mana in case they changed from level up
-      const existingChar = store.character;
-      if (existingChar && gameData.character) {
-        const updatedChar = { ...existingChar };
-        updatedChar.max_health = gameData.character.max_health;
-        updatedChar.max_mana = gameData.character.max_mana;
-        actions.setCharacter(updatedChar);
-      }
-      
-      // Update staleness timestamp when data is refreshed
-      setLastDataSyncTimestamp(Date.now());
+    } else {
+      console.log('[DATA] Already initialized - skipping server data initialization');
+      // CharacterContext is the source of truth, only update sync timestamp
+      actions.updateSyncTimestamp();
     }
   });
   
@@ -442,10 +437,6 @@ export default function GamePage() {
   let lastSyncedManaValue = 0;
   const [syncTimer, setSyncTimer] = createSignal<number | null>(null);
   let isSyncing = false;
-  
-  // Staleness detection: Track when data was last synced from server
-  const [lastDataSyncTimestamp, setLastDataSyncTimestamp] = createSignal<number>(Date.now());
-  const STALENESS_THRESHOLD_MS = 60000; // 1 minute - data older than this triggers refresh on tab reactivation
 
   // Watch for health/mana changes and sync to server with debouncing
   // Use on() to explicitly track only these values
@@ -706,11 +697,11 @@ export default function GamePage() {
       // Close travel modal
       setShowTravelModal(false);
       
-      // Refetch in background to sync (health/mana already preserved above)
-      await refetchData();
-      
       // Lazy load merchants and dungeons for new region
       await loadRegionalData(regionId);
+      
+      // Update sync timestamp since we got fresh data from the server
+      actions.updateSyncTimestamp();
     } catch (error: any) {
       alert(error.message);
       console.error('Travel error:', error);
@@ -939,24 +930,21 @@ export default function GamePage() {
           setCombatThorns(null); // Clear Thorns when combat ends
         }, 100);
 
-        // Update inventory optimistically from server response
+        // Update inventory from server response
         if (responseData.inventory) {
-          setOptimisticInventory(responseData.inventory);
+          actions.setInventory(responseData.inventory);
         }
 
-        // Refetch data in background to ensure everything is synced
-        setTimeout(async () => {
-          await refetchData();
-          
-          // Don't clear optimistic states - let them persist until next update
-          // The refetch will update data() and the memos will use whichever is newer
-          
-          // Show death modal with exact losses
+        // Show death modal with exact losses after a brief delay
+        setTimeout(() => {
           setDeathData({
             expLost: responseData.expLost,
             goldLost: responseData.goldLost
           });
           setShowDeathModal(true);
+          
+          // Update sync timestamp since we got fresh data from the server
+          actions.updateSyncTimestamp();
         }, 200);
       }
     } catch (error: any) {
@@ -1400,8 +1388,11 @@ export default function GamePage() {
       
     } catch (error: any) {
       console.error('Assign stats error:', error);
-      // Revert on error by refetching
-      await refetchData();
+      // Revert optimistic changes on error
+      const gameData = data();
+      if (gameData?.character) {
+        actions.setCharacter(gameData.character);
+      }
       setPendingStats({});
     } finally {
       setAssigningStats(false);
@@ -1862,14 +1853,14 @@ export default function GamePage() {
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         // Tab became visible
-        const timeSinceLastSync = Date.now() - lastDataSyncTimestamp();
+        const timeSinceLastSync = Date.now() - store.lastSyncTimestamp;
         
         if (timeSinceLastSync > STALENESS_THRESHOLD_MS) {
           console.log(`[STALENESS] Tab reactivated after ${Math.round(timeSinceLastSync / 1000)}s - data may be stale, refetching...`);
           refetchData().then(() => {
             console.log('[STALENESS] Data refreshed successfully');
             // Update the timestamp after successful refresh
-            setLastDataSyncTimestamp(Date.now());
+            actions.updateSyncTimestamp();
           }).catch(err => {
             console.error('[STALENESS] Failed to refresh data:', err);
           });
@@ -2018,7 +2009,7 @@ export default function GamePage() {
         <GameNavigation />
 
         {/* Sticky Character Stats Header */}
-        <Show when={isScrolled() && data() && store.character}>
+        <Show when={isScrolled() && store.character}>
           <div style={{
           position: "fixed",
           top: 0,
@@ -2201,7 +2192,7 @@ export default function GamePage() {
         </div>
       </Show>
 
-      <Show when={data() && store.character} fallback={<LoadingSkeleton />}>
+      <Show when={store.character || data()?.character} fallback={<LoadingSkeleton />}>
         <div class="container" style={{ "padding-bottom": "calc(5rem + env(safe-area-inset-bottom, 0px))" }}>
           {/* Passive Health/Mana Regeneration */}
           <HealthRegen
@@ -2318,7 +2309,7 @@ export default function GamePage() {
             {/* Combat Engine - Always mounted but hidden when not in use */}
             <Show when={activeMob()}>
                 <CombatEngine
-                  character={data()!.character}
+                  character={store.character!}
                   mob={activeMob()!}
                   equippedWeapon={equippedWeapon()}
                   equippedOffhand={equippedOffhand()}
@@ -2589,9 +2580,9 @@ export default function GamePage() {
                               class="button"
                               style={{ width: "100%", "margin-top": "0.5rem" }}
                               onClick={() => handleStartDungeon(dungeon.id)}
-                              disabled={data()!.character.level < dungeon.required_level}
+                              disabled={store.character!.level < dungeon.required_level}
                             >
-                              {data()!.character.level < dungeon.required_level
+                              {store.character!.level < dungeon.required_level
                                 ? `Requires Level ${dungeon.required_level}`
                                 : "Enter Dungeon"}
                             </button>
@@ -2678,10 +2669,10 @@ export default function GamePage() {
                       "font-size": "2rem",
                       "margin-bottom": "1rem"
                     }}>
-                      {data().levelUp ? "LEVEL UP!" : "VICTORY!"}
+                      {victoryData()!.levelUp ? "LEVEL UP!" : "VICTORY!"}
                     </h2>
                     
-                    <Show when={data().levelUp}>
+                    <Show when={victoryData()!.levelUp}>
                       <div style={{ 
                         "text-align": "center",
                         "margin-bottom": "1.5rem",
@@ -2696,7 +2687,7 @@ export default function GamePage() {
                           color: "var(--success)",
                           "margin-bottom": "0.5rem"
                         }}>
-                          You reached Level {data().newLevel}!
+                          You reached Level {victoryData()!.newLevel}!
                         </div>
                         <div style={{ color: "var(--text-secondary)" }}>
                           You have 3 stat points to assign
@@ -2728,7 +2719,7 @@ export default function GamePage() {
                           "font-weight": "bold",
                           color: "var(--accent)"
                         }}>
-                          +{data().expGained} XP
+                          +{victoryData()!.expGained} XP
                         </div>
                       </div>
 
@@ -2750,7 +2741,7 @@ export default function GamePage() {
                           "font-weight": "bold",
                           color: "var(--warning)"
                         }}>
-                          {data().goldGained}
+                          {victoryData()!.goldGained}
                         </div>
                       </div>
 
@@ -2768,7 +2759,7 @@ export default function GamePage() {
                           }}>
                             Loot Acquired
                           </div>
-                          <For each={data().loot}>
+                          <For each={victoryData()!.loot}>
                             {(item) => (
                               <div style={{ 
                                 "font-size": "1rem",
@@ -2810,7 +2801,7 @@ export default function GamePage() {
                           }}>
                             Weapon Mastery
                           </div>
-                          <For each={data().masteryResults}>
+                          <For each={victoryData()!.masteryResults || []}>
                             {(mastery) => (
                               <div style={{ 
                                 "font-size": "1rem",
@@ -2917,7 +2908,7 @@ export default function GamePage() {
                             "font-weight": "bold",
                             color: "var(--danger)"
                           }}>
-                            -{data().expLost} XP
+                            -{deathData()!.expLost} XP
                           </div>
                           <Show when={data().expLost > 0}>
                             <div style={{ 
@@ -2948,7 +2939,7 @@ export default function GamePage() {
                             "font-weight": "bold",
                             color: "var(--warning)"
                           }}>
-                            -{data().goldLost} Gold
+                            -{deathData()!.goldLost} Gold
                           </div>
                           <Show when={data().goldLost > 0}>
                             <div style={{ 
@@ -3454,7 +3445,7 @@ export default function GamePage() {
                   }}>
                   
                   <div style={{ display: "flex", "flex-direction": "column", gap: "1rem" }}>
-                    <For each={data()!.regions}>
+                    <For each={store.regions}>
                       {(region) => {
                         const isCurrent = region.id === currentCharacter()?.current_region;
                         const isLocked = region.locked === 1;
@@ -3612,17 +3603,17 @@ export default function GamePage() {
                         "font-weight": "bold",
                         "margin-bottom": "0.5rem"
                       }}>
-                        {data().itemName}
+                        {sellItemData()!.itemName}
                       </div>
                       <div style={{ 
                         "font-size": "0.875rem", 
                         color: "var(--text-secondary)",
                         "margin-bottom": "1rem"
                       }}>
-                        {data().maxQuantity > 1 ? `Available: ${data().maxQuantity}` : 'This action cannot be undone'}
+                        {sellItemData()!.maxQuantity > 1 ? `Available: ${sellItemData()!.maxQuantity}` : 'This action cannot be undone'}
                       </div>
                       
-                      <Show when={data().maxQuantity > 1}>
+                      <Show when={sellItemData()!.maxQuantity > 1}>
                         <div style={{
                           display: "flex",
                           "align-items": "center",
@@ -3648,8 +3639,8 @@ export default function GamePage() {
                           </div>
                           <button
                             class="button secondary"
-                            onClick={() => setSellQuantity(Math.min(data().maxQuantity, sellQuantity() + 1))}
-                            disabled={sellQuantity() >= data().maxQuantity}
+                            onClick={() => setSellQuantity(Math.min(sellItemData()!.maxQuantity, sellQuantity() + 1))}
+                            disabled={sellQuantity() >= sellItemData()!.maxQuantity}
                             style={{ padding: "0.5rem 1rem", "font-size": "1.25rem" }}
                           >
                             +
@@ -3675,7 +3666,7 @@ export default function GamePage() {
                           "font-weight": "bold",
                           color: "var(--warning)"
                         }}>
-                          {Math.floor(data().value * 0.4) * sellQuantity()}
+                          {Math.floor(sellItemData()!.value * 0.4) * sellQuantity()}
                         </div>
                         <div style={{ 
                           "font-size": "1rem",
@@ -3768,17 +3759,17 @@ export default function GamePage() {
                         "font-weight": "bold",
                         "margin-bottom": "0.5rem"
                       }}>
-                        {data().itemName}
+                        {dropItemData()!.itemName}
                       </div>
                       <div style={{ 
                         "font-size": "0.875rem", 
                         color: "var(--text-secondary)",
                         "margin-bottom": "1rem"
                       }}>
-                        {data().maxQuantity > 1 ? `Available: ${data().maxQuantity}` : 'This action cannot be undone'}
+                        {dropItemData()!.maxQuantity > 1 ? `Available: ${dropItemData()!.maxQuantity}` : 'This action cannot be undone'}
                       </div>
                       
-                      <Show when={data().maxQuantity > 1}>
+                      <Show when={dropItemData()!.maxQuantity > 1}>
                         <div style={{
                           display: "flex",
                           "align-items": "center",
@@ -3804,8 +3795,8 @@ export default function GamePage() {
                           </div>
                           <button
                             class="button secondary"
-                            onClick={() => setDropQuantity(Math.min(data().maxQuantity, dropQuantity() + 1))}
-                            disabled={dropQuantity() >= data().maxQuantity}
+                            onClick={() => setDropQuantity(Math.min(dropItemData()!.maxQuantity, dropQuantity() + 1))}
+                            disabled={dropQuantity() >= dropItemData()!.maxQuantity}
                             style={{ padding: "0.5rem 1rem", "font-size": "1.25rem" }}
                           >
                             +
@@ -3909,13 +3900,13 @@ export default function GamePage() {
                         color: "var(--accent)",
                         "margin-bottom": "0.5rem"
                       }}>
-                        {data().abilityName}
+                        {learnAbilityData()!.abilityName}
                       </div>
                       <div style={{ 
                         "font-size": "1rem",
                         color: "var(--text-secondary)"
                       }}>
-                        {data().message}
+                        {learnAbilityData()!.message}
                       </div>
                     </div>
 

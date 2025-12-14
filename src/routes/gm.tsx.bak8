@@ -3153,8 +3153,8 @@ export default function GMPage() {
                 </div>
                 <div>
                   <label>Drop Chance (0-1, e.g. 0.05 = 5%)</label>
-                   <input type="number" step="any" min="0" max="1" value={editingMobLoot()?.drop_chance || 0.1} 
-                          onChange={(e) => { const val = parseFloat(e.currentTarget.value); if (!isNaN(val)) setEditingMobLoot({...editingMobLoot()!, drop_chance: val}); }} required />
+                  <input type="number" step="any" min="0" max="1" value={editingMobLoot()?.drop_chance || 0.1} 
+                         onInput={(e) => setEditingMobLoot({...editingMobLoot()!, drop_chance: parseFloat(e.currentTarget.value)})} required />
                 </div>
                 <div style={{ display: "grid", "grid-template-columns": "1fr 1fr", gap: "1rem" }}>
                   <div>
@@ -3214,7 +3214,7 @@ export default function GMPage() {
                 <div>
                   <label>Drop Chance (0-1, e.g. 0.001 = 0.1%)</label>
                   <input type="number" step="any" min="0" max="1" value={editingRegionLoot()?.drop_chance || 0.001} 
-                         onChange={(e) => { const val = parseFloat(e.currentTarget.value); if (!isNaN(val)) setEditingRegionLoot({...editingRegionLoot()!, drop_chance: val}); }} required />
+                         onInput={(e) => setEditingRegionLoot({...editingRegionLoot()!, drop_chance: parseFloat(e.currentTarget.value)})} required />
                 </div>
                 <div>
                   <label>Minimum Mob Level</label>
@@ -4241,7 +4241,7 @@ export default function GMPage() {
                 <div>
                   <label>Price Multiplier</label>
                   <input type="number" step="any" min="0.1" value={editingMerchantInv()?.price_multiplier || 1.0} 
-                         onChange={(e) => { const val = parseFloat(e.currentTarget.value); if (!isNaN(val)) setEditingMerchantInv({...editingMerchantInv()!, price_multiplier: val}); }} required />
+                         onInput={(e) => setEditingMerchantInv({...editingMerchantInv()!, price_multiplier: parseFloat(e.currentTarget.value)})} required />
                   <small style={{ display: "block", "margin-top": "0.25rem", color: "var(--text-secondary)" }}>
                     1.0 = normal price, 0.5 = half price, 2.0 = double price
                   </small>

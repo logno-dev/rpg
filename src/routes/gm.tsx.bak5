@@ -3044,12 +3044,12 @@ export default function GMPage() {
                 </div>
                 <div>
                   <label>Attack</label>
-                  <input type="number" step="any" value={editingMob()?.attack || 10} 
+                  <input type="number" step="0.1" value={editingMob()?.attack || 10} 
                          onInput={(e) => setEditingMob({...editingMob()!, attack: parseInt(e.currentTarget.value)})} required />
                 </div>
                 <div>
                   <label>Defense</label>
-                  <input type="number" step="any" value={editingMob()?.defense || 5} 
+                  <input type="number" step="0.1" value={editingMob()?.defense || 5} 
                          onInput={(e) => setEditingMob({...editingMob()!, defense: parseInt(e.currentTarget.value)})} required />
                 </div>
                 <div>
@@ -3069,13 +3069,8 @@ export default function GMPage() {
                 </div>
                 <div>
                   <label>Attack Speed</label>
-                  <input type="text" inputmode="decimal" value={editingMob()?.attack_speed ?? 1.0} 
-                         onChange={(e) => {
-                           const val = parseFloat(e.currentTarget.value);
-                           if (!isNaN(val)) {
-                             setEditingMob({...editingMob()!, attack_speed: val});
-                           }
-                         }} required />
+                  <input type="number" step="0.1" value={editingMob()?.attack_speed || 1.0} 
+                         onInput={(e) => setEditingMob({...editingMob()!, attack_speed: parseFloat(e.currentTarget.value)})} required />
                 </div>
                 <div>
                   <label>Region ID <span style={{ "font-size": "0.8rem", color: "var(--warning)" }}>(controls rare loot)</span></label>
@@ -3153,8 +3148,8 @@ export default function GMPage() {
                 </div>
                 <div>
                   <label>Drop Chance (0-1, e.g. 0.05 = 5%)</label>
-                   <input type="number" step="any" min="0" max="1" value={editingMobLoot()?.drop_chance || 0.1} 
-                          onChange={(e) => { const val = parseFloat(e.currentTarget.value); if (!isNaN(val)) setEditingMobLoot({...editingMobLoot()!, drop_chance: val}); }} required />
+                  <input type="number" step="0.001" min="0" max="1" value={editingMobLoot()?.drop_chance || 0.1} 
+                         onInput={(e) => setEditingMobLoot({...editingMobLoot()!, drop_chance: parseFloat(e.currentTarget.value)})} required />
                 </div>
                 <div style={{ display: "grid", "grid-template-columns": "1fr 1fr", gap: "1rem" }}>
                   <div>
@@ -3213,8 +3208,8 @@ export default function GMPage() {
                 </div>
                 <div>
                   <label>Drop Chance (0-1, e.g. 0.001 = 0.1%)</label>
-                  <input type="number" step="any" min="0" max="1" value={editingRegionLoot()?.drop_chance || 0.001} 
-                         onChange={(e) => { const val = parseFloat(e.currentTarget.value); if (!isNaN(val)) setEditingRegionLoot({...editingRegionLoot()!, drop_chance: val}); }} required />
+                  <input type="number" step="0.0001" min="0" max="1" value={editingRegionLoot()?.drop_chance || 0.001} 
+                         onInput={(e) => setEditingRegionLoot({...editingRegionLoot()!, drop_chance: parseFloat(e.currentTarget.value)})} required />
                 </div>
                 <div>
                   <label>Minimum Mob Level</label>
@@ -3290,42 +3285,42 @@ export default function GMPage() {
                 </div>
                 <div>
                   <label>Damage</label>
-                  <input type="number" step="any" min="0" value={editingItem()?.damage || 0} 
+                  <input type="number" min="0" value={editingItem()?.damage || 0} 
                          onInput={(e) => setEditingItem({...editingItem()!, damage: parseInt(e.currentTarget.value)})} />
                 </div>
                 <div>
                   <label>Armor</label>
-                  <input type="number" step="any" min="0" value={editingItem()?.armor || 0} 
+                  <input type="number" min="0" value={editingItem()?.armor || 0} 
                          onInput={(e) => setEditingItem({...editingItem()!, armor: parseInt(e.currentTarget.value)})} />
                 </div>
                 <div>
                   <label>STR Bonus</label>
-                  <input type="number" step="any" value={editingItem()?.strength_bonus || 0} 
+                  <input type="number" value={editingItem()?.strength_bonus || 0} 
                          onInput={(e) => setEditingItem({...editingItem()!, strength_bonus: parseInt(e.currentTarget.value)})} />
                 </div>
                 <div>
                   <label>DEX Bonus</label>
-                  <input type="number" step="any" value={editingItem()?.dexterity_bonus || 0} 
+                  <input type="number" value={editingItem()?.dexterity_bonus || 0} 
                          onInput={(e) => setEditingItem({...editingItem()!, dexterity_bonus: parseInt(e.currentTarget.value)})} />
                 </div>
                 <div>
                   <label>CON Bonus</label>
-                  <input type="number" step="any" value={editingItem()?.constitution_bonus || 0} 
+                  <input type="number" value={editingItem()?.constitution_bonus || 0} 
                          onInput={(e) => setEditingItem({...editingItem()!, constitution_bonus: parseInt(e.currentTarget.value)})} />
                 </div>
                 <div>
                   <label>INT Bonus</label>
-                  <input type="number" step="any" value={editingItem()?.intelligence_bonus || 0} 
+                  <input type="number" value={editingItem()?.intelligence_bonus || 0} 
                          onInput={(e) => setEditingItem({...editingItem()!, intelligence_bonus: parseInt(e.currentTarget.value)})} />
                 </div>
                 <div>
                   <label>WIS Bonus</label>
-                  <input type="number" step="any" value={editingItem()?.wisdom_bonus || 0} 
+                  <input type="number" value={editingItem()?.wisdom_bonus || 0} 
                          onInput={(e) => setEditingItem({...editingItem()!, wisdom_bonus: parseInt(e.currentTarget.value)})} />
                 </div>
                 <div>
                   <label>CHA Bonus</label>
-                  <input type="number" step="any" value={editingItem()?.charisma_bonus || 0} 
+                  <input type="number" value={editingItem()?.charisma_bonus || 0} 
                          onInput={(e) => setEditingItem({...editingItem()!, charisma_bonus: parseInt(e.currentTarget.value)})} />
                 </div>
                 
@@ -3388,25 +3383,20 @@ export default function GMPage() {
                 
                 <div>
                   <label>Damage Min</label>
-                  <input type="number" step="any" min="0" value={editingItem()?.damage_min || 0} 
+                  <input type="number" min="0" value={editingItem()?.damage_min || 0} 
                          onInput={(e) => setEditingItem({...editingItem()!, damage_min: parseInt(e.currentTarget.value)})} />
                 </div>
                 
                 <div>
                   <label>Damage Max</label>
-                  <input type="number" step="any" min="0" value={editingItem()?.damage_max || 0} 
+                  <input type="number" min="0" value={editingItem()?.damage_max || 0} 
                          onInput={(e) => setEditingItem({...editingItem()!, damage_max: parseInt(e.currentTarget.value)})} />
                 </div>
                 
                 <div>
                   <label>Attack Speed</label>
-                  <input type="text" inputmode="decimal" value={editingItem()?.attack_speed ?? 1.0} 
-                         onChange={(e) => {
-                           const val = parseFloat(e.currentTarget.value);
-                           if (!isNaN(val)) {
-                             setEditingItem({...editingItem()!, attack_speed: val});
-                           }
-                         }} />
+                  <input type="number" step="0.1" min="0" value={editingItem()?.attack_speed || 1.0} 
+                         onInput={(e) => setEditingItem({...editingItem()!, attack_speed: parseFloat(e.currentTarget.value)})} />
                   <small style={{ display: "block", "font-size": "0.75rem", color: "var(--text-secondary)", "margin-top": "0.25rem" }}>
                     Seconds between attacks (lower = faster)
                   </small>
@@ -3594,17 +3584,17 @@ export default function GMPage() {
                 
                 <div>
                   <label>Level Requirement</label>
-                  <input type="number" step="1" min="1" value={editingAbility()?.required_level || 1} 
+                  <input type="number" min="1" value={editingAbility()?.required_level || 1} 
                          onInput={(e) => setEditingAbility({...editingAbility()!, required_level: parseInt(e.currentTarget.value)})} required />
                 </div>
                 <div>
                   <label>Mana Cost</label>
-                  <input type="number" step="1" min="0" value={editingAbility()?.mana_cost || 0} 
+                  <input type="number" min="0" value={editingAbility()?.mana_cost || 0} 
                          onInput={(e) => setEditingAbility({...editingAbility()!, mana_cost: parseInt(e.currentTarget.value)})} required />
                 </div>
                 <div>
                   <label>Cooldown (seconds)</label>
-                  <input type="number" step="any" min="0" value={editingAbility()?.cooldown || 0} 
+                  <input type="number" step="0.01" min="0" value={editingAbility()?.cooldown || 0} 
                          onChange={(e) => setEditingAbility({...editingAbility()!, cooldown: parseFloat(e.currentTarget.value) || 0})} required />
                 </div>
                 <div>
@@ -3627,32 +3617,32 @@ export default function GMPage() {
                 
                 <div>
                   <label>Required STR</label>
-                  <input type="number" step="1" min="0" value={editingAbility()?.required_strength ?? 0} 
+                  <input type="number" min="0" value={editingAbility()?.required_strength ?? 0} 
                          onInput={(e) => setEditingAbility({...editingAbility()!, required_strength: parseInt(e.currentTarget.value)})} />
                 </div>
                 <div>
                   <label>Required DEX</label>
-                  <input type="number" step="1" min="0" value={editingAbility()?.required_dexterity ?? 0} 
+                  <input type="number" min="0" value={editingAbility()?.required_dexterity ?? 0} 
                          onInput={(e) => setEditingAbility({...editingAbility()!, required_dexterity: parseInt(e.currentTarget.value)})} />
                 </div>
                 <div>
                   <label>Required CON</label>
-                  <input type="number" step="1" min="0" value={editingAbility()?.required_constitution ?? 0} 
+                  <input type="number" min="0" value={editingAbility()?.required_constitution ?? 0} 
                          onInput={(e) => setEditingAbility({...editingAbility()!, required_constitution: parseInt(e.currentTarget.value)})} />
                 </div>
                 <div>
                   <label>Required INT</label>
-                  <input type="number" step="1" min="0" value={editingAbility()?.required_intelligence ?? 0} 
+                  <input type="number" min="0" value={editingAbility()?.required_intelligence ?? 0} 
                          onInput={(e) => setEditingAbility({...editingAbility()!, required_intelligence: parseInt(e.currentTarget.value)})} />
                 </div>
                 <div>
                   <label>Required WIS</label>
-                  <input type="number" step="1" min="0" value={editingAbility()?.required_wisdom ?? 0} 
+                  <input type="number" min="0" value={editingAbility()?.required_wisdom ?? 0} 
                          onInput={(e) => setEditingAbility({...editingAbility()!, required_wisdom: parseInt(e.currentTarget.value)})} />
                 </div>
                 <div>
                   <label>Required CHA</label>
-                  <input type="number" step="1" min="0" value={editingAbility()?.required_charisma ?? 0} 
+                  <input type="number" min="0" value={editingAbility()?.required_charisma ?? 0} 
                          onInput={(e) => setEditingAbility({...editingAbility()!, required_charisma: parseInt(e.currentTarget.value)})} />
                 </div>
                 
@@ -3846,7 +3836,7 @@ export default function GMPage() {
                   <div style={{ display: "grid", gap: "1rem", "grid-template-columns": "1fr 1fr" }}>
                     <div>
                       <label>Effect Order</label>
-                      <input type="number" step="1" min="1" value={editingAbilityEffect()?.effect_order || 1} 
+                      <input type="number" min="1" value={editingAbilityEffect()?.effect_order || 1} 
                              onInput={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, effect_order: parseInt(e.currentTarget.value)})} required />
                     </div>
                     <div>
@@ -3874,7 +3864,7 @@ export default function GMPage() {
                     </div>
                     <div>
                       <label>Chance (0-1)</label>
-                      <input type="number" step="any" min="0" max="1" value={editingAbilityEffect()?.chance ?? 1.0} 
+                      <input type="number" step="0.01" min="0" max="1" value={editingAbilityEffect()?.chance ?? 1.0} 
                              onChange={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, chance: parseFloat(e.currentTarget.value) || 1.0})} />
                     </div>
                     
@@ -3884,12 +3874,12 @@ export default function GMPage() {
                     
                     <div>
                       <label>Value Min</label>
-                      <input type="number" step="any" min="0" value={editingAbilityEffect()?.value_min ?? 0} 
+                      <input type="number" min="0" value={editingAbilityEffect()?.value_min ?? 0} 
                              onInput={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, value_min: parseInt(e.currentTarget.value) || 0})} />
                     </div>
                     <div>
                       <label>Value Max</label>
-                      <input type="number" step="any" min="0" value={editingAbilityEffect()?.value_max ?? 0} 
+                      <input type="number" min="0" value={editingAbilityEffect()?.value_max ?? 0} 
                              onInput={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, value_max: parseInt(e.currentTarget.value) || 0})} />
                     </div>
                     
@@ -3907,7 +3897,7 @@ export default function GMPage() {
                     </div>
                     <div>
                       <label>Tick Value</label>
-                      <input type="number" step="any" min="0" value={editingAbilityEffect()?.tick_value ?? 0} 
+                      <input type="number" min="0" value={editingAbilityEffect()?.tick_value ?? 0} 
                              onInput={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, tick_value: parseInt(e.currentTarget.value) || 0})} />
                     </div>
                     <div>
@@ -3915,7 +3905,7 @@ export default function GMPage() {
                       <input 
                         type="number" 
                         min="0" 
-                        step="any" 
+                        step="0.1" 
                         value={editingAbilityEffect()?.tick_interval ?? 0} 
                         onChange={(e) => {
                           const val = parseFloat(e.currentTarget.value);
@@ -3928,7 +3918,7 @@ export default function GMPage() {
                     </div>
                     <div>
                       <label>Tick Count</label>
-                      <input type="number" step="1" min="0" value={editingAbilityEffect()?.tick_count ?? 0} 
+                      <input type="number" min="0" value={editingAbilityEffect()?.tick_count ?? 0} 
                              onInput={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, tick_count: parseInt(e.currentTarget.value) || 0})} />
                     </div>
                     
@@ -3956,7 +3946,7 @@ export default function GMPage() {
                     </div>
                     <div>
                       <label>Duration (seconds)</label>
-                      <input type="number" step="any" min="0" value={editingAbilityEffect()?.duration ?? 0} 
+                      <input type="number" min="0" value={editingAbilityEffect()?.duration ?? 0} 
                              onInput={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, duration: parseInt(e.currentTarget.value) || 0})} />
                     </div>
                     
@@ -3979,7 +3969,7 @@ export default function GMPage() {
                     </div>
                     <div>
                       <label>Scaling Factor</label>
-                      <input type="number" step="any" min="0" value={editingAbilityEffect()?.scaling_factor ?? 0} 
+                      <input type="number" step="0.1" min="0" value={editingAbilityEffect()?.scaling_factor ?? 0} 
                              onChange={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, scaling_factor: parseFloat(e.currentTarget.value) || 0})} />
                     </div>
                     
@@ -3989,17 +3979,17 @@ export default function GMPage() {
                     
                     <div>
                       <label>Shield Amount</label>
-                      <input type="number" step="any" min="0" value={editingAbilityEffect()?.shield_amount ?? 0} 
+                      <input type="number" min="0" value={editingAbilityEffect()?.shield_amount ?? 0} 
                              onInput={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, shield_amount: parseInt(e.currentTarget.value) || 0})} />
                     </div>
                     <div>
                       <label>Drain % (0-1)</label>
-                      <input type="number" step="any" min="0" max="1" value={editingAbilityEffect()?.drain_percent ?? 0} 
+                      <input type="number" step="0.01" min="0" max="1" value={editingAbilityEffect()?.drain_percent ?? 0} 
                              onChange={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, drain_percent: parseFloat(e.currentTarget.value) || 0})} />
                     </div>
                     <div>
                       <label>Max Stacks</label>
-                      <input type="number" step="1" min="1" value={editingAbilityEffect()?.stacks_max ?? 1} 
+                      <input type="number" min="1" value={editingAbilityEffect()?.stacks_max ?? 1} 
                              onInput={(e) => setEditingAbilityEffect({...editingAbilityEffect()!, stacks_max: parseInt(e.currentTarget.value) || 1})} />
                       <small style={{ display: "block", "font-size": "0.75rem", color: "var(--text-secondary)" }}>How many times this effect can stack</small>
                     </div>
@@ -4240,8 +4230,8 @@ export default function GMPage() {
                 </div>
                 <div>
                   <label>Price Multiplier</label>
-                  <input type="number" step="any" min="0.1" value={editingMerchantInv()?.price_multiplier || 1.0} 
-                         onChange={(e) => { const val = parseFloat(e.currentTarget.value); if (!isNaN(val)) setEditingMerchantInv({...editingMerchantInv()!, price_multiplier: val}); }} required />
+                  <input type="number" step="0.1" min="0.1" value={editingMerchantInv()?.price_multiplier || 1.0} 
+                         onInput={(e) => setEditingMerchantInv({...editingMerchantInv()!, price_multiplier: parseFloat(e.currentTarget.value)})} required />
                   <small style={{ display: "block", "margin-top": "0.25rem", color: "var(--text-secondary)" }}>
                     1.0 = normal price, 0.5 = half price, 2.0 = double price
                   </small>

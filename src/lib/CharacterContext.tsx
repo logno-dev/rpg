@@ -97,6 +97,8 @@ type CharacterStore = {
   dungeonSession: DungeonSession | null;
   isLoading: boolean;
   hasCompletableQuests: boolean;
+  isInitialized: boolean;
+  lastSyncTimestamp: number;
 };
 
 type CharacterContextValue = [
@@ -127,6 +129,8 @@ type CharacterContextValue = [
     removeAbility: (abilityId: number) => void;
     setLoading: (loading: boolean) => void;
     setHasCompletableQuests: (hasCompletable: boolean) => void;
+    setInitialized: (initialized: boolean) => void;
+    updateSyncTimestamp: () => void;
     reset: () => void;
   },
   computed: {
@@ -159,6 +163,8 @@ export const CharacterProvider: ParentComponent<{ initialData?: Partial<Characte
     dungeonSession: null,
     isLoading: false,
     hasCompletableQuests: false,
+    isInitialized: false,
+    lastSyncTimestamp: 0,
   });
 
   const actions = {
@@ -347,6 +353,14 @@ export const CharacterProvider: ParentComponent<{ initialData?: Partial<Characte
       setStore("hasCompletableQuests", hasCompletable);
     },
 
+    setInitialized: (initialized: boolean) => {
+      setStore("isInitialized", initialized);
+    },
+
+    updateSyncTimestamp: () => {
+      setStore("lastSyncTimestamp", Date.now());
+    },
+
     reset: () => {
       setStore({
         character: null,
@@ -361,6 +375,8 @@ export const CharacterProvider: ParentComponent<{ initialData?: Partial<Characte
         dungeonSession: null,
         isLoading: false,
         hasCompletableQuests: false,
+        isInitialized: false,
+        lastSyncTimestamp: 0,
       });
     },
   };
