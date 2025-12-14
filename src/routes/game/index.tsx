@@ -730,9 +730,9 @@ export default function GamePage() {
         setNamedMobEncounter(result.namedMob);
         const title = result.namedMob.title ? ` ${result.namedMob.title}` : '';
         setCombatLog([
-          ...combatLog(),
+          `The creature watches you but does not attack...`,
           `WARNING: A legendary creature appears: ${result.namedMob.name}${title}!`,
-          `The creature watches you but does not attack...`
+          ...combatLog()
         ]);
       } else {
         setNamedMobEncounter(null);
@@ -883,7 +883,7 @@ export default function GamePage() {
 
       if (responseData.result === 'victory') {
         // Keep the combat log visible in background
-        setCombatLog([...finalState.log, `Victory! You defeated ${activeMob()?.name}!`]);
+        setCombatLog([`Victory! You defeated ${activeMob()?.name}!`, ...finalState.log]);
         
         // Wait a moment before clearing combat
         setTimeout(() => {
@@ -920,7 +920,7 @@ export default function GamePage() {
         }, 200);
       } else if (responseData.result === 'defeat') {
         // Keep the combat log visible in background
-        setCombatLog([...finalState.log, 'You have been defeated...']);
+        setCombatLog(['You have been defeated...', ...finalState.log]);
         
         // Wait a moment before clearing combat
         setTimeout(() => {
@@ -1823,26 +1823,8 @@ export default function GamePage() {
     navigate(`/game/dungeon/${store.dungeonSession.dungeon_id}`);
   };
 
-  // Auto-scroll adventure combat log
-  createEffect(() => {
-    const log = combatLog(); // Track log changes
-    
-    if (adventureLogRef && !adventureLogUserScrolledUp() && log.length > 0) {
-      setTimeout(() => {
-        if (adventureLogRef) {
-          adventureLogRef.scrollTop = adventureLogRef.scrollHeight;
-        }
-      }, 0);
-    }
-  });
-
   const handleAdventureLogScroll = () => {
-    if (!adventureLogRef) return;
-    
-    const { scrollTop, scrollHeight, clientHeight } = adventureLogRef;
-    const isAtBottom = scrollHeight - scrollTop - clientHeight < 10;
-    
-    setAdventureLogUserScrolledUp(!isAtBottom);
+    // Kept for potential future features
   };
 
   // Check for saved combat state on mount
@@ -2535,8 +2517,7 @@ export default function GamePage() {
                       style={{ 
                         "margin-top": "1rem",
                         "max-height": "120px",
-                        "overflow-y": "auto",
-                        "scroll-behavior": "smooth"
+                        "overflow-y": "auto"
                       }}
                       onScroll={handleAdventureLogScroll}
                     >

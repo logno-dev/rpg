@@ -232,10 +232,10 @@ export default function DungeonRoute() {
       if (result.isBoss && result.namedMob) {
         setActiveNamedMobId(result.namedMob.id);
         const title = result.namedMob?.title ? ` ${result.namedMob.title}` : '';
-        setCombatLog([`Boss Fight!`, `${result.mob.name}${title} blocks your path!`]);
+        setCombatLog([`${result.mob.name}${title} blocks your path!`, `Boss Fight!`]);
       } else {
         setActiveNamedMobId(null);
-        setCombatLog([`Encounter ${progress()?.current_encounter}`, `${result.mob.name} attacks!`]);
+        setCombatLog([`${result.mob.name} attacks!`, `Encounter ${progress()?.current_encounter}`]);
       }
       
     } catch (error: any) {

@@ -436,28 +436,7 @@ export function CombatEngine(props: CombatEngineProps) {
     }
   });
 
-  // Auto-scroll combat log when new messages arrive (if user hasn't scrolled up)
-  createEffect(() => {
-    const log = state().log; // Track log changes
-    
-    if (logContainerRef && !userScrolledUp()) {
-      // Use requestAnimationFrame for more reliable scrolling
-      requestAnimationFrame(() => {
-        if (logContainerRef) {
-          logContainerRef.scrollTop = logContainerRef.scrollHeight;
-        }
-      });
-      
-      // Double-check after a short delay to catch edge cases
-      setTimeout(() => {
-        if (logContainerRef && !userScrolledUp()) {
-          logContainerRef.scrollTop = logContainerRef.scrollHeight;
-        }
-      }, 50);
-    }
-  });
-
-  // Handle scroll events to detect if user scrolled up
+  // Handle scroll events (kept for potential future features)
   const handleLogScroll = () => {
     if (!logContainerRef) return;
     
@@ -593,12 +572,12 @@ export function CombatEngine(props: CombatEngineProps) {
           // Apply instant damage
           if (result.damage) {
             newState.mobHealth = Math.max(0, newState.mobHealth - result.damage);
-            newLog.push(`You cast ${ability.name} for ${result.damage} damage!`);
+            newLog.unshift(`You cast ${ability.name} for ${result.damage} damage!`);
             
             if (newState.mobHealth <= 0) {
               newState.isActive = false;
               newState.result = 'victory';
-              newLog.push(`Victory! You defeated ${props.mob.name}!`);
+              newLog.unshift(`Victory! You defeated ${props.mob.name}!`);
               setTimeout(() => props.onCombatEnd('victory', newState), 0);
             }
           }
@@ -613,7 +592,7 @@ export function CombatEngine(props: CombatEngineProps) {
             newState.characterHealth = newHealth;
             updatedHealth = newHealth;
             didHeal = true;
-            newLog.push(`You cast ${ability.name} and restore ${actualHealing} HP!`);
+            newLog.unshift(`You cast ${ability.name} and restore ${actualHealing} HP!`);
           }
           
           // Create active effects (DOT, HOT, buff, debuff)
@@ -621,10 +600,10 @@ export function CombatEngine(props: CombatEngineProps) {
           if (activeEffect) {
             if (activeEffect.effect_type === 'dot') {
               setActiveDots(EffectProcessor.addOrStackEffect(activeDots(), activeEffect));
-              newLog.push(`Applied ${ability.name} DOT!`);
+              newLog.unshift(`Applied ${ability.name} DOT!`);
             } else if (activeEffect.effect_type === 'hot') {
               setActiveHots(EffectProcessor.addOrStackEffect(activeHots(), activeEffect));
-              newLog.push(`Applied ${ability.name} HoT!`);
+              newLog.unshift(`Applied ${ability.name} HoT!`);
             } else if (activeEffect.effect_type === 'buff') {
               // Check if this is a Thorns buff (damage reflection)
               if (activeEffect.stat === 'thorns' && activeEffect.amount) {
@@ -634,7 +613,7 @@ export function CombatEngine(props: CombatEngineProps) {
                   duration: activeEffect.duration,
                   expiresAt: Date.now() + (activeEffect.duration * 1000),
                 });
-                newLog.push(`${ability.name}: Reflecting ${activeEffect.amount}% damage for ${activeEffect.duration}s!`);
+                newLog.unshift(`${ability.name}: Reflecting ${activeEffect.amount}% damage for ${activeEffect.duration}s!`);
               } else {
                 // Regular stat buff
                 effectsActions.addEffect({
@@ -643,11 +622,11 @@ export function CombatEngine(props: CombatEngineProps) {
                   amount: activeEffect.amount!,
                   duration: activeEffect.duration,
                 });
-                newLog.push(`${ability.name}: +${activeEffect.amount} ${activeEffect.stat} for ${activeEffect.duration}s`);
+                newLog.unshift(`${ability.name}: +${activeEffect.amount} ${activeEffect.stat} for ${activeEffect.duration}s`);
               }
             } else if (activeEffect.effect_type === 'debuff') {
               setActiveDebuffs(EffectProcessor.addOrStackEffect(activeDebuffs(), activeEffect));
-              newLog.push(`${ability.name}: Debuff applied!`);
+              newLog.unshift(`${ability.name}: Debuff applied!`);
             } else if (activeEffect.effect_type === 'shield') {
               // Shield effect - absorbs damage
               // (Future implementation for shield mechanics)
@@ -665,13 +644,13 @@ export function CombatEngine(props: CombatEngineProps) {
         const totalDamage = Math.max(1, baseDamage + statBonus - props.mob.defense);
 
         newState.mobHealth = Math.max(0, currentState.mobHealth - totalDamage);
-        newLog.push(`You cast ${ability.name} for ${totalDamage} damage!`);
+        newLog.unshift(`You cast ${ability.name} for ${totalDamage} damage!`);
 
         // Check if mob is defeated
         if (newState.mobHealth <= 0) {
           newState.isActive = false;
           newState.result = 'victory';
-          newLog.push(`Victory! You defeated ${props.mob.name}!`);
+          newLog.unshift(`Victory! You defeated ${props.mob.name}!`);
           setTimeout(() => props.onCombatEnd('victory', newState), 0);
         }
       } else if (ability.category === 'heal') {
@@ -716,7 +695,7 @@ export function CombatEngine(props: CombatEngineProps) {
         newState.characterHealth = newHealth;
         updatedHealth = newHealth; // Store for parent notification
         didHeal = true;
-        newLog.push(`You cast ${ability.name} and restore ${actualHealing} HP!`);
+        newLog.unshift(`You cast ${ability.name} and restore ${actualHealing} HP!`);
       } else if (ability.category === 'buff') {
         // Apply buff effect
         if (ability.buff_stat && ability.buff_amount && ability.buff_duration) {
@@ -726,7 +705,7 @@ export function CombatEngine(props: CombatEngineProps) {
             amount: ability.buff_amount,
             duration: ability.buff_duration,
           });
-          newLog.push(`You cast ${ability.name}! +${ability.buff_amount} ${ability.buff_stat} for ${ability.buff_duration}s`);
+          newLog.unshift(`You cast ${ability.name}! +${ability.buff_amount} ${ability.buff_stat} for ${ability.buff_duration}s`);
         }
       }
 
@@ -842,13 +821,13 @@ export function CombatEngine(props: CombatEngineProps) {
           // Apply DOT tick damage to mob
           const actualDamage = Math.max(1, tickDamage);
           newState.mobHealth = Math.max(0, newState.mobHealth - actualDamage);
-          newState.log = [...newState.log, `${effect.name} deals ${actualDamage} damage!`];
+          newState.log = [`${effect.name} deals ${actualDamage} damage!`, ...newState.log];
           
           // Check if mob died from DOT
           if (newState.mobHealth <= 0) {
             newState.isActive = false;
             newState.result = 'victory';
-            newState.log = [...newState.log, `Victory! You defeated ${props.mob.name}!`];
+              newState.log = [`Victory! You defeated ${props.mob.name}!`, ...newState.log];
             setTimeout(() => props.onCombatEnd('victory', newState), 0);
             clearInterval(intervalId);
           }
@@ -864,7 +843,7 @@ export function CombatEngine(props: CombatEngineProps) {
           
           if (healingApplied > 0) {
             newState.characterHealth = newHealth;
-            newState.log = [...newState.log, `${effect.name} restores ${healingApplied} HP!`];
+            newState.log = [`${effect.name} restores ${healingApplied} HP!`, ...newState.log];
             props.onHealthChange(newHealth, currentMana());
           }
         });
@@ -928,9 +907,9 @@ export function CombatEngine(props: CombatEngineProps) {
             newState.mobHealth = newMobHealth;
             
             if (isCrit) {
-              newState.log = [...currentState.log, `Critical Hit! You attack for ${damage} damage!`];
+              newState.log = [`Critical Hit! You attack for ${damage} damage!`, ...currentState.log];
             } else {
-              newState.log = [...currentState.log, `You attack for ${damage} damage!`];
+              newState.log = [`You attack for ${damage} damage!`, ...currentState.log];
             }
             
             // Track mastery XP gain (will be processed server-side in finish-combat)
@@ -945,14 +924,14 @@ export function CombatEngine(props: CombatEngineProps) {
             if (newMobHealth <= 0) {
               newState.isActive = false;
               newState.result = 'victory';
-              newState.log = [...newState.log, `Victory! You defeated ${props.mob.name}!`];
+            newState.log = [`Victory! You defeated ${props.mob.name}!`, ...newState.log];
               setTimeout(() => props.onCombatEnd('victory', newState), 0);
               clearInterval(intervalId);
               return newState;
             }
           } else {
             // Attack missed
-            newState.log = [...currentState.log, `Your attack missed!`];
+            newState.log = [`Your attack missed!`, ...currentState.log];
           }
         } else {
           newState.characterTicks = newCharTicks;
@@ -987,7 +966,7 @@ export function CombatEngine(props: CombatEngineProps) {
             const newCharHealth = Math.max(0, currentState.characterHealth - damage);
 
             newState.characterHealth = newCharHealth;
-            newState.log = [...newState.log, `${props.mob.name} attacks for ${damage} damage!`];
+            newState.log = [`${props.mob.name} attacks for ${damage} damage!`, ...newState.log];
             
             // Check for Thorns effect (damage reflection)
             const currentThorns = thornsEffect();
@@ -995,13 +974,13 @@ export function CombatEngine(props: CombatEngineProps) {
               const reflectedDamage = Math.floor(damage * (currentThorns.reflectPercent / 100));
               if (reflectedDamage > 0) {
                 newState.mobHealth = Math.max(0, newState.mobHealth - reflectedDamage);
-                newState.log = [...newState.log, `${currentThorns.name} reflects ${reflectedDamage} damage!`];
+                newState.log = [`${currentThorns.name} reflects ${reflectedDamage} damage!`, ...newState.log];
                 
                 // Check if mob died from reflected damage
                 if (newState.mobHealth <= 0) {
                   newState.isActive = false;
                   newState.result = 'victory';
-                  newState.log = [...newState.log, `Victory! ${props.mob.name} was defeated by reflected damage!`];
+                  newState.log = [`Victory! ${props.mob.name} was defeated by reflected damage!`, ...newState.log];
                   setTimeout(() => props.onCombatEnd('victory', newState), 0);
                   clearInterval(intervalId);
                   return newState;
@@ -1018,14 +997,14 @@ export function CombatEngine(props: CombatEngineProps) {
             if (newCharHealth <= 0) {
               newState.isActive = false;
               newState.result = 'defeat';
-              newState.log = [...newState.log, `Defeat! You were slain by ${props.mob.name}...`];
+              newState.log = [`Defeat! You were slain by ${props.mob.name}...`, ...newState.log];
               setTimeout(() => props.onCombatEnd('defeat', newState), 0);
               clearInterval(intervalId);
               return newState;
             }
           } else {
             // Attack missed
-            newState.log = [...newState.log, `${props.mob.name}'s attack missed!`];
+            newState.log = [`${props.mob.name}'s attack missed!`, ...newState.log];
           }
         } else {
           newState.mobTicks = newMobTicks;
@@ -1484,8 +1463,7 @@ export function CombatEngine(props: CombatEngineProps) {
         class="combat-log" 
         style={{ 
           "height": "150px", // Fixed height - always occupies same space
-          "overflow-y": "auto",
-          "scroll-behavior": "smooth"
+          "overflow-y": "auto"
         }}
         onScroll={handleLogScroll}
       >
