@@ -40,6 +40,8 @@ export function BulkEditTable<T extends Record<string, any>>(props: BulkEditTabl
   const [editedRows, setEditedRows] = createSignal<Map<number | string, Partial<T>>>(new Map());
   const [saving, setSaving] = createSignal(false);
   const [expandedRows, setExpandedRows] = createSignal<Set<number | string>>(new Set());
+  const [currentPage, setCurrentPage] = createSignal(1);
+  const [pageSize, setPageSize] = createSignal(50);
   
   // Toggle sort
   const handleSort = (columnKey: string) => {
@@ -67,6 +69,7 @@ export function BulkEditTable<T extends Record<string, any>>(props: BulkEditTabl
       values.add(value);
     }
     setActiveFilters(filters);
+    resetPagination();
   };
   
   // Clear all filters
@@ -180,11 +183,24 @@ export function BulkEditTable<T extends Record<string, any>>(props: BulkEditTabl
     return result;
   });
   
+  // Pagination
+  const totalPages = createMemo(() => Math.ceil(processedData().length / pageSize()));
+  const paginatedData = createMemo(() => {
+    const start = (currentPage() - 1) * pageSize();
+    const end = start + pageSize();
+    return processedData().slice(start, end);
+  });
+  
+  // Reset to page 1 when filters/search changes
+  const resetPagination = () => {
+    setCurrentPage(1);
+  };
+  
   return (
     <div class="card">
       {/* Header */}
       <div style={{ display: "flex", "justify-content": "space-between", "align-items": "center", "margin-bottom": "1rem", "flex-wrap": "wrap", gap: "1rem" }}>
-        <h2>{props.title} ({props.data.length})</h2>
+        <h2>{props.title} ({processedData().length} {processedData().length !== props.data.length ? `of ${props.data.length}` : ''})</h2>
         <div style={{ display: "flex", gap: "0.5rem", "flex-wrap": "wrap" }}>
           <Show when={editedRows().size > 0}>
             <span style={{ 
@@ -226,7 +242,7 @@ export function BulkEditTable<T extends Record<string, any>>(props: BulkEditTabl
           type="text" 
           placeholder="Search..." 
           value={search()}
-          onInput={(e) => setSearch(e.currentTarget.value)}
+          onInput={(e) => { setSearch(e.currentTarget.value); resetPagination(); }}
           style={{ flex: "1", "min-width": "200px", padding: "0.5rem" }}
         />
         <Show when={props.filters && props.filters.length > 0}>
@@ -345,7 +361,7 @@ export function BulkEditTable<T extends Record<string, any>>(props: BulkEditTabl
             </tr>
           </thead>
           <tbody>
-            <For each={processedData()}>
+            <For each={paginatedData()}>
               {(row) => {
                 const rowId = props.getRowId(row);
                 const isEdited = hasChanges(rowId);
@@ -478,6 +494,86 @@ export function BulkEditTable<T extends Record<string, any>>(props: BulkEditTabl
           color: "var(--text-secondary)" 
         }}>
           No items match your search or filters
+        </div>
+      </Show>
+      
+      {/* Pagination Controls */}
+      <Show when={processedData().length > 0}>
+        <div style={{ 
+          display: "flex", 
+          "justify-content": "space-between", 
+          "align-items": "center", 
+          "margin-top": "1rem",
+          padding: "1rem",
+          "border-top": "1px solid var(--border)",
+          "flex-wrap": "wrap",
+          gap: "1rem"
+        }}>
+          <div style={{ display: "flex", "align-items": "center", gap: "0.5rem" }}>
+            <label>Show:</label>
+            <select 
+              value={pageSize()} 
+              onChange={(e) => { setPageSize(Number(e.currentTarget.value)); resetPagination(); }}
+              style={{
+                padding: "0.25rem 0.5rem",
+                background: "var(--bg-light)",
+                border: "1px solid var(--border)",
+                "border-radius": "4px",
+                color: "var(--text)"
+              }}
+            >
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={250}>250</option>
+              <option value={500}>500</option>
+            </select>
+            <span>per page</span>
+          </div>
+          
+          <div style={{ display: "flex", "align-items": "center", gap: "0.5rem" }}>
+            <span>
+              Showing {((currentPage() - 1) * pageSize()) + 1} - {Math.min(currentPage() * pageSize(), processedData().length)} of {processedData().length}
+            </span>
+          </div>
+          
+          <div style={{ display: "flex", gap: "0.25rem" }}>
+            <button
+              class="button secondary"
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage() === 1}
+              style={{ padding: "0.25rem 0.5rem" }}
+            >
+              ««
+            </button>
+            <button
+              class="button secondary"
+              onClick={() => setCurrentPage(Math.max(1, currentPage() - 1))}
+              disabled={currentPage() === 1}
+              style={{ padding: "0.25rem 0.5rem" }}
+            >
+              «
+            </button>
+            <span style={{ padding: "0.25rem 0.5rem", display: "flex", "align-items": "center" }}>
+              Page {currentPage()} of {totalPages()}
+            </span>
+            <button
+              class="button secondary"
+              onClick={() => setCurrentPage(Math.min(totalPages(), currentPage() + 1))}
+              disabled={currentPage() === totalPages()}
+              style={{ padding: "0.25rem 0.5rem" }}
+            >
+              »
+            </button>
+            <button
+              class="button secondary"
+              onClick={() => setCurrentPage(totalPages())}
+              disabled={currentPage() === totalPages()}
+              style={{ padding: "0.25rem 0.5rem" }}
+            >
+              »»
+            </button>
+          </div>
         </div>
       </Show>
       

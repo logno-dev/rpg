@@ -1000,15 +1000,20 @@ export default function GamePage() {
       
       const result = await response.json();
       
-      console.log('[USE ITEM] Restored', result.healthRestored, 'HP and', result.manaRestored, 'mana');
+      console.log('[USE ITEM] Backend restored', result.healthRestored, 'HP and', result.manaRestored, 'mana');
+      console.log('[USE ITEM] Backend says new health:', result.character.current_health, 'new mana:', result.character.current_mana);
+      console.log('[USE ITEM] skipHealthUpdate was:', skipHealthUpdate);
       
       // Use server-confirmed data
       actions.setInventory(result.inventory);
       
-      // Update health/mana: dungeon session if in dungeon, otherwise character
+      // Always update health/mana from backend response
+      // The backend has already calculated the correct values
       if (store.dungeonSession) {
+        console.log('[USE ITEM] Updating dungeon health to:', result.character.current_health);
         actions.updateDungeonHealth(result.character.current_health, result.character.current_mana);
       } else {
+        console.log('[USE ITEM] Updating character health to:', result.character.current_health);
         actions.updateHealth(result.character.current_health, result.character.current_mana);
       }
       
@@ -2332,13 +2337,12 @@ export default function GamePage() {
                   onUseConsumable={async (itemId) => {
                     const item = currentInventory().find((i: any) => i.id === itemId);
                     if (item) {
-                      // Skip health update - let CombatEngine handle it to avoid double restoration
+                      // Backend already applies health/mana restoration
+                      // We skip the frontend update to avoid double restoration
                       await handleUseItem(itemId, item.name, item.health_restore || 0, item.mana_restore || 0, true);
-                      // Return restoration values so CombatEngine can apply them internally
-                      return {
-                        healthRestore: item.health_restore || 0,
-                        manaRestore: item.mana_restore || 0
-                      };
+                      // Don't return restoration values - backend already handled it
+                      // CombatEngine will get the updated health from props.onHealthChange
+                      return undefined;
                     }
                   }}
                 />
