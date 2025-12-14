@@ -1,12 +1,12 @@
 import { json } from '@solidjs/router';
 import type { APIEvent } from '@solidjs/start/server';
 import { db } from '~/lib/db';
-import { updateQuestProgress } from '~/lib/game';
+import { updateQuestProgress, addWeaponMasteryXP } from '~/lib/game';
 
 export async function POST(event: APIEvent) {
   try {
     const body = await event.request.json();
-    const { characterId, mobId, namedMobId, result, finalHealth, finalMana } = body;
+    const { characterId, mobId, namedMobId, result, finalHealth, finalMana, weaponMasteryData } = body;
 
     // Check if this is dungeon combat
     const activeDungeonResult = await db.execute({
@@ -384,6 +384,27 @@ export async function POST(event: APIEvent) {
         required_charisma: row.ability_required_charisma || row.required_charisma,
       }));
 
+      // Process weapon mastery XP
+      const masteryResults: any[] = [];
+      if (weaponMasteryData && Array.isArray(weaponMasteryData)) {
+        console.log('[Weapon Mastery] Processing mastery data:', weaponMasteryData);
+        for (const entry of weaponMasteryData) {
+          if (entry.weaponType && entry.totalDamage > 0) {
+            const xpGained = Math.max(1, Math.floor(entry.totalDamage / 5));
+            const masteryResult = await addWeaponMasteryXP(characterId, entry.weaponType, xpGained);
+            
+            if (masteryResult.leveledUp) {
+              masteryResults.push({
+                weaponType: entry.weaponType,
+                oldLevel: masteryResult.oldLevel,
+                newLevel: masteryResult.newLevel,
+                xpGained
+              });
+            }
+          }
+        }
+      }
+
       // Update quest progress for kill objectives
       console.log('[Quest Progress] Mob object:', mob);
       const mobRegionId = mob.region_id || mob.current_region;
@@ -425,6 +446,7 @@ export async function POST(event: APIEvent) {
         character: updatedCharacter,
         inventory: updatedInventory,
         hasCompletableQuests,
+        masteryResults, // Include mastery level-ups in response
       });
     } else {
       // Defeat - death penalty

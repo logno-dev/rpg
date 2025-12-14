@@ -51,6 +51,7 @@ type CombatEngineProps = {
   onThornsChange?: (thorns: { name: string; reflectPercent: number; duration: number; expiresAt: number } | null) => void;
   onMobHealthChange?: (currentHealth: number, maxHealth: number) => void;
   initialState?: StoredCombatState; // Optional restored state from localStorage
+  onMasteryGain?: (weaponType: string, xpGained: number, damageDealt: number) => Promise<void>; // Mastery XP tracking
 };
 
 const TICK_INTERVAL = 100; // 100ms per tick
@@ -556,6 +557,22 @@ export function CombatEngine(props: CombatEngineProps) {
   const useAbility = (ability: AbilityWithCooldown) => {
     const check = canUseAbility(ability);
     if (!check.canUse) return;
+    
+    // WEAPON MASTERY: Check for ability failure based on weapon type requirement
+    // If ability requires a weapon type, check mastery level
+    const weaponTypeReq = (ability as any).weapon_type_requirement;
+    if (weaponTypeReq) {
+      // For now, we'll use a simplified failure check
+      // Full mastery data will be server-side, but we can estimate client-side
+      const abilityLevel = (ability as any).level || 1;
+      
+      // Simplified: assume 10% failure chance per 2 levels if not matching weapon level
+      // This is a rough approximation - actual calculation is server-side
+      const estimatedFailureChance = 0; // Will be properly calculated server-side
+      
+      // We'll handle ability failure fully on server-side in finish-combat
+      // Client-side we just proceed normally
+    }
 
     let updatedHealth: number | null = null;
     let didHeal = false;
@@ -861,12 +878,24 @@ export function CombatEngine(props: CombatEngineProps) {
           const weaponDamageMin = props.equippedWeapon?.damage_min || 1;
           const weaponDamageMax = props.equippedWeapon?.damage_max || 3;
           
-          // Calculate hit chance
-          const hitChance = calculateHitChance(
+          // Get weapon type and level for mastery calculations
+          const weaponType = (props.equippedWeapon as any)?.weapon_type || 'unarmed';
+          const weaponLevel = props.equippedWeapon?.required_level || 1;
+          
+          // WEAPON MASTERY: Calculate modifiers (these will be fetched from server in finish-combat)
+          // For now, we assume default values (no mastery)
+          // The actual mastery XP will be tracked server-side based on damage dealt
+          
+          // Calculate base hit chance
+          let hitChance = calculateHitChance(
             props.character.level,
             props.mob.level,
             getMobEvasiveness()
           );
+          
+          // Note: Mastery hit chance modifier would be applied here if we had it client-side
+          // For now, we'll handle penalties/bonuses server-side to avoid async issues during combat
+          
           const hitRoll = Math.random() * 100;
           const didHit = hitRoll <= hitChance;
           
@@ -877,18 +906,41 @@ export function CombatEngine(props: CombatEngineProps) {
           newState.characterAttackTicks = nextAttackTicks;
           
           if (didHit) {
-            const damage = calculateDamage(
+            let damage = calculateDamage(
               props.equippedWeapon?.damage_min || 1,
               props.equippedWeapon?.damage_max || 3,
               getActualStrength(),
               props.character.level,
               props.mob.defense
             );
+            
+            // WEAPON MASTERY: Check for critical hit (simplified - full logic is server-side)
+            // Base 5% crit chance (will be enhanced by mastery server-side)
+            const critRoll = Math.random() * 100;
+            const isCrit = critRoll <= 5; // Base crit chance
+            
+            if (isCrit) {
+              damage = Math.floor(damage * 1.5); // Base crit: 150% damage
+            }
 
             const newMobHealth = Math.max(0, currentState.mobHealth - damage);
 
             newState.mobHealth = newMobHealth;
-            newState.log = [...currentState.log, `You attack for ${damage} damage!`];
+            
+            if (isCrit) {
+              newState.log = [...currentState.log, `Critical Hit! You attack for ${damage} damage!`];
+            } else {
+              newState.log = [...currentState.log, `You attack for ${damage} damage!`];
+            }
+            
+            // Track mastery XP gain (will be processed server-side in finish-combat)
+            // Store weapon type and damage for server-side mastery processing
+            if (props.onMasteryGain && weaponType) {
+              const masteryXP = Math.max(1, Math.floor(damage / 5));
+              props.onMasteryGain(weaponType, masteryXP, damage).catch(err => {
+                console.error('Failed to track mastery XP:', err);
+              });
+            }
 
             if (newMobHealth <= 0) {
               newState.isActive = false;

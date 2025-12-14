@@ -1876,11 +1876,59 @@ export default function GMPage() {
                           <p style={{ color: "var(--text-secondary)", "font-size": "0.875rem", "margin-bottom": "0.5rem" }}>
                             {quest.description}
                           </p>
-                          <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
+                          <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)", "margin-bottom": "0.5rem" }}>
                             <div>Region: {allRegions().find(r => r.id === quest.region_id)?.name || 'Unknown'}</div>
                             <div>Min Level: {quest.min_level}</div>
                             <div>Repeatable: {quest.repeatable ? `Yes (${quest.cooldown_hours}h cooldown)` : 'No'}</div>
                           </div>
+                          
+                          <Show when={(quest as any).rewards}>
+                            <div style={{ 
+                              "margin-top": "0.5rem",
+                              "padding-top": "0.5rem",
+                              "border-top": "1px solid var(--border)"
+                            }}>
+                              <div style={{ 
+                                "font-size": "0.75rem", 
+                                color: "var(--text-secondary)", 
+                                "margin-bottom": "0.25rem",
+                                "font-weight": "600"
+                              }}>
+                                Rewards:
+                              </div>
+                              <div style={{ display: "flex", "flex-wrap": "wrap", gap: "0.5rem" }}>
+                                <For each={(quest as any).rewards}>
+                                  {(reward: any) => (
+                                    <div style={{ 
+                                      padding: "0.25rem 0.5rem", 
+                                      background: "var(--bg-dark)", 
+                                      "border-radius": "4px",
+                                      "font-size": "0.75rem",
+                                      border: "1px solid var(--border)"
+                                    }}>
+                                      <Show when={reward.reward_type === 'xp'}>
+                                        <span style={{ color: "var(--accent)" }}>+{reward.reward_amount} XP</span>
+                                      </Show>
+                                      <Show when={reward.reward_type === 'gold'}>
+                                        <span style={{ color: "var(--warning)" }}>+{reward.reward_amount} Gold</span>
+                                      </Show>
+                                      <Show when={reward.reward_type === 'item'}>
+                                        <span style={{ color: "var(--success)" }}>
+                                          {items().find((i: any) => i.id === reward.reward_item_id)?.name || `Item #${reward.reward_item_id}`}
+                                          {reward.reward_amount > 1 ? ` x${reward.reward_amount}` : ''}
+                                        </span>
+                                      </Show>
+                                      <Show when={reward.reward_type === 'crafting_material'}>
+                                        <span style={{ color: "var(--text-secondary)" }}>
+                                          Material #{reward.reward_material_id} x{reward.reward_amount}
+                                        </span>
+                                      </Show>
+                                    </div>
+                                  )}
+                                </For>
+                              </div>
+                            </div>
+                          </Show>
                         </div>
                         <div style={{ display: "flex", gap: "0.5rem" }}>
                           <button class="button secondary" onClick={async () => {
@@ -1919,13 +1967,13 @@ export default function GMPage() {
                     <div style={{ "grid-column": "1 / -1" }}>
                       <label>Quest Name</label>
                       <input type="text" value={editingQuest()!.name} 
-                             onInput={(e) => setEditingQuest({...editingQuest()!, name: e.currentTarget.value})} />
+                             onChange={(e) => setEditingQuest({...editingQuest()!, name: e.currentTarget.value})} />
                     </div>
                     
                     <div style={{ "grid-column": "1 / -1" }}>
                       <label>Description</label>
                       <textarea rows="3" value={editingQuest()!.description} 
-                                onInput={(e) => setEditingQuest({...editingQuest()!, description: e.currentTarget.value})} />
+                                onChange={(e) => setEditingQuest({...editingQuest()!, description: e.currentTarget.value})} />
                     </div>
                     
                     <div>
@@ -1941,7 +1989,7 @@ export default function GMPage() {
                     <div>
                       <label>Minimum Level</label>
                       <input type="number" min="1" value={editingQuest()!.min_level} 
-                             onInput={(e) => setEditingQuest({...editingQuest()!, min_level: parseInt(e.currentTarget.value)})} />
+                             onChange={(e) => setEditingQuest({...editingQuest()!, min_level: parseInt(e.currentTarget.value)})} />
                     </div>
                     
                     <div>
@@ -1956,7 +2004,7 @@ export default function GMPage() {
                       <div>
                         <label>Cooldown (hours)</label>
                         <input type="number" min="0" value={editingQuest()!.cooldown_hours} 
-                               onInput={(e) => setEditingQuest({...editingQuest()!, cooldown_hours: parseInt(e.currentTarget.value)})} />
+                               onChange={(e) => setEditingQuest({...editingQuest()!, cooldown_hours: parseInt(e.currentTarget.value)})} />
                       </div>
                     </Show>
                   </div>
@@ -1989,17 +2037,21 @@ export default function GMPage() {
                           
                           <div>
                             <label>Description</label>
-                            <input type="text" value={objective.description} onInput={(e) => {
-                              const updated = [...editingQuestObjectives()];
-                              updated[index()] = {...objective, description: e.currentTarget.value};
-                              setEditingQuestObjectives(updated);
-                            }} />
+                            <input 
+                              type="text" 
+                              value={objective.description} 
+                              onChange={(e) => {
+                                const updated = [...editingQuestObjectives()];
+                                updated[index()] = {...objective, description: e.currentTarget.value};
+                                setEditingQuestObjectives(updated);
+                              }}
+                            />
                           </div>
                           
                           <Show when={objective.type === 'kill'}>
                             <div>
                               <label>Target Mob ID</label>
-                              <input type="number" value={objective.target_mob_id || ''} onInput={(e) => {
+                              <input type="number" value={objective.target_mob_id || ''} onChange={(e) => {
                                 const updated = [...editingQuestObjectives()];
                                 updated[index()] = {...objective, target_mob_id: parseInt(e.currentTarget.value) || null};
                                 setEditingQuestObjectives(updated);
@@ -2009,19 +2061,22 @@ export default function GMPage() {
                           
                           <Show when={objective.type === 'collect'}>
                             <div>
-                              <label>Target Item/Material ID</label>
-                              <input type="number" value={objective.target_item_id || ''} onInput={(e) => {
+                              <label>Target Material ID (crafting_materials table)</label>
+                              <input type="number" value={objective.target_item_id || ''} onChange={(e) => {
                                 const updated = [...editingQuestObjectives()];
                                 updated[index()] = {...objective, target_item_id: parseInt(e.currentTarget.value) || null};
                                 setEditingQuestObjectives(updated);
                               }} />
+                              <small style={{ color: "var(--text-secondary)", display: "block", "margin-top": "0.25rem" }}>
+                                Note: This must be a crafting_materials ID, not an items ID
+                              </small>
                             </div>
                           </Show>
                           
                           <Show when={objective.type === 'explore'}>
                             <div>
                               <label>Target Sub-Area ID</label>
-                              <input type="number" value={objective.target_sub_area_id || ''} onInput={(e) => {
+                              <input type="number" value={objective.target_sub_area_id || ''} onChange={(e) => {
                                 const updated = [...editingQuestObjectives()];
                                 updated[index()] = {...objective, target_sub_area_id: parseInt(e.currentTarget.value) || null};
                                 setEditingQuestObjectives(updated);
@@ -2031,7 +2086,7 @@ export default function GMPage() {
                           
                           <div>
                             <label>Required Count</label>
-                            <input type="number" min="1" value={objective.required_count} onInput={(e) => {
+                            <input type="number" min="1" value={objective.required_count} onChange={(e) => {
                               const updated = [...editingQuestObjectives()];
                               updated[index()] = {...objective, required_count: parseInt(e.currentTarget.value)};
                               setEditingQuestObjectives(updated);
@@ -2128,7 +2183,7 @@ export default function GMPage() {
                           <Show when={reward.reward_type === 'crafting_material'}>
                             <div>
                               <label>Material ID</label>
-                              <input type="number" value={reward.reward_material_id || ''} onInput={(e) => {
+                              <input type="number" value={reward.reward_material_id || ''} onChange={(e) => {
                                 const updated = [...editingQuestRewards()];
                                 updated[index()] = {...reward, reward_material_id: parseInt(e.currentTarget.value) || null};
                                 setEditingQuestRewards(updated);
@@ -2138,7 +2193,7 @@ export default function GMPage() {
                           
                           <div>
                             <label>Amount</label>
-                            <input type="number" min="1" value={reward.reward_amount} onInput={(e) => {
+                            <input type="number" min="1" value={reward.reward_amount} onChange={(e) => {
                               const updated = [...editingQuestRewards()];
                               updated[index()] = {...reward, reward_amount: parseInt(e.currentTarget.value)};
                               setEditingQuestRewards(updated);
@@ -2170,22 +2225,126 @@ export default function GMPage() {
                       Cancel
                     </button>
                     <button class="button primary" onClick={async () => {
-                      const method = editingQuest()!.id ? 'PUT' : 'POST';
-                      const url = editingQuest()!.id ? `/api/gm/quests/${editingQuest()!.id}` : '/api/gm/quests';
-                      
-                      const response = await fetch(url, {
-                        method,
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          quest: editingQuest(),
-                          objectives: editingQuestObjectives(),
-                          rewards: editingQuestRewards()
-                        })
-                      });
-                      
-                      if (response.ok) {
-                        setShowQuestModal(false);
-                        await refetchQuests();
+                      try {
+                        const quest = editingQuest()!;
+                        const objectives = editingQuestObjectives();
+                        const rewards = editingQuestRewards();
+                        
+                        // Validate region
+                        const regionExists = regions().find((r: any) => r.id === quest.region_id);
+                        if (!regionExists) {
+                          alert(`Invalid Region ID: ${quest.region_id}\n\nRegion does not exist in the regions table.`);
+                          return;
+                        }
+                        
+                        // Validate objectives
+                        for (let i = 0; i < objectives.length; i++) {
+                          const obj = objectives[i];
+                          
+                          if (obj.type === 'kill' && obj.target_mob_id) {
+                            const mobExists = mobs().find((m: any) => m.id === obj.target_mob_id);
+                            if (!mobExists) {
+                              alert(`Objective ${i + 1}: Invalid Mob ID ${obj.target_mob_id}\n\nMob does not exist in the mobs table.`);
+                              return;
+                            }
+                          }
+                          
+                          if (obj.type === 'collect' && obj.target_item_id) {
+                            // We can't validate crafting materials here as we don't have them loaded
+                            // But we can at least check it's a number
+                            if (!obj.target_item_id || obj.target_item_id <= 0) {
+                              alert(`Objective ${i + 1}: Invalid Material ID\n\nMust be a valid crafting_materials ID.`);
+                              return;
+                            }
+                          }
+                          
+                          if (obj.target_sub_area_id) {
+                            const subAreaExists = subAreas().find((sa: any) => sa.id === obj.target_sub_area_id);
+                            if (!subAreaExists) {
+                              alert(`Objective ${i + 1}: Invalid Sub-Area ID ${obj.target_sub_area_id}\n\nSub-area does not exist.`);
+                              return;
+                            }
+                          }
+                          
+                          if (obj.target_region_id) {
+                            const regionExists = regions().find((r: any) => r.id === obj.target_region_id);
+                            if (!regionExists) {
+                              alert(`Objective ${i + 1}: Invalid Region ID ${obj.target_region_id}\n\nRegion does not exist.`);
+                              return;
+                            }
+                          }
+                        }
+                        
+                        // Validate rewards
+                        for (let i = 0; i < rewards.length; i++) {
+                          const reward = rewards[i];
+                          
+                          if (reward.reward_type === 'item' && reward.reward_item_id) {
+                            const itemExists = items().find((item: any) => item.id === reward.reward_item_id);
+                            if (!itemExists) {
+                              alert(`Reward ${i + 1}: Invalid Item ID ${reward.reward_item_id}\n\nItem does not exist in the items table.`);
+                              return;
+                            }
+                          }
+                          
+                          if (reward.reward_type === 'crafting_material' && reward.reward_material_id) {
+                            // We can't validate crafting materials here as we don't have them loaded
+                            // But we can at least check it's a number
+                            if (!reward.reward_material_id || reward.reward_material_id <= 0) {
+                              alert(`Reward ${i + 1}: Invalid Material ID\n\nMust be a valid crafting_materials ID.`);
+                              return;
+                            }
+                          }
+                        }
+                        
+                        const method = quest.id ? 'PUT' : 'POST';
+                        const url = quest.id ? `/api/gm/quests/${quest.id}` : '/api/gm/quests';
+                        
+                        // Strip out IDs from objectives and rewards (they get regenerated on insert)
+                        const cleanObjectives = objectives.map(obj => {
+                          const { id, quest_id, ...rest } = obj;
+                          return rest;
+                        });
+                        
+                        const cleanRewards = rewards.map(reward => {
+                          const { id, quest_id, ...rest } = reward;
+                          return rest;
+                        });
+                        
+                        console.log('Saving quest...');
+                        console.log('Quest:', JSON.stringify(quest, null, 2));
+                        console.log('Clean Objectives (without IDs):', JSON.stringify(cleanObjectives, null, 2));
+                        console.log('Clean Rewards (without IDs):', JSON.stringify(cleanRewards, null, 2));
+                        
+                        const response = await fetch(url, {
+                          method,
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            quest,
+                            objectives: cleanObjectives,
+                            rewards: cleanRewards
+                          })
+                        });
+                        
+                        const result = await response.json();
+                        console.log('Save response:', result);
+                        
+                        if (response.ok) {
+                          setShowQuestModal(false);
+                          await refetchQuests();
+                        } else {
+                          let errorMsg = result.error || 'Unknown error';
+                          if (errorMsg.includes('FOREIGN KEY constraint')) {
+                            errorMsg = 'Foreign key constraint failed. This usually means:\n\n' +
+                                      '- A crafting material ID does not exist (for collect objectives or material rewards)\n' +
+                                      '- An item/mob/region/sub-area ID is invalid\n\n' +
+                                      'Check the browser console for the full data being sent.';
+                          }
+                          alert(`Error saving quest:\n\n${errorMsg}`);
+                        }
+                      } catch (error) {
+                        console.error('Error saving quest:', error);
+                        alert(`Error saving quest: ${error}`);
                       }
                     }}>
                       Save Quest
@@ -2208,7 +2367,7 @@ export default function GMPage() {
               display: "flex",
               "align-items": "center",
               "justify-content": "center",
-              "z-index": 1001,
+              "z-index": 10000,
               padding: "1rem"
             }}>
               <div class="card" style={{ 

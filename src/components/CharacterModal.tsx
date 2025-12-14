@@ -141,7 +141,7 @@ export function CharacterModal(props: CharacterModalProps) {
           >
             <Grid3x3 size={24} style={{ "margin-right": "1rem", "flex-shrink": "0" }} />
             <div>
-              <div style={{ "font-weight": "600", "margin-bottom": "0.25rem" }}>Hotbar Management</div>
+              <div style={{ "font-weight": "600", "margin-bottom": "0.25rem" }}>Abilities</div>
               <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
                 Configure abilities and items
               </div>

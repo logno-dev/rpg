@@ -97,6 +97,7 @@ export default function GamePage() {
   const [isRoaming, setIsRoaming] = createSignal(false);
   const [isTraveling, setIsTraveling] = createSignal(false);
   const [savedCombatState, setSavedCombatState] = createSignal<StoredCombatState | null>(null);
+  const [weaponMasteryTracking, setWeaponMasteryTracking] = createSignal<Record<string, number>>({});
   const [subAreas, setSubAreas] = createSignal<any[]>([]);
   const [showSubAreaModal, setShowSubAreaModal] = createSignal(false);
   const [subAreaMobs, setSubAreaMobs] = createSignal<Record<number, any[]>>({});
@@ -255,9 +256,10 @@ export default function GamePage() {
   const [victoryData, setVictoryData] = createSignal<{
     expGained: number;
     goldGained: number;
-    loot: Array<{name: string, quantity: number}>;
+    loot: any[];
     levelUp: boolean;
     newLevel?: number;
+    masteryResults?: any[];
   } | null>(null);
   
   // Travel modal state
@@ -833,11 +835,26 @@ export default function GamePage() {
     }
   });
 
+  // Handle weapon mastery XP tracking
+  const handleMasteryGain = async (weaponType: string, xpGained: number, damageDealt: number) => {
+    setWeaponMasteryTracking(prev => ({
+      ...prev,
+      [weaponType]: (prev[weaponType] || 0) + damageDealt
+    }));
+  };
+
   const handleCombatEnd = async (result: 'victory' | 'defeat', finalState: any) => {
     try {
       // Clear saved combat state since combat is ending
       clearCombatState();
       setSavedCombatState(null);
+      
+      // Prepare weapon mastery data for server
+      const masteryTracking = weaponMasteryTracking();
+      const weaponMasteryData = Object.entries(masteryTracking).map(([weaponType, totalDamage]) => ({
+        weaponType,
+        totalDamage
+      }));
       
       const response = await fetch('/api/game/finish-combat', {
         method: 'POST',
@@ -849,6 +866,7 @@ export default function GamePage() {
           result,
           finalHealth: finalState.characterHealth,
           finalMana: currentMana(),
+          weaponMasteryData, // Include weapon mastery tracking
         }),
       });
 
@@ -882,6 +900,7 @@ export default function GamePage() {
           setActiveNamedMobId(null);
           setCombatHots([]); // Clear HOTs when combat ends
           setCombatThorns(null); // Clear Thorns when combat ends
+          setWeaponMasteryTracking({}); // Clear mastery tracking for next combat
         }, 100);
 
         // Update inventory in CharacterContext from server response
@@ -903,7 +922,8 @@ export default function GamePage() {
             goldGained: responseData.goldGained,
             loot: responseData.loot || [],
             levelUp: responseData.levelUp,
-            newLevel: responseData.newLevel
+            newLevel: responseData.newLevel,
+            masteryResults: responseData.masteryResults || []
           });
           setShowVictoryModal(true);
         }, 200);
@@ -2314,6 +2334,7 @@ export default function GamePage() {
                     setEnemyCurrentHealth(currentHealth);
                     setEnemyMaxHealth(maxHealth);
                   }}
+                  onMasteryGain={handleMasteryGain}
                   initialState={savedCombatState() ?? undefined}
                   onUseConsumable={async (itemId) => {
                     const item = currentInventory().find((i: any) => i.id === itemId);
@@ -2772,6 +2793,35 @@ export default function GamePage() {
                           "font-style": "italic"
                         }}>
                           No items dropped
+                        </div>
+                      </Show>
+                      
+                      <Show when={data().masteryResults && data().masteryResults!.length > 0}>
+                        <div style={{ 
+                          padding: "1rem",
+                          background: "var(--bg-light)",
+                          "border-radius": "6px",
+                          "border-left": "4px solid var(--accent)"
+                        }}>
+                          <div style={{ 
+                            "font-size": "0.875rem", 
+                            color: "var(--text-secondary)",
+                            "margin-bottom": "0.5rem"
+                          }}>
+                            Weapon Mastery
+                          </div>
+                          <For each={data().masteryResults}>
+                            {(mastery) => (
+                              <div style={{ 
+                                "font-size": "1rem",
+                                "font-weight": "bold",
+                                color: "var(--accent)",
+                                "margin-bottom": "0.25rem"
+                              }}>
+                                {mastery.weaponType.charAt(0).toUpperCase() + mastery.weaponType.slice(1)} Mastery: Level {mastery.oldLevel} → {mastery.newLevel}!
+                              </div>
+                            )}
+                          </For>
                         </div>
                       </Show>
                     </div>

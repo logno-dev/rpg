@@ -1,4 +1,4 @@
-import { createSignal, For, Show, onMount, createMemo } from "solid-js";
+import { createSignal, For, Show, createMemo } from "solid-js";
 import type { Ability } from "~/lib/db";
 
 type HotbarSlot = {
@@ -22,8 +22,15 @@ type Props = {
 };
 
 export function HotbarManager(props: Props) {
-  const [selectedSlot, setSelectedSlot] = createSignal<number | null>(null);
-  const [assignMode, setAssignMode] = createSignal<'ability' | 'consumable' | null>(null);
+  const [showSlotModal, setShowSlotModal] = createSignal(false);
+  const [selectedSlotForModal, setSelectedSlotForModal] = createSignal<number | null>(null);
+  const [showItemModal, setShowItemModal] = createSignal(false);
+  const [selectedItem, setSelectedItem] = createSignal<any>(null);
+  const [selectedItemType, setSelectedItemType] = createSignal<'ability' | 'consumable'>('ability');
+  const [slotSearchQuery, setSlotSearchQuery] = createSignal('');
+  const [itemListSearchQuery, setItemListSearchQuery] = createSignal('');
+  const [slotModalTab, setSlotModalTab] = createSignal<'ability' | 'consumable'>('ability');
+  const [targetSlotForItem, setTargetSlotForItem] = createSignal<number>(1);
   const [isSaving, setIsSaving] = createSignal(false);
 
   // Create hotbar memo that converts props.hotbar to the format we need
@@ -59,17 +66,61 @@ export function HotbarManager(props: Props) {
     return slots;
   });
 
+  // Filtered abilities and consumables for slot modal
+  const filteredAbilitiesForSlot = createMemo(() => {
+    const query = slotSearchQuery().toLowerCase();
+    if (!query) return props.abilities;
+    return props.abilities.filter((a: any) => 
+      a.name?.toLowerCase().includes(query) || 
+      a.description?.toLowerCase().includes(query)
+    );
+  });
+
+  const filteredConsumablesForSlot = createMemo(() => {
+    const query = slotSearchQuery().toLowerCase();
+    if (!query) return props.consumables;
+    return props.consumables.filter((c: any) => 
+      c.name?.toLowerCase().includes(query) || 
+      c.description?.toLowerCase().includes(query)
+    );
+  });
+
+  // Filtered abilities and consumables for item list
+  const filteredAbilitiesForList = createMemo(() => {
+    const query = itemListSearchQuery().toLowerCase();
+    if (!query) return props.abilities;
+    return props.abilities.filter((a: any) => 
+      a.name?.toLowerCase().includes(query) || 
+      a.description?.toLowerCase().includes(query)
+    );
+  });
+
+  const filteredConsumablesForList = createMemo(() => {
+    const query = itemListSearchQuery().toLowerCase();
+    if (!query) return props.consumables;
+    return props.consumables.filter((c: any) => 
+      c.name?.toLowerCase().includes(query) || 
+      c.description?.toLowerCase().includes(query)
+    );
+  });
+
+  // Method 1: Click on hotbar slot to open modal
   const handleSlotClick = (slot: number) => {
-    setSelectedSlot(slot);
-    setAssignMode(null);
+    setSelectedSlotForModal(slot);
+    setSlotSearchQuery('');
+    setSlotModalTab('ability');
+    setShowSlotModal(true);
   };
 
-  const handleAssignAbility = async (abilityId: number) => {
-    const slot = selectedSlot();
-    if (slot === null) return;
+  // Method 2: Click on ability/consumable to open assignment modal
+  const handleItemClick = (item: any, type: 'ability' | 'consumable') => {
+    setSelectedItem(item);
+    setSelectedItemType(type);
+    setTargetSlotForItem(1);
+    setShowItemModal(true);
+  };
 
-    console.log('[HotbarManager] Assigning ability', abilityId, 'to slot', slot);
-    
+  const handleAssignToSlot = async (slot: number, type: 'ability' | 'consumable', id: number) => {
     setIsSaving(true);
     try {
       const response = await fetch('/api/game/set-hotbar', {
@@ -78,60 +129,29 @@ export function HotbarManager(props: Props) {
         body: JSON.stringify({
           characterId: props.characterId,
           slot,
-          type: 'ability',
-          abilityId,
+          type,
+          abilityId: type === 'ability' ? id : undefined,
+          itemId: type === 'consumable' ? id : undefined,
         }),
       });
       
       const result = await response.json();
-      console.log('[HotbarManager] Response:', result);
       
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to assign ability');
+        throw new Error(result.error || 'Failed to assign');
       }
       
-      setSelectedSlot(null);
-      setAssignMode(null);
+      setShowSlotModal(false);
+      setShowItemModal(false);
+      setSelectedSlotForModal(null);
+      setSelectedItem(null);
       
-      // Notify parent of hotbar change - parent will update CharacterContext
       if (props.onHotbarChange) {
         props.onHotbarChange();
       }
     } catch (error) {
-      console.error('Failed to assign ability:', error);
-      alert('Failed to assign ability');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleAssignConsumable = async (itemId: number) => {
-    const slot = selectedSlot();
-    if (slot === null) return;
-
-    setIsSaving(true);
-    try {
-      await fetch('/api/game/set-hotbar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          characterId: props.characterId,
-          slot,
-          type: 'consumable',
-          itemId,
-        }),
-      });
-      
-      setSelectedSlot(null);
-      setAssignMode(null);
-      
-      // Notify parent of hotbar change - parent will update CharacterContext
-      if (props.onHotbarChange) {
-        props.onHotbarChange();
-      }
-    } catch (error) {
-      console.error('Failed to assign consumable:', error);
-      alert('Failed to assign consumable');
+      console.error('Failed to assign:', error);
+      alert('Failed to assign to hotbar');
     } finally {
       setIsSaving(false);
     }
@@ -149,9 +169,6 @@ export function HotbarManager(props: Props) {
         }),
       });
       
-      setSelectedSlot(null);
-      
-      // Notify parent of hotbar change - parent will update CharacterContext
       if (props.onHotbarChange) {
         props.onHotbarChange();
       }
@@ -173,7 +190,7 @@ export function HotbarManager(props: Props) {
           color: "var(--text-secondary)", 
           "margin-bottom": "1rem" 
         }}>
-          Click a slot to assign an ability or consumable. These will be available during combat and can be triggered with keyboard keys 1-8.
+          Click a slot to assign an ability or consumable. Click an ability/consumable below to assign it to a specific slot.
         </p>
         
         <div style={{
@@ -187,8 +204,8 @@ export function HotbarManager(props: Props) {
               <div
                 onClick={() => handleSlotClick(slot.slot)}
                 style={{
-                  background: selectedSlot() === slot.slot ? "var(--accent)" : "var(--bg-light)",
-                  border: `2px solid ${selectedSlot() === slot.slot ? "var(--accent)" : "var(--border)"}`,
+                  background: "var(--bg-light)",
+                  border: "2px solid var(--border)",
                   "border-radius": "8px",
                   padding: "1rem",
                   cursor: "pointer",
@@ -199,8 +216,13 @@ export function HotbarManager(props: Props) {
                   transition: "all 0.2s",
                   position: "relative"
                 }}
-                classList={{
-                  "hover:transform": true,
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "var(--accent)";
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "var(--border)";
+                  e.currentTarget.style.transform = "translateY(0)";
                 }}
               >
                 {/* Slot Number */}
@@ -279,175 +301,451 @@ export function HotbarManager(props: Props) {
         </div>
       </div>
 
-      {/* Assignment Panel */}
-      <Show when={selectedSlot() !== null}>
-        <div class="card">
-          <h3 style={{ "margin-bottom": "1rem" }}>
-            Assign to Slot {selectedSlot()}
-          </h3>
-          
-          <div class="button-group" style={{ "margin-bottom": "1.5rem" }}>
-            <button
-              class={assignMode() === 'ability' ? "button" : "button secondary"}
-              onClick={() => setAssignMode('ability')}
-            >
-              Abilities & Spells
-            </button>
-            <button
-              class={assignMode() === 'consumable' ? "button" : "button secondary"}
-              onClick={() => setAssignMode('consumable')}
-            >
-              Consumables
-            </button>
+      {/* Abilities and Consumables List */}
+      <div class="card">
+        <h3 style={{ "margin-bottom": "1rem" }}>Available Abilities & Consumables</h3>
+        <p style={{ 
+          "font-size": "0.875rem", 
+          color: "var(--text-secondary)", 
+          "margin-bottom": "1rem" 
+        }}>
+          Click on any ability or consumable to assign it to a hotbar slot.
+        </p>
+
+        {/* Search Bar */}
+        <input
+          type="text"
+          placeholder="Search abilities and consumables..."
+          value={itemListSearchQuery()}
+          onInput={(e) => setItemListSearchQuery(e.currentTarget.value)}
+          style={{
+            width: "100%",
+            padding: "0.75rem",
+            "margin-bottom": "1rem",
+            background: "var(--bg-light)",
+            border: "2px solid var(--border)",
+            "border-radius": "6px",
+            color: "var(--text)",
+            "font-size": "1rem"
+          }}
+        />
+
+        {/* Abilities Section */}
+        <div style={{ "margin-bottom": "2rem" }}>
+          <h4 style={{ "margin-bottom": "0.75rem", color: "var(--accent)" }}>
+            Abilities ({filteredAbilitiesForList().length})
+          </h4>
+          <Show when={filteredAbilitiesForList().length === 0}>
+            <div style={{
+              padding: "2rem",
+              "text-align": "center",
+              color: "var(--text-secondary)",
+              background: "var(--bg-light)",
+              "border-radius": "6px"
+            }}>
+              {itemListSearchQuery() ? 'No abilities match your search.' : 'No abilities learned yet.'}
+            </div>
+          </Show>
+          <div style={{ display: "grid", gap: "0.75rem" }}>
+            <For each={filteredAbilitiesForList()}>
+              {(ability) => (
+                <div
+                  onClick={() => handleItemClick(ability, 'ability')}
+                  style={{
+                    background: "var(--bg-light)",
+                    border: "2px solid var(--border)",
+                    "border-radius": "6px",
+                    padding: "1rem",
+                    cursor: "pointer",
+                    transition: "all 0.2s"
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = "var(--accent)";
+                    e.currentTarget.style.background = "var(--bg-dark)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = "var(--border)";
+                    e.currentTarget.style.background = "var(--bg-light)";
+                  }}
+                >
+                  <div style={{ display: "flex", "justify-content": "space-between", "align-items": "start" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ "font-weight": "bold", "font-size": "1rem", "margin-bottom": "0.25rem" }}>
+                        {ability.name}
+                      </div>
+                      <Show when={ability.description}>
+                        <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)", "margin-bottom": "0.5rem" }}>
+                          {ability.description}
+                        </div>
+                      </Show>
+                      <div style={{ "font-size": "0.875rem", display: "flex", gap: "1rem", "flex-wrap": "wrap" }}>
+                        <Show when={ability.mana_cost}>
+                          <span style={{ color: "var(--accent)" }}>{ability.mana_cost} Mana</span>
+                        </Show>
+                        <Show when={ability.cooldown}>
+                          <span style={{ color: "var(--warning)" }}>{ability.cooldown}s CD</span>
+                        </Show>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </For>
+          </div>
+        </div>
+
+        {/* Consumables Section */}
+        <div>
+          <h4 style={{ "margin-bottom": "0.75rem", color: "var(--success)" }}>
+            Consumables ({filteredConsumablesForList().length})
+          </h4>
+          <Show when={filteredConsumablesForList().length === 0}>
+            <div style={{
+              padding: "2rem",
+              "text-align": "center",
+              color: "var(--text-secondary)",
+              background: "var(--bg-light)",
+              "border-radius": "6px"
+            }}>
+              {itemListSearchQuery() ? 'No consumables match your search.' : 'No consumables in inventory.'}
+            </div>
+          </Show>
+          <div style={{ display: "grid", gap: "0.75rem" }}>
+            <For each={filteredConsumablesForList()}>
+              {(item) => (
+                <div
+                  onClick={() => handleItemClick(item, 'consumable')}
+                  style={{
+                    background: "var(--bg-light)",
+                    border: "2px solid var(--border)",
+                    "border-radius": "6px",
+                    padding: "1rem",
+                    cursor: "pointer",
+                    transition: "all 0.2s"
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = "var(--success)";
+                    e.currentTarget.style.background = "var(--bg-dark)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = "var(--border)";
+                    e.currentTarget.style.background = "var(--bg-light)";
+                  }}
+                >
+                  <div style={{ display: "flex", "justify-content": "space-between", "align-items": "start" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ "font-weight": "bold", "font-size": "1rem", "margin-bottom": "0.25rem" }}>
+                        {item.name} <span style={{ color: "var(--text-secondary)" }}>x{item.quantity}</span>
+                      </div>
+                      <Show when={item.description}>
+                        <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)", "margin-bottom": "0.5rem" }}>
+                          {item.description}
+                        </div>
+                      </Show>
+                      <div style={{ "font-size": "0.875rem", display: "flex", gap: "1rem" }}>
+                        <Show when={item.health_restore}>
+                          <span style={{ color: "var(--danger)" }}>+{item.health_restore} HP</span>
+                        </Show>
+                        <Show when={item.mana_restore}>
+                          <span style={{ color: "var(--accent)" }}>+{item.mana_restore} MP</span>
+                        </Show>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </For>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal 1: Slot Assignment Modal (when clicking on hotbar slot) */}
+      <Show when={showSlotModal()}>
+        <div 
+          style={{ 
+            position: "fixed", 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            background: "rgba(0, 0, 0, 0.85)", 
+            display: "flex", 
+            "align-items": "center", 
+            "justify-content": "center",
+            "z-index": 1000,
+            padding: "1rem"
+          }}
+          onClick={() => setShowSlotModal(false)}
+        >
+          <div 
+            class="card"
+            style={{ 
+              "max-width": "600px",
+              width: "100%",
+              "max-height": "80vh",
+              "overflow-y": "auto",
+              background: "var(--bg-dark)",
+              border: "2px solid var(--accent)"
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ "margin-bottom": "1rem" }}>Assign to Slot {selectedSlotForModal()}</h2>
+
+            {/* Search Bar */}
+            <input
+              type="text"
+              placeholder="Search..."
+              value={slotSearchQuery()}
+              onInput={(e) => setSlotSearchQuery(e.currentTarget.value)}
+              style={{
+                width: "100%",
+                padding: "0.75rem",
+                "margin-bottom": "1rem",
+                background: "var(--bg-light)",
+                border: "2px solid var(--border)",
+                "border-radius": "6px",
+                color: "var(--text)",
+                "font-size": "1rem"
+              }}
+            />
+
+            {/* Tabs */}
+            <div class="button-group" style={{ "margin-bottom": "1rem" }}>
+              <button
+                class={slotModalTab() === 'ability' ? "button" : "button secondary"}
+                onClick={() => setSlotModalTab('ability')}
+              >
+                Abilities
+              </button>
+              <button
+                class={slotModalTab() === 'consumable' ? "button" : "button secondary"}
+                onClick={() => setSlotModalTab('consumable')}
+              >
+                Consumables
+              </button>
+            </div>
+
+            {/* Abilities List */}
+            <Show when={slotModalTab() === 'ability'}>
+              <div style={{ display: "grid", gap: "0.75rem", "max-height": "400px", "overflow-y": "auto" }}>
+                <Show when={filteredAbilitiesForSlot().length === 0}>
+                  <div style={{ padding: "2rem", "text-align": "center", color: "var(--text-secondary)" }}>
+                    {slotSearchQuery() ? 'No abilities match your search.' : 'No abilities available.'}
+                  </div>
+                </Show>
+                <For each={filteredAbilitiesForSlot()}>
+                  {(ability) => (
+                    <div
+                      onClick={() => !isSaving() && handleAssignToSlot(selectedSlotForModal()!, 'ability', ability.ability_id || ability.id)}
+                      style={{
+                        background: "var(--bg-light)",
+                        border: "2px solid var(--border)",
+                        "border-radius": "6px",
+                        padding: "1rem",
+                        cursor: isSaving() ? "not-allowed" : "pointer",
+                        transition: "all 0.2s",
+                        opacity: isSaving() ? 0.5 : 1
+                      }}
+                    >
+                      <div style={{ "font-weight": "bold", "margin-bottom": "0.25rem" }}>{ability.name}</div>
+                      <Show when={ability.description}>
+                        <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)", "margin-bottom": "0.5rem" }}>
+                          {ability.description}
+                        </div>
+                      </Show>
+                      <div style={{ "font-size": "0.875rem", display: "flex", gap: "1rem", "flex-wrap": "wrap" }}>
+                        <Show when={ability.mana_cost}>
+                          <span style={{ color: "var(--accent)" }}>{ability.mana_cost} Mana</span>
+                        </Show>
+                        <Show when={ability.cooldown}>
+                          <span style={{ color: "var(--warning)" }}>{ability.cooldown}s</span>
+                        </Show>
+                      </div>
+                    </div>
+                  )}
+                </For>
+              </div>
+            </Show>
+
+            {/* Consumables List */}
+            <Show when={slotModalTab() === 'consumable'}>
+              <div style={{ display: "grid", gap: "0.75rem", "max-height": "400px", "overflow-y": "auto" }}>
+                <Show when={filteredConsumablesForSlot().length === 0}>
+                  <div style={{ padding: "2rem", "text-align": "center", color: "var(--text-secondary)" }}>
+                    {slotSearchQuery() ? 'No consumables match your search.' : 'No consumables available.'}
+                  </div>
+                </Show>
+                <For each={filteredConsumablesForSlot()}>
+                  {(item) => (
+                    <div
+                      onClick={() => !isSaving() && handleAssignToSlot(selectedSlotForModal()!, 'consumable', item.item_id)}
+                      style={{
+                        background: "var(--bg-light)",
+                        border: "2px solid var(--border)",
+                        "border-radius": "6px",
+                        padding: "1rem",
+                        cursor: isSaving() ? "not-allowed" : "pointer",
+                        transition: "all 0.2s",
+                        opacity: isSaving() ? 0.5 : 1
+                      }}
+                    >
+                      <div style={{ "font-weight": "bold", "margin-bottom": "0.25rem" }}>
+                        {item.name} <span style={{ color: "var(--text-secondary)" }}>x{item.quantity}</span>
+                      </div>
+                      <Show when={item.description}>
+                        <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)", "margin-bottom": "0.5rem" }}>
+                          {item.description}
+                        </div>
+                      </Show>
+                      <div style={{ "font-size": "0.875rem", display: "flex", gap: "1rem" }}>
+                        <Show when={item.health_restore}>
+                          <span style={{ color: "var(--danger)" }}>+{item.health_restore} HP</span>
+                        </Show>
+                        <Show when={item.mana_restore}>
+                          <span style={{ color: "var(--accent)" }}>+{item.mana_restore} MP</span>
+                        </Show>
+                      </div>
+                    </div>
+                  )}
+                </For>
+              </div>
+            </Show>
+
             <button
               class="button secondary"
-              onClick={() => {
-                setSelectedSlot(null);
-                setAssignMode(null);
-              }}
+              onClick={() => setShowSlotModal(false)}
+              style={{ width: "100%", "margin-top": "1rem" }}
             >
               Cancel
             </button>
           </div>
+        </div>
+      </Show>
 
-          {/* Abilities List */}
-          <Show when={assignMode() === 'ability'}>
-            <div style={{ display: "grid", gap: "0.75rem" }}>
-              <Show when={props.abilities.length === 0}>
-                <div style={{
-                  padding: "2rem",
-                  "text-align": "center",
-                  color: "var(--text-secondary)",
-                  background: "var(--bg-light)",
-                  "border-radius": "6px"
-                }}>
-                  No abilities learned yet. Find ability scrolls to learn new abilities!
+      {/* Modal 2: Item Assignment Modal (when clicking on ability/consumable) */}
+      <Show when={showItemModal() && selectedItem()}>
+        <div 
+          style={{ 
+            position: "fixed", 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            background: "rgba(0, 0, 0, 0.85)", 
+            display: "flex", 
+            "align-items": "center", 
+            "justify-content": "center",
+            "z-index": 1000,
+            padding: "1rem"
+          }}
+          onClick={() => setShowItemModal(false)}
+        >
+          <div 
+            class="card"
+            style={{ 
+              "max-width": "500px",
+              width: "100%",
+              background: "var(--bg-dark)",
+              border: `2px solid ${selectedItemType() === 'ability' ? 'var(--accent)' : 'var(--success)'}`
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ "margin-bottom": "1rem" }}>{selectedItem().name}</h2>
+
+            {/* Item Details */}
+            <div style={{ 
+              padding: "1rem", 
+              background: "var(--bg-light)", 
+              "border-radius": "6px",
+              "margin-bottom": "1.5rem"
+            }}>
+              <Show when={selectedItem().description}>
+                <p style={{ "margin-bottom": "1rem", color: "var(--text-secondary)" }}>
+                  {selectedItem().description}
+                </p>
+              </Show>
+
+              <Show when={selectedItemType() === 'ability'}>
+                <div style={{ display: "grid", "grid-template-columns": "1fr 1fr", gap: "0.5rem", "font-size": "0.875rem" }}>
+                  <Show when={selectedItem().mana_cost}>
+                    <div><strong>Mana Cost:</strong> {selectedItem().mana_cost}</div>
+                  </Show>
+                  <Show when={selectedItem().cooldown}>
+                    <div><strong>Cooldown:</strong> {selectedItem().cooldown}s</div>
+                  </Show>
+                  <Show when={selectedItem().damage_min && selectedItem().damage_max}>
+                    <div><strong>Damage:</strong> {selectedItem().damage_min}-{selectedItem().damage_max}</div>
+                  </Show>
+                  <Show when={selectedItem().healing}>
+                    <div><strong>Healing:</strong> {selectedItem().healing}</div>
+                  </Show>
                 </div>
               </Show>
-              <For each={props.abilities}>
-                {(ability) => {
-                  console.log('[HotbarManager] Ability:', ability);
-                  return (
-                  <div
-                    onClick={() => {
-                      console.log('[HotbarManager] Clicked ability:', ability);
-                      if (!isSaving()) handleAssignAbility(ability.ability_id || ability.id);
-                    }}
-                    style={{
-                      background: "var(--bg-light)",
-                      border: "2px solid var(--border)",
-                      "border-radius": "6px",
-                      padding: "1rem",
-                      cursor: isSaving() ? "not-allowed" : "pointer",
-                      transition: "all 0.2s",
-                      opacity: isSaving() ? 0.5 : 1
-                    }}
-                  >
-                    <div style={{ display: "flex", "justify-content": "space-between", "align-items": "start" }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ "font-weight": "bold", "font-size": "1rem", "margin-bottom": "0.25rem" }}>
-                          {ability.name}
-                        </div>
-                        <Show when={ability.description}>
-                          <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)", "margin-bottom": "0.5rem" }}>
-                            {ability.description}
-                          </div>
-                        </Show>
-                        <div style={{ "font-size": "0.875rem", display: "flex", gap: "1rem", "flex-wrap": "wrap" }}>
-                          <Show when={ability.mana_cost}>
-                            <span style={{ color: "var(--accent)" }}>{ability.mana_cost} Mana</span>
-                          </Show>
-                          <Show when={ability.cooldown}>
-                            <span style={{ color: "var(--warning)" }}>{ability.cooldown}s</span>
-                          </Show>
-                          <Show when={ability.damage_min && ability.damage_max}>
-                            <span style={{ color: "var(--danger)" }}>{ability.damage_min}-{ability.damage_max}</span>
-                          </Show>
-                          <Show when={ability.healing}>
-                            <span style={{ color: "var(--success)" }}>{ability.healing}</span>
-                          </Show>
-                        </div>
-                        <Show when={ability.weapon_type_requirement || ability.offhand_type_requirement}>
-                          <div style={{ 
-                            "font-size": "0.75rem", 
-                            "margin-top": "0.5rem",
-                            padding: "0.5rem",
-                            background: "rgba(59, 130, 246, 0.1)",
-                            "border-radius": "4px",
-                            border: "1px solid var(--accent)",
-                            color: "var(--text-secondary)"
-                          }}>
-                            <div style={{ color: "var(--accent)", "font-weight": "bold", "margin-bottom": "0.25rem" }}>Equipment Required:</div>
-                            <Show when={ability.weapon_type_requirement}>
-                              <div><strong>Weapon:</strong> {ability.weapon_type_requirement.split(',').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).replace('_', ' ')).join(', ')}</div>
-                            </Show>
-                            <Show when={ability.offhand_type_requirement}>
-                              <div><strong>Offhand:</strong> {ability.offhand_type_requirement.split(',').map((o: string) => o.charAt(0).toUpperCase() + o.slice(1).replace('_', ' ')).join(', ')}</div>
-                            </Show>
-                          </div>
-                        </Show>
-                      </div>
-                    </div>
-                  </div>
-                  );
+
+              <Show when={selectedItemType() === 'consumable'}>
+                <div style={{ display: "grid", "grid-template-columns": "1fr 1fr", gap: "0.5rem", "font-size": "0.875rem" }}>
+                  <Show when={selectedItem().health_restore}>
+                    <div><strong>HP Restore:</strong> +{selectedItem().health_restore}</div>
+                  </Show>
+                  <Show when={selectedItem().mana_restore}>
+                    <div><strong>MP Restore:</strong> +{selectedItem().mana_restore}</div>
+                  </Show>
+                  <div><strong>Quantity:</strong> x{selectedItem().quantity}</div>
+                </div>
+              </Show>
+            </div>
+
+            {/* Slot Selection */}
+            <div style={{ "margin-bottom": "1rem" }}>
+              <label style={{ display: "block", "margin-bottom": "0.5rem", "font-weight": "bold" }}>
+                Assign to Slot:
+              </label>
+              <select
+                value={targetSlotForItem()}
+                onChange={(e) => setTargetSlotForItem(parseInt(e.currentTarget.value))}
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  background: "var(--bg-light)",
+                  border: "2px solid var(--border)",
+                  "border-radius": "6px",
+                  color: "var(--text)",
+                  "font-size": "1rem"
                 }}
-              </For>
+              >
+                <For each={[1, 2, 3, 4, 5, 6, 7, 8]}>
+                  {(slot) => {
+                    const slotData = hotbar().find(s => s.slot === slot);
+                    const slotLabel = slotData?.name ? `Slot ${slot} (${slotData.name})` : `Slot ${slot} (Empty)`;
+                    return <option value={slot}>{slotLabel}</option>;
+                  }}
+                </For>
+              </select>
             </div>
-          </Show>
 
-          {/* Consumables List */}
-          <Show when={assignMode() === 'consumable'}>
-            <div style={{ display: "grid", gap: "0.75rem" }}>
-              <Show when={props.consumables.length === 0}>
-                <div style={{
-                  padding: "2rem",
-                  "text-align": "center",
-                  color: "var(--text-secondary)",
-                  background: "var(--bg-light)",
-                  "border-radius": "6px"
-                }}>
-                  No consumables in inventory. Purchase or loot potions to use them in combat!
-                </div>
-              </Show>
-              <For each={props.consumables}>
-                {(item) => (
-                  <div
-                    onClick={() => !isSaving() && handleAssignConsumable(item.item_id)}
-                    style={{
-                      background: "var(--bg-light)",
-                      border: "2px solid var(--border)",
-                      "border-radius": "6px",
-                      padding: "1rem",
-                      cursor: isSaving() ? "not-allowed" : "pointer",
-                      transition: "all 0.2s",
-                      opacity: isSaving() ? 0.5 : 1
-                    }}
-                  >
-                    <div style={{ display: "flex", "justify-content": "space-between", "align-items": "start" }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ "font-weight": "bold", "font-size": "1rem", "margin-bottom": "0.25rem" }}>
-                          {item.name} <span style={{ color: "var(--text-secondary)" }}>x{item.quantity}</span>
-                        </div>
-                        <Show when={item.description}>
-                          <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)", "margin-bottom": "0.5rem" }}>
-                            {item.description}
-                          </div>
-                        </Show>
-                        <div style={{ "font-size": "0.875rem", display: "flex", gap: "1rem" }}>
-                          <Show when={item.health_restore}>
-                            <span style={{ color: "var(--danger)" }}>+{item.health_restore} HP</span>
-                          </Show>
-                          <Show when={item.mana_restore}>
-                            <span style={{ color: "var(--accent)" }}>+{item.mana_restore} MP</span>
-                          </Show>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </For>
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <button
+                class="button"
+                onClick={() => {
+                  const id = selectedItemType() === 'ability' 
+                    ? (selectedItem().ability_id || selectedItem().id)
+                    : selectedItem().item_id;
+                  handleAssignToSlot(targetSlotForItem(), selectedItemType(), id);
+                }}
+                disabled={isSaving()}
+                style={{ flex: 1 }}
+              >
+                {isSaving() ? 'Assigning...' : 'Assign'}
+              </button>
+              <button
+                class="button secondary"
+                onClick={() => setShowItemModal(false)}
+                disabled={isSaving()}
+              >
+                Cancel
+              </button>
             </div>
-          </Show>
+          </div>
         </div>
       </Show>
     </div>

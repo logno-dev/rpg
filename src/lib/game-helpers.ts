@@ -4,7 +4,7 @@
 
 import { createAsync, cache, redirect } from "@solidjs/router";
 import { getUser, getSelectedCharacter as getSelectedCharacterFromSession } from "~/lib/auth";
-import { getCharacter, getInventory, getAbilitiesWithEffects, getHotbar, getActiveDungeon } from "~/lib/game";
+import { getCharacter, getInventory, getAbilitiesWithEffects, getHotbar, getActiveDungeon, getAllWeaponMasteries } from "~/lib/game";
 
 /**
  * Get the currently selected character ID from localStorage (client-side fallback)
@@ -46,13 +46,14 @@ const fetchBasicCharacterDataFromSession = cache(async () => {
   const activeDungeonProgress = await getActiveDungeon(characterId);
   
   // Fetch minimal data in parallel for fast context initialization
-  const [inventory, abilities, hotbar] = await Promise.all([
+  const [inventory, abilities, hotbar, weaponMasteries] = await Promise.all([
     getInventory(characterId),
     getAbilitiesWithEffects(characterId),
     getHotbar(characterId),
+    getAllWeaponMasteries(characterId),
   ]);
 
-  return { character, inventory, abilities, hotbar, activeDungeonProgress };
+  return { character, inventory, abilities, hotbar, activeDungeonProgress, weaponMasteries };
 }, "basic-character-data");
 
 /**

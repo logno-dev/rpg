@@ -1,4 +1,4 @@
-import { createSignal, Show, For, createEffect, createResource, createMemo, Suspense } from "solid-js";
+import { createSignal, Show, For, createEffect, createResource, createMemo, Suspense, onMount } from "solid-js";
 import { GameLayout } from "~/components/GameLayout";
 import { CraftingMinigameNew } from "~/components/CraftingMinigameNew";
 import { useCharacter } from "~/lib/CharacterContext";
@@ -62,20 +62,17 @@ export default function CraftingPage() {
   const basicData = useBasicCharacterData();
   const [store, actions] = useCharacter();
   
-  // Initialize context with basic data - defer until after hydration
+  // Initialize context with basic data
   createEffect(() => {
-    // Use queueMicrotask to defer until after hydration
-    queueMicrotask(() => {
-      const data = basicData();
-      if (data) {
-        if (!store.character) {
-          actions.setCharacter(data.character);
-        }
-        actions.setInventory(data.inventory as any);
-        actions.setAbilities(data.abilities);
-        actions.setHotbar(data.hotbar);
+    const data = basicData();
+    if (data) {
+      if (!store.character) {
+        actions.setCharacter(data.character);
       }
-    });
+      actions.setInventory(data.inventory as any);
+      actions.setAbilities(data.abilities);
+      actions.setHotbar(data.hotbar);
+    }
   });
 
   const [selectedProfession, setSelectedProfession] = createSignal<Profession | null>(null);
@@ -235,18 +232,15 @@ export default function CraftingPage() {
       return;
     }
     
-    // Defer to avoid hydration mismatch
-    queueMicrotask(() => {
-      // Only auto-expand once when profession is first selected
-      if (!initialExpansionDone()) {
-        const groups = groupRecipesByCategory();
-        if (groups.length > 0) {
-          const firstCategory = groups[0][0] as string;
-          setExpandedBrackets(new Set([firstCategory]));
-          setInitialExpansionDone(true);
-        }
+    // Only auto-expand once when profession is first selected
+    if (!initialExpansionDone()) {
+      const groups = groupRecipesByCategory();
+      if (groups.length > 0) {
+        const firstCategory = groups[0][0] as string;
+        setExpandedBrackets(new Set([firstCategory]));
+        setInitialExpansionDone(true);
       }
-    });
+    }
   });
 
   // Check if player has enough materials for a recipe

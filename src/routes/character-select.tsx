@@ -1,5 +1,5 @@
 import { createAsync, redirect, useNavigate, A } from "@solidjs/router";
-import { For, Show } from "solid-js";
+import { For, Show, createSignal } from "solid-js";
 import { getUser, setSelectedCharacter } from "~/lib/auth";
 import { getCharactersByUser } from "~/lib/game";
 
@@ -17,6 +17,9 @@ async function getUserCharacters() {
 export default function CharacterSelect() {
   const data = createAsync(() => getUserCharacters());
   const navigate = useNavigate();
+  const [deletingCharacter, setDeletingCharacter] = createSignal<number | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = createSignal(false);
+  const [characterToDelete, setCharacterToDelete] = createSignal<{ id: number; name: string } | null>(null);
 
   const handleSelectCharacter = async (characterId: number) => {
     console.log('[CharacterSelect] Selecting character:', characterId);
@@ -28,6 +31,46 @@ export default function CharacterSelect() {
       navigate('/game');
     } catch (error) {
       console.error('[CharacterSelect] Error saving character:', error);
+    }
+  };
+
+  const openDeleteModal = (characterId: number, characterName: string) => {
+    setCharacterToDelete({ id: characterId, name: characterName });
+    setShowDeleteModal(true);
+  };
+
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setCharacterToDelete(null);
+  };
+
+  const confirmDelete = async () => {
+    const char = characterToDelete();
+    if (!char) return;
+
+    setDeletingCharacter(char.id);
+    
+    try {
+      const response = await fetch('/api/character/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ characterId: char.id }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete character');
+      }
+
+      // Refresh the page to update the character list
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Delete character error:', error);
+      alert(error.message || 'Failed to delete character');
+      setDeletingCharacter(null);
+      closeDeleteModal();
     }
   };
 
@@ -58,25 +101,43 @@ export default function CharacterSelect() {
           <div style={{ display: "grid", gap: "1rem", "grid-template-columns": "repeat(auto-fill, minmax(300px, 1fr))" }}>
             <For each={data()!.characters}>
               {(character) => (
-                <div onClick={() => handleSelectCharacter(character.id)} class="card" style={{ cursor: "pointer" }}>
-                  <h3 style={{ "margin-bottom": "0.5rem" }}>{character.name}</h3>
-                  <p style={{ color: "var(--text-secondary)" }}>
-                    Level {character.level} - {character.gold} Gold
-                  </p>
-                  <div class="stat-grid" style={{ "margin-top": "1rem" }}>
-                    <div class="stat-item">
-                      <div class="stat-label">HP</div>
-                      <div class="stat-value" style={{ "font-size": "1rem" }}>
-                        {character.current_health}/{character.max_health}
+                <div class="card" style={{ position: "relative" }}>
+                  <div onClick={() => handleSelectCharacter(character.id)} style={{ cursor: "pointer" }}>
+                    <h3 style={{ "margin-bottom": "0.5rem" }}>{character.name}</h3>
+                    <p style={{ color: "var(--text-secondary)" }}>
+                      Level {character.level} - {character.gold} Gold
+                    </p>
+                    <div class="stat-grid" style={{ "margin-top": "1rem" }}>
+                      <div class="stat-item">
+                        <div class="stat-label">HP</div>
+                        <div class="stat-value" style={{ "font-size": "1rem" }}>
+                          {character.current_health}/{character.max_health}
+                        </div>
                       </div>
-                    </div>
-                    <div class="stat-item">
-                      <div class="stat-label">MP</div>
-                      <div class="stat-value" style={{ "font-size": "1rem" }}>
-                        {character.current_mana}/{character.max_mana}
+                      <div class="stat-item">
+                        <div class="stat-label">MP</div>
+                        <div class="stat-value" style={{ "font-size": "1rem" }}>
+                          {character.current_mana}/{character.max_mana}
+                        </div>
                       </div>
                     </div>
                   </div>
+                  <button
+                    class="button secondary"
+                    style={{ 
+                      "margin-top": "1rem", 
+                      width: "100%",
+                      "background-color": "var(--danger, #dc3545)",
+                      "border-color": "var(--danger, #dc3545)"
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openDeleteModal(character.id, character.name);
+                    }}
+                    disabled={deletingCharacter() === character.id}
+                  >
+                    {deletingCharacter() === character.id ? "Deleting..." : "Delete Character"}
+                  </button>
                 </div>
               )}
             </For>
@@ -99,6 +160,65 @@ export default function CharacterSelect() {
           </div>
         </Show>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <Show when={showDeleteModal()}>
+        <div 
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            "background-color": "rgba(0, 0, 0, 0.7)",
+            display: "flex",
+            "align-items": "center",
+            "justify-content": "center",
+            "z-index": 1000,
+          }}
+          onClick={closeDeleteModal}
+        >
+          <div 
+            class="card"
+            style={{
+              "max-width": "500px",
+              width: "90%",
+              margin: "1rem",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ "margin-bottom": "1rem", color: "var(--danger, #dc3545)" }}>
+              Delete Character
+            </h2>
+            <p style={{ "margin-bottom": "1.5rem", "font-size": "1.1rem" }}>
+              Are you sure you want to delete <strong>{characterToDelete()?.name}</strong>?
+            </p>
+            <p style={{ "margin-bottom": "1.5rem", color: "var(--text-secondary)" }}>
+              This action cannot be undone. All character data including inventory, abilities, and progress will be permanently deleted.
+            </p>
+            <div style={{ display: "flex", gap: "1rem", "justify-content": "flex-end" }}>
+              <button
+                class="button secondary"
+                onClick={closeDeleteModal}
+                disabled={deletingCharacter() !== null}
+              >
+                Cancel
+              </button>
+              <button
+                class="button"
+                style={{
+                  "background-color": "var(--danger, #dc3545)",
+                  "border-color": "var(--danger, #dc3545)",
+                }}
+                onClick={confirmDelete}
+                disabled={deletingCharacter() !== null}
+              >
+                {deletingCharacter() !== null ? "Deleting..." : "Delete Character"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
     </div>
   );
 }

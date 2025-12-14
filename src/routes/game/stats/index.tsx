@@ -1,4 +1,4 @@
-import { createSignal, Show, For, createEffect, Suspense } from 'solid-js';
+import { createSignal, Show, For, createEffect, Suspense, createResource } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { useCharacter } from '~/lib/CharacterContext';
 import { useActiveEffects } from '~/lib/ActiveEffectsContext';
@@ -98,6 +98,19 @@ export default function StatsRoute() {
   const availablePoints = () => {
     return (currentCharacter()?.available_points || 0) - totalPendingPoints();
   };
+  
+  // Fetch weapon masteries
+  const [weaponMasteries] = createResource(characterId, async (charId) => {
+    if (!charId) return [];
+    try {
+      const response = await fetch('/api/game/weapon-mastery');
+      if (!response.ok) return [];
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to fetch weapon masteries:', error);
+      return [];
+    }
+  });
 
   const adjustPendingStat = (stat: string, amount: number) => {
     console.log('[STAT ADJUST] Adjusting', stat, 'by', amount);
@@ -399,6 +412,75 @@ export default function StatsRoute() {
             </button>
           </div>
         </Show>
+        
+        {/* Weapon Mastery Section */}
+        <div style={{ "margin-top": "2rem", "padding-top": "2rem", "border-top": "1px solid var(--border)" }}>
+          <h3 style={{ "margin-bottom": "1rem", color: "var(--accent)" }}>Weapon Mastery</h3>
+          <Show 
+            when={!weaponMasteries.loading && weaponMasteries()} 
+            fallback={<p style={{ color: "var(--text-secondary)", "text-align": "center" }}>Loading mastery data...</p>}
+          >
+            <Show when={(weaponMasteries() || []).length > 0} fallback={
+              <p style={{ color: "var(--text-secondary)", "text-align": "center", "font-style": "italic" }}>
+                No weapon mastery yet. Fight with weapons to gain mastery!
+              </p>
+            }>
+              <div style={{ display: "grid", gap: "0.75rem" }}>
+                <For each={weaponMasteries()}>
+                  {(mastery: any) => {
+                    const xpForNextLevel = (mastery.mastery_level + 1) * 100;
+                    const progress = (mastery.mastery_experience / xpForNextLevel) * 100;
+                    const characterLevel = currentCharacter()?.level || 1;
+                    const isMaxed = mastery.mastery_level >= characterLevel;
+                    
+                    return (
+                      <div style={{ 
+                        padding: "1rem",
+                        background: "var(--bg-light)",
+                        "border-radius": "6px",
+                        "border-left": `4px solid ${isMaxed ? 'var(--success)' : 'var(--accent)'}`
+                      }}>
+                        <div style={{ 
+                          display: "flex", 
+                          "justify-content": "space-between", 
+                          "align-items": "center",
+                          "margin-bottom": "0.5rem"
+                        }}>
+                          <div>
+                            <div style={{ "font-weight": "bold", "font-size": "1.1rem" }}>
+                              {mastery.weapon_type.charAt(0).toUpperCase() + mastery.weapon_type.slice(1)}
+                            </div>
+                            <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
+                              {isMaxed ? 'Maxed for your level' : `${mastery.mastery_experience} / ${xpForNextLevel} XP`}
+                            </div>
+                          </div>
+                          <div style={{ 
+                            "font-size": "1.5rem", 
+                            "font-weight": "bold",
+                            color: isMaxed ? "var(--success)" : "var(--accent)"
+                          }}>
+                            Level {mastery.mastery_level}
+                          </div>
+                        </div>
+                        <Show when={!isMaxed}>
+                          <div class="progress-bar" style={{ height: "8px" }}>
+                            <div 
+                              class="progress-fill" 
+                              style={{ 
+                                width: `${progress}%`,
+                                background: "var(--accent)"
+                              }} 
+                            />
+                          </div>
+                        </Show>
+                      </div>
+                    );
+                  }}
+                </For>
+              </div>
+            </Show>
+          </Show>
+        </div>
       </div>
       </Show>
       </Suspense>

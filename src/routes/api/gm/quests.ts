@@ -24,7 +24,21 @@ export async function GET() {
       args: [],
     });
     
-    return new Response(JSON.stringify({ quests: result.rows }), {
+    // Fetch rewards for all quests
+    const questsWithRewards = await Promise.all(
+      result.rows.map(async (quest: any) => {
+        const rewardsResult = await db.execute({
+          sql: `SELECT * FROM quest_rewards WHERE quest_id = ?`,
+          args: [quest.id],
+        });
+        return {
+          ...quest,
+          rewards: rewardsResult.rows,
+        };
+      })
+    );
+    
+    return new Response(JSON.stringify({ quests: questsWithRewards }), {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (err: any) {

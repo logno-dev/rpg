@@ -20,6 +20,49 @@ function calculateMaxMana(level: number, intelligence: number): number {
   return baseMana + levelBonus + intelligenceBonus;
 }
 
+// Check for level up and apply it if character has enough XP
+// Returns array of log messages if level up occurred, empty array otherwise
+async function checkAndApplyLevelUp(characterId: number): Promise<string[]> {
+  const character = await getCharacter(characterId);
+  if (!character) return [];
+
+  const log: string[] = [];
+  let currentExp = character.experience;
+  let currentLevel = character.level;
+
+  // Check if we can level up (potentially multiple times)
+  while (currentExp >= currentLevel * EXPERIENCE_PER_LEVEL) {
+    const expNeeded = currentLevel * EXPERIENCE_PER_LEVEL;
+    currentExp -= expNeeded;
+    currentLevel += 1;
+
+    const newBaseMaxHealth = calculateMaxHealth(currentLevel, character.constitution);
+    const newBaseMaxMana = calculateMaxMana(currentLevel, character.intelligence);
+    
+    // Give +20 HP and +20 mana per level
+    const healthIncrease = 20;
+    const manaIncrease = 20;
+    
+    await db.execute({
+      sql: `UPDATE characters 
+            SET level = ?, 
+                available_points = available_points + ?, 
+                experience = ?,
+                max_health = ?,
+                current_health = current_health + ?,
+                max_mana = ?,
+                current_mana = current_mana + ?
+            WHERE id = ?`,
+      args: [currentLevel, POINTS_PER_LEVEL, currentExp, newBaseMaxHealth, healthIncrease, newBaseMaxMana, manaIncrease, characterId],
+    });
+    
+    log.push(`LEVEL UP! You are now level ${currentLevel}! You have ${POINTS_PER_LEVEL} stat points to assign.`);
+    log.push(`Your maximum health increased by ${healthIncrease} and mana by ${manaIncrease}!`);
+  }
+
+  return log;
+}
+
 // Get total stats including equipment bonuses
 async function getTotalStats(characterId: number): Promise<{ constitution: number; intelligence: number; wisdom: number }> {
   const character = await getCharacter(characterId);
@@ -195,8 +238,50 @@ async function giveStartingEquipment(characterId: number) {
 
   // Give starting potions (for all builds)
   await db.execute({
-    sql: 'INSERT INTO character_inventory (character_id, item_id, quantity) VALUES (?, ?, 3)',
-    args: [characterId, 13], // Health Potions
+    sql: 'INSERT INTO character_inventory (character_id, item_id, quantity) VALUES (?, ?, 5)',
+    args: [characterId, 13], // 5 Health Potions
+  });
+
+  await db.execute({
+    sql: 'INSERT INTO character_inventory (character_id, item_id, quantity) VALUES (?, ?, 5)',
+    args: [characterId, 14], // 5 Mana Potions
+  });
+
+  // Give starter abilities to all new characters (already learned, not scrolls)
+  // These are basic abilities that every character starts with
+  
+  // Novice Strike - Basic physical attack (strength-based)
+  await db.execute({
+    sql: 'INSERT INTO character_abilities (character_id, ability_id) VALUES (?, ?)',
+    args: [characterId, 536], // Novice Strike
+  });
+
+  // Novice Spark - Basic magical attack (intelligence-based)
+  await db.execute({
+    sql: 'INSERT INTO character_abilities (character_id, ability_id) VALUES (?, ?)',
+    args: [characterId, 537], // Novice Spark
+  });
+
+  // Add starter abilities to hotbar slots 1 and 2
+  await db.execute({
+    sql: 'INSERT INTO character_hotbar (character_id, slot, type, ability_id) VALUES (?, ?, ?, ?)',
+    args: [characterId, 1, 'ability', 536], // Novice Strike in slot 1
+  });
+
+  await db.execute({
+    sql: 'INSERT INTO character_hotbar (character_id, slot, type, ability_id) VALUES (?, ?, ?, ?)',
+    args: [characterId, 2, 'ability', 537], // Novice Spark in slot 2
+  });
+
+  // Add potions to hotbar slots 7 and 8
+  await db.execute({
+    sql: 'INSERT INTO character_hotbar (character_id, slot, type, item_id) VALUES (?, ?, ?, ?)',
+    args: [characterId, 7, 'consumable', 13], // Health Potion in slot 7
+  });
+
+  await db.execute({
+    sql: 'INSERT INTO character_hotbar (character_id, slot, type, item_id) VALUES (?, ?, ?, ?)',
+    args: [characterId, 8, 'consumable', 14], // Mana Potion in slot 8
   });
 
   // Give starter ability scrolls to all new characters
@@ -665,36 +750,8 @@ export async function processCombatRound(
     log.push(`Gained ${expGained} XP and ${goldGained} gold!`);
 
     // Check for level up
-    const newExp = character.experience + expGained;
-    const expNeeded = character.level * EXPERIENCE_PER_LEVEL;
-
-    if (newExp >= expNeeded) {
-      // On level up, increase max_health and max_mana based on new level
-      // Health: Base + (Level × 20) + (CON - 10) × 8
-      // Mana: Base + (Level × 20) + (INT - 10) × 5
-      const newLevel = character.level + 1;
-      const newBaseMaxHealth = calculateMaxHealth(newLevel, character.constitution);
-      const newBaseMaxMana = calculateMaxMana(newLevel, character.intelligence);
-      
-      // Give +20 HP and +20 mana per level
-      const healthIncrease = 20;
-      const manaIncrease = 20;
-      
-      await db.execute({
-        sql: `UPDATE characters 
-              SET level = level + 1, 
-                  available_points = available_points + ?, 
-                  experience = 0,
-                  max_health = ?,
-                  current_health = current_health + ?,
-                  max_mana = ?,
-                  current_mana = current_mana + ?
-              WHERE id = ?`,
-        args: [POINTS_PER_LEVEL, newBaseMaxHealth, healthIncrease, newBaseMaxMana, manaIncrease, character.id],
-      });
-      log.push(`LEVEL UP! You are now level ${newLevel}! You have ${POINTS_PER_LEVEL} stat points to assign.`);
-      log.push(`Your maximum health increased by ${healthIncrease} and mana by ${manaIncrease}!`);
-    }
+    const levelUpMessages = await checkAndApplyLevelUp(character.id);
+    log.push(...levelUpMessages);
 
     // Roll for loot (only for regular mobs, not named mobs in dungeons)
     if (!isNamedMob) {
@@ -1290,13 +1347,138 @@ export async function hasUnlockedRegion(characterId: number, regionId: number): 
   return (result.rows[0] as any).count > 0;
 }
 
-// Unlock a region for a character
-export async function unlockRegion(characterId: number, regionId: number): Promise<void> {
-  await db.execute({
-    sql: 'INSERT OR IGNORE INTO character_region_unlocks (character_id, region_id) VALUES (?, ?)',
-    args: [characterId, regionId],
+// ==================== WEAPON MASTERY FUNCTIONS ====================
+
+/**
+ * Get weapon mastery for a specific weapon type
+ */
+export async function getWeaponMastery(characterId: number, weaponType: string): Promise<{ mastery_level: number; mastery_experience: number }> {
+  const result = await db.execute({
+    sql: 'SELECT mastery_level, mastery_experience FROM character_weapon_mastery WHERE character_id = ? AND weapon_type = ?',
+    args: [characterId, weaponType],
   });
+
+  if (result.rows.length === 0) {
+    // No mastery record exists, return defaults
+    return { mastery_level: 0, mastery_experience: 0 };
+  }
+
+  return result.rows[0] as { mastery_level: number; mastery_experience: number };
 }
+
+/**
+ * Get all weapon masteries for a character
+ */
+export async function getAllWeaponMasteries(characterId: number): Promise<any[]> {
+  const result = await db.execute({
+    sql: 'SELECT weapon_type, mastery_level, mastery_experience FROM character_weapon_mastery WHERE character_id = ? ORDER BY mastery_level DESC, weapon_type ASC',
+    args: [characterId],
+  });
+
+  return result.rows as any[];
+}
+
+/**
+ * Add weapon mastery XP and handle level ups
+ * Returns true if mastery leveled up
+ */
+export async function addWeaponMasteryXP(
+  characterId: number, 
+  weaponType: string, 
+  xpGained: number
+): Promise<{ leveledUp: boolean; newLevel?: number; oldLevel?: number }> {
+  const character = await getCharacter(characterId);
+  if (!character) throw new Error('Character not found');
+
+  const mastery = await getWeaponMastery(characterId, weaponType);
+  
+  // Calculate XP needed for next level: current_level * 100
+  const xpNeededForNextLevel = (mastery.mastery_level + 1) * 100;
+  const newXP = mastery.mastery_experience + xpGained;
+  
+  let newLevel = mastery.mastery_level;
+  let remainingXP = newXP;
+  let leveledUp = false;
+  const oldLevel = mastery.mastery_level;
+  
+  // Check for level up (can level up multiple times)
+  while (remainingXP >= (newLevel + 1) * 100 && newLevel < character.level) {
+    remainingXP -= (newLevel + 1) * 100;
+    newLevel++;
+    leveledUp = true;
+  }
+  
+  // Ensure mastery level doesn't exceed character level
+  newLevel = Math.min(newLevel, character.level);
+  
+  // Insert or update mastery record
+  await db.execute({
+    sql: `
+      INSERT INTO character_weapon_mastery (character_id, weapon_type, mastery_level, mastery_experience, updated_at)
+      VALUES (?, ?, ?, ?, unixepoch())
+      ON CONFLICT(character_id, weapon_type) DO UPDATE SET
+        mastery_level = ?,
+        mastery_experience = ?,
+        updated_at = unixepoch()
+    `,
+    args: [characterId, weaponType, newLevel, remainingXP, newLevel, remainingXP],
+  });
+
+  return { leveledUp, newLevel: leveledUp ? newLevel : undefined, oldLevel: leveledUp ? oldLevel : undefined };
+}
+
+/**
+ * Calculate weapon mastery modifiers for hit chance, damage, and crit
+ * Returns: { hitChanceMod, damageMod, critChance, critDamage }
+ */
+export function calculateWeaponMasteryModifiers(
+  masteryLevel: number,
+  weaponLevel: number
+): {
+  hitChanceMod: number;
+  damageMod: number;
+  critChance: number;
+  critDamage: number;
+} {
+  const levelDiff = masteryLevel - weaponLevel;
+  
+  let hitChanceMod = 0;
+  let damageMod = 1.0;
+  let critChance = 0;
+  let critDamage = 1.5;
+  
+  if (levelDiff < 0) {
+    // Mastery below weapon level - penalties
+    const penalty = Math.abs(levelDiff);
+    hitChanceMod = -Math.min(40, penalty * 2); // -2% hit per level, max -40%
+    damageMod = Math.max(0.4, 1.0 - (penalty * 0.03)); // -3% damage per level, min 40% damage
+  } else if (levelDiff >= 0) {
+    // Mastery at or above weapon level - bonuses
+    critChance = 5 + (levelDiff * 1); // 5% base crit at matched level, +1% per level above
+    critDamage = 1.5 + (levelDiff * 0.05); // 150% base crit damage, +5% per level above
+  }
+  
+  return { hitChanceMod, damageMod, critChance, critDamage };
+}
+
+/**
+ * Calculate ability mastery failure chance
+ * Returns failure chance as a percentage (0-100)
+ */
+export function calculateAbilityFailureChance(
+  masteryLevel: number,
+  abilityLevel: number
+): number {
+  const levelDiff = abilityLevel - masteryLevel;
+  
+  if (levelDiff <= 0) {
+    return 0; // No failure if mastery >= ability level
+  }
+  
+  // 5% failure chance per level below requirement, max 95%
+  return Math.min(95, levelDiff * 5);
+}
+
 
 // Check if a character meets the requirements to unlock a region
 async function checkRegionUnlockRequirements(
@@ -2326,6 +2508,9 @@ export async function turnInQuest(characterId: number, questId: number): Promise
     gold: 0,
     items: [],
     materials: [],
+    levelUp: false,
+    newLevel: 0,
+    levelUpMessages: [],
   };
 
   // Apply rewards
@@ -2338,6 +2523,18 @@ export async function turnInQuest(characterId: number, questId: number): Promise
         args: [r.reward_amount, characterId],
       });
       rewardSummary.xp = r.reward_amount;
+      
+      // Check for level up after awarding XP
+      const levelUpMessages = await checkAndApplyLevelUp(characterId);
+      if (levelUpMessages.length > 0) {
+        rewardSummary.levelUp = true;
+        rewardSummary.levelUpMessages = levelUpMessages;
+        // Get new level
+        const updatedChar = await getCharacter(characterId);
+        if (updatedChar) {
+          rewardSummary.newLevel = updatedChar.level;
+        }
+      }
     } else if (r.reward_type === 'gold') {
       await db.execute({
         sql: 'UPDATE characters SET gold = gold + ? WHERE id = ?',

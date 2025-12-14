@@ -90,6 +90,15 @@ export async function PUT(event: APIEvent) {
       ],
     });
     
+    // Delete character quest objective progress first (foreign key dependency)
+    await db.execute({
+      sql: `DELETE FROM character_quest_objectives 
+            WHERE quest_objective_id IN (
+              SELECT id FROM quest_objectives WHERE quest_id = ?
+            )`,
+      args: [questId],
+    });
+    
     // Delete existing objectives
     await db.execute({
       sql: `DELETE FROM quest_objectives WHERE quest_id = ?`,
@@ -99,22 +108,27 @@ export async function PUT(event: APIEvent) {
     // Insert new objectives
     if (objectives && objectives.length > 0) {
       for (const obj of objectives) {
-        await db.execute({
-          sql: `INSERT INTO quest_objectives (quest_id, objective_order, type, description, target_mob_id, target_item_id, target_region_id, target_sub_area_id, required_count, auto_complete)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          args: [
-            questId,
-            obj.objective_order,
-            obj.type,
-            obj.description,
-            obj.target_mob_id || null,
-            obj.target_item_id || null,
-            obj.target_region_id || null,
-            obj.target_sub_area_id || null,
-            obj.required_count,
-            obj.auto_complete !== undefined ? obj.auto_complete : 1,
-          ],
-        });
+        try {
+          await db.execute({
+            sql: `INSERT INTO quest_objectives (quest_id, objective_order, type, description, target_mob_id, target_item_id, target_region_id, target_sub_area_id, required_count, auto_complete)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            args: [
+              questId,
+              obj.objective_order,
+              obj.type,
+              obj.description,
+              obj.target_mob_id || null,
+              obj.target_item_id || null,
+              obj.target_region_id || null,
+              obj.target_sub_area_id || null,
+              obj.required_count,
+              obj.auto_complete !== undefined ? obj.auto_complete : 1,
+            ],
+          });
+        } catch (err: any) {
+          console.error('Failed to insert objective:', obj, err.message);
+          throw new Error(`Failed to insert objective "${obj.description}": ${err.message}. Objective data: ${JSON.stringify(obj)}`);
+        }
       }
     }
     
@@ -127,17 +141,22 @@ export async function PUT(event: APIEvent) {
     // Insert new rewards
     if (rewards && rewards.length > 0) {
       for (const reward of rewards) {
-        await db.execute({
-          sql: `INSERT INTO quest_rewards (quest_id, reward_type, reward_item_id, reward_material_id, reward_amount)
-                VALUES (?, ?, ?, ?, ?)`,
-          args: [
-            questId,
-            reward.reward_type,
-            reward.reward_item_id || null,
-            reward.reward_material_id || null,
-            reward.reward_amount,
-          ],
-        });
+        try {
+          await db.execute({
+            sql: `INSERT INTO quest_rewards (quest_id, reward_type, reward_item_id, reward_material_id, reward_amount)
+                  VALUES (?, ?, ?, ?, ?)`,
+            args: [
+              questId,
+              reward.reward_type,
+              reward.reward_item_id || null,
+              reward.reward_material_id || null,
+              reward.reward_amount,
+            ],
+          });
+        } catch (err: any) {
+          console.error('Failed to insert reward:', reward, err.message);
+          throw new Error(`Failed to insert reward (type: ${reward.reward_type}): ${err.message}. Reward data: ${JSON.stringify(reward)}`);
+        }
       }
     }
     
