@@ -954,22 +954,24 @@ export default function GamePage() {
 
 
 
-  const handleUseItem = async (inventoryItemId: number, itemName: string, healthRestore: number, manaRestore: number) => {
+  const handleUseItem = async (inventoryItemId: number, itemName: string, healthRestore: number, manaRestore: number, skipHealthUpdate = false) => {
     try {
       console.log('[USE ITEM] Using:', itemName, 'HP restore:', healthRestore, 'Mana restore:', manaRestore);
       
-      // Optimistic update - restore health/mana immediately
-      const currentH = currentHealth();
-      const currentM = currentMana();
-      
-      const newHealth = Math.min(currentMaxHealth(), currentH + healthRestore);
-      const newMana = Math.min(currentMaxMana(), currentM + manaRestore);
-      
-      // Update dungeon session if in dungeon, otherwise update character
-      if (store.dungeonSession) {
-        actions.updateDungeonHealth(newHealth, newMana);
-      } else {
-        actions.updateHealth(newHealth, newMana);
+      // Only restore health/mana if NOT in combat (combat engine handles it)
+      if (!skipHealthUpdate) {
+        const currentH = currentHealth();
+        const currentM = currentMana();
+        
+        const newHealth = Math.min(currentMaxHealth(), currentH + healthRestore);
+        const newMana = Math.min(currentMaxMana(), currentM + manaRestore);
+        
+        // Update dungeon session if in dungeon, otherwise update character
+        if (store.dungeonSession) {
+          actions.updateDungeonHealth(newHealth, newMana);
+        } else {
+          actions.updateHealth(newHealth, newMana);
+        }
       }
       
       // Optimistically update inventory
@@ -2330,7 +2332,8 @@ export default function GamePage() {
                   onUseConsumable={async (itemId) => {
                     const item = currentInventory().find((i: any) => i.id === itemId);
                     if (item) {
-                      await handleUseItem(itemId, item.name, item.health_restore || 0, item.mana_restore || 0);
+                      // Skip health update - let CombatEngine handle it to avoid double restoration
+                      await handleUseItem(itemId, item.name, item.health_restore || 0, item.mana_restore || 0, true);
                       // Return restoration values so CombatEngine can apply them internally
                       return {
                         healthRestore: item.health_restore || 0,

@@ -1,6 +1,6 @@
 import { json } from '@solidjs/router';
 import type { APIEvent } from '@solidjs/start/server';
-import { turnInQuest } from '~/lib/game';
+import { turnInQuest, getCharacter } from '~/lib/game';
 
 export async function POST(event: APIEvent) {
   const characterId = parseInt(event.request.headers.get('x-character-id') || '0');
@@ -17,7 +17,16 @@ export async function POST(event: APIEvent) {
     }
 
     const result = await turnInQuest(characterId, questId);
-    return json({ success: true, rewards: result.rewards, repeatable: result.repeatable });
+    
+    // Get updated character to return to frontend
+    const character = await getCharacter(characterId);
+    
+    return json({ 
+      success: true, 
+      rewards: result.rewards, 
+      repeatable: result.repeatable,
+      character: character
+    });
   } catch (error: any) {
     return json({ error: error.message }, { status: 400 });
   }

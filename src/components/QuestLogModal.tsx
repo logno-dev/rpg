@@ -385,30 +385,9 @@ export function QuestLogModal(props: QuestLogModalProps) {
                                          if (response.ok) {
                                            const data = await response.json();
                                            
-                                           // Update character context with rewards
-                                           if (data.rewards) {
-                                             const currentChar = store.character;
-                                             if (currentChar) {
-                                               const updatedChar = { ...currentChar };
-                                               
-                                               // Add XP
-                                               if (data.rewards.xp) {
-                                                 updatedChar.experience = (updatedChar.experience || 0) + data.rewards.xp;
-                                               }
-                                               
-                                               // Add Gold
-                                               if (data.rewards.gold) {
-                                                 updatedChar.gold = (updatedChar.gold || 0) + data.rewards.gold;
-                                               }
-                                               
-                                               // Handle level up
-                                               if (data.rewards.levelUp && data.rewards.newLevel) {
-                                                 updatedChar.level = data.rewards.newLevel;
-                                                 updatedChar.available_points = (updatedChar.available_points || 0) + 3; // 3 points per level
-                                               }
-                                               
-                                               actions.setCharacter(updatedChar);
-                                             }
+                                           // Update character context with updated character from server
+                                           if (data.character) {
+                                             actions.setCharacter(data.character);
                                            }
                                            
                                            // Show completion modal
