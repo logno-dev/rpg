@@ -1347,6 +1347,13 @@ export async function hasUnlockedRegion(characterId: number, regionId: number): 
   return (result.rows[0] as any).count > 0;
 }
 
+export async function unlockRegion(characterId: number, regionId: number): Promise<void> {
+  await db.execute({
+    sql: 'INSERT OR IGNORE INTO character_region_unlocks (character_id, region_id) VALUES (?, ?)',
+    args: [characterId, regionId],
+  });
+}
+
 // ==================== WEAPON MASTERY FUNCTIONS ====================
 
 /**
