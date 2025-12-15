@@ -277,8 +277,7 @@ export function CombatEngine(props: CombatEngineProps) {
 
 
 
-  const [state, setState] = createSignal<CombatState>(
-    props.initialState ? {
+  const initialState = props.initialState ? {
       // Restore from saved state
       characterHealth: props.initialState.characterHealth,
       characterMana: props.initialState.characterMana,
@@ -300,8 +299,30 @@ export function CombatEngine(props: CombatEngineProps) {
       mobAttackTicks: initialMobAttackTicks,
       log: [`Combat started against ${props.mob.name}!`],
       isActive: true,
-    }
-  );
+    };
+
+  const [state, setState] = createSignal<CombatState>(initialState);
+  
+  // IMMEDIATELY save initial state to localStorage
+  onMount(() => {
+    saveCombatState({
+      characterHealth: initialState.characterHealth,
+      characterMana: currentMana(),
+      mobHealth: initialState.mobHealth,
+      characterTicks: initialState.characterTicks,
+      mobTicks: initialState.mobTicks,
+      characterAttackTicks: initialState.characterAttackTicks,
+      mobAttackTicks: initialState.mobAttackTicks,
+      log: initialState.log,
+      mob: props.mob,
+      timestamp: Date.now(),
+      activeDots: props.initialState?.activeDots ?? [],
+      activeHots: props.initialState?.activeHots ?? [],
+      activeDebuffs: props.initialState?.activeDebuffs ?? [],
+      thornsEffect: props.initialState?.thornsEffect ?? null,
+      abilityCooldowns: props.initialState?.abilityCooldowns ?? {},
+    });
+  });
   
   // Notify parent of mob health changes
   createEffect(() => {
@@ -1071,15 +1092,8 @@ export function CombatEngine(props: CombatEngineProps) {
     });
   });
 
-  onCleanup(() => {
-    if (intervalId) {
-      clearInterval(intervalId);
-    }
-    if (cooldownIntervalId) {
-      clearInterval(cooldownIntervalId);
-    }
-    
-    // Save combat state to localStorage if combat is still active
+  // Save combat state to localStorage whenever state changes (during active combat)
+  createEffect(() => {
     const currentState = state();
     if (currentState.isActive && !currentState.result) {
       const cooldownsRecord: Record<number, number> = {};
@@ -1089,7 +1103,7 @@ export function CombatEngine(props: CombatEngineProps) {
         }
       });
       
-      saveCombatState({
+      const stateToSave = {
         characterHealth: currentState.characterHealth,
         characterMana: currentMana(),
         mobHealth: currentState.mobHealth,
@@ -1105,7 +1119,49 @@ export function CombatEngine(props: CombatEngineProps) {
         activeDebuffs: activeDebuffs(),
         thornsEffect: thornsEffect(),
         abilityCooldowns: cooldownsRecord,
+      };
+      
+      saveCombatState(stateToSave);
+    }
+  });
+
+  onCleanup(() => {
+    if (intervalId) {
+      clearInterval(intervalId);
+    }
+    if (cooldownIntervalId) {
+      clearInterval(cooldownIntervalId);
+    }
+    
+    // Final save on cleanup if combat is still active
+    const currentState = state();
+    if (currentState.isActive && !currentState.result) {
+      const cooldownsRecord: Record<number, number> = {};
+      abilityCooldowns().forEach((value, key) => {
+        if (value > 0) {
+          cooldownsRecord[key] = value;
+        }
       });
+      
+      const stateToSave = {
+        characterHealth: currentState.characterHealth,
+        characterMana: currentMana(),
+        mobHealth: currentState.mobHealth,
+        characterTicks: currentState.characterTicks,
+        mobTicks: currentState.mobTicks,
+        characterAttackTicks: currentState.characterAttackTicks,
+        mobAttackTicks: currentState.mobAttackTicks,
+        log: currentState.log,
+        mob: props.mob,
+        timestamp: Date.now(),
+        activeDots: activeDots(),
+        activeHots: activeHots(),
+        activeDebuffs: activeDebuffs(),
+        thornsEffect: thornsEffect(),
+        abilityCooldowns: cooldownsRecord,
+      };
+      
+      saveCombatState(stateToSave);
     }
   });
 

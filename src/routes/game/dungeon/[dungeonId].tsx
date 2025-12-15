@@ -189,6 +189,26 @@ export default function DungeonRoute() {
     }
   });
   
+  // Check for active combat session on mount (prevent refresh escape)
+  onMount(async () => {
+    try {
+      const response = await fetch(`/api/game/active-combat?characterId=${characterId()}`);
+      const data = await response.json();
+      
+      if (data.hasActiveCombat && data.session && data.mob && data.session.is_dungeon) {
+        console.log('[Dungeon Combat Restore] Active server combat session found, restoring...');
+        setActiveMob(data.mob);
+        setCombatLog([`Combat resumed - You are fighting ${data.mob.name}!`]);
+        
+        if (data.session.named_mob_id) {
+          setActiveNamedMobId(data.session.named_mob_id);
+        }
+      }
+    } catch (error) {
+      console.error('[Dungeon Combat Restore] Failed to check for active combat:', error);
+    }
+  });
+
   // Scroll detection for sticky header
   onMount(() => {
     const handleScroll = () => {

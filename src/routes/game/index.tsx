@@ -117,10 +117,7 @@ export default function GamePage() {
   const currentSubAreaObject = createMemo(() => {
     const id = selectedSubArea();
     const areas = subAreas();
-    console.log('[DEBUG] currentSubAreaObject recomputing:', { id, areasCount: areas.length });
-    if (!id) return null;
-    const found = areas.find((sa: any) => sa.id === id) || null;
-    console.log('[DEBUG] currentSubAreaObject result:', found);
+    const found = areas.find(a => a.id === id);
     return found;
   });
   
@@ -364,12 +361,10 @@ export default function GamePage() {
     
     // Guard: only proceed if we have data
     if (!gameData) {
-      console.log('[DATA] Waiting for game data to load...');
       return;
     }
     
-    if (!store.isInitialized) {
-      console.log('[DATA] Initial load - initializing CharacterContext from server');
+    if (!store.character) {
       
       // On initial load, use all server data as-is
       // NOTE: If there's an active dungeon, client-side effect redirects before we initialize
@@ -383,14 +378,6 @@ export default function GamePage() {
       actions.setMerchants([]);
       actions.setDungeons([]);
       
-      console.log('[DATA] CharacterContext initialized:', {
-        character: gameData.character.name,
-        health: gameData.character.current_health,
-        mana: gameData.character.current_mana,
-        inventory: gameData.inventory.length,
-        abilities: gameData.abilities.length
-      });
-      
       // Mark context as initialized and update sync timestamp
       actions.setInitialized(true);
       actions.updateSyncTimestamp();
@@ -400,7 +387,6 @@ export default function GamePage() {
         loadRegionalData(gameData.currentRegion.id);
       }
     } else {
-      console.log('[DATA] Already initialized - skipping server data initialization');
       // CharacterContext is the source of truth, only update sync timestamp
       actions.updateSyncTimestamp();
     }
@@ -740,7 +726,8 @@ export default function GamePage() {
       
       if (result.initiated && result.aggroMob) {
         setCombatLog([`A wild ${result.aggroMob.name} appears and attacks!`]);
-        setActiveMob(result.aggroMob);
+        // Start combat via the proper handler to create server session
+        await handleStartCombat(result.aggroMob);
       } else {
         setAvailableMobs(result.mobs || []);
         const mobCount = result.mobs?.length || 0;
@@ -757,19 +744,39 @@ export default function GamePage() {
   };
 
   const handleStartCombat = async (mob: Mob) => {
-    // Sync current health to DB before entering combat
-    const currentH = currentHealth();
-    const currentM = currentMana();
-    
-    if (currentH !== data()?.character.current_health || currentM !== data()?.character.current_mana) {
-      await syncHealthToServer(currentH, currentM);
+    try {
+      // Sync current health to DB before entering combat
+      const currentH = currentHealth();
+      const currentM = currentMana();
+      
+      if (currentH !== data()?.character.current_health || currentM !== data()?.character.current_mana) {
+        await syncHealthToServer(currentH, currentM);
+      }
+      
+      // Create server-side combat session to prevent refresh exploit
+      const response = await fetch('/api/game/start-combat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          characterId: characterId(), 
+          mobId: mob.id 
+        }),
+      });
+
+      const result = await response.json();
+      if (result.error) {
+        throw new Error(result.error);
+      }
+      
+      setAvailableMobs([]);
+      setActiveMob(mob);
+      // Initialize optimistic health with current values
+      setOptimisticHealth(currentH);
+      setOptimisticMana(currentM);
+    } catch (error: any) {
+      console.error('Start combat error:', error);
+      alert('Failed to start combat: ' + error.message);
     }
-    
-    setAvailableMobs([]);
-    setActiveMob(mob);
-    // Initialize optimistic health with current values
-    setOptimisticHealth(currentH);
-    setOptimisticMana(currentM);
   };
 
   const handleHealthChange = (health: number, mana: number) => {
@@ -1579,11 +1586,9 @@ export default function GamePage() {
   };
 
   const handleViewItem = (item: any, isMerchant: boolean = false) => {
-    console.log('[DEBUG] handleViewItem called with:', item?.name);
     setSelectedItem(item);
     setSelectedItemIsMerchant(isMerchant);
     setShowItemDetailModal(true);
-    console.log('[DEBUG] Signals set - isOpen:', showItemDetailModal(), 'item:', selectedItem()?.name);
   };
 
   const toggleItemSelection = (itemId: number) => {
@@ -1828,14 +1833,69 @@ export default function GamePage() {
   };
 
   // Check for saved combat state on mount
-  onMount(() => {
-    const saved = loadCombatState();
-    if (saved) {
-      console.log('[Combat Storage] Restoring saved combat state');
-      setSavedCombatState(saved);
-      setActiveMob(saved.mob);
-      // Restore health/mana to the saved values
-      actions.updateHealth(saved.characterHealth, saved.characterMana);
+  onMount(async () => {
+    // TWO-PHASE RESTORE:
+    // 1. Check server to verify combat is legitimate (prevent escape exploit)
+    // 2. Use localStorage for detailed state (HP, ticks, effects, etc.)
+    
+    try {
+      const response = await fetch(`/api/game/active-combat?characterId=${store.character?.id}`);
+      const data = await response.json();
+      
+      if (data.hasActiveCombat && data.session && data.mob) {
+        // If this is dungeon combat, don't restore here - let the dungeon route handle it
+        if (data.session.is_dungeon) {
+          return;
+        }
+        
+        // Server confirms combat is active, now restore detailed state from localStorage
+        const localState = loadCombatState();
+        
+        if (localState && localState.mob.id === data.mob.id) {
+          // localStorage has matching combat - use it for detailed state
+          setSavedCombatState(localState);
+          setActiveMob(localState.mob);
+          actions.updateHealth(localState.characterHealth, localState.characterMana);
+        } else {
+          // No localStorage or mismatched mob - use server session as fallback
+          const serverState: StoredCombatState = {
+            characterHealth: data.session.character_health,
+            characterMana: store.character?.current_mana ?? 100,
+            mobHealth: data.session.mob_health,
+            characterTicks: 0,
+            mobTicks: 0,
+            characterAttackTicks: 70,
+            mobAttackTicks: 70,
+            log: [`Combat resumed - You are fighting ${data.mob.name}!`],
+            mob: data.mob,
+            timestamp: Date.now(),
+          };
+          setSavedCombatState(serverState);
+          setActiveMob(data.mob);
+          actions.updateHealth(data.session.character_health, store.character?.current_mana ?? 100);
+        }
+      } else {
+        // No active server session - clear any stale localStorage
+        const saved = loadCombatState();
+        if (saved) {
+          clearCombatState();
+        }
+      }
+    } catch (error) {
+      console.error('[Combat Restore] Failed to check for active combat:', error);
+      // On API error, check localStorage but be cautious
+      const saved = loadCombatState();
+      if (saved) {
+        // Check if localStorage is recent (within last 5 minutes)
+        const age = Date.now() - saved.timestamp;
+        if (age < 5 * 60 * 1000) {
+          setSavedCombatState(saved);
+          setActiveMob(saved.mob);
+          actions.updateHealth(saved.characterHealth, saved.characterMana);
+        } else {
+          clearCombatState();
+        }
+      }
     }
     
     // Staleness detection: Handle tab visibility changes
@@ -3221,10 +3281,7 @@ export default function GamePage() {
                                 transition: "all 0.2s ease"
                               }}
                               onClick={async () => {
-                                console.log('[DEBUG] Selecting sub-area:', subArea.id, subArea.name);
-                                console.log('[DEBUG] Before update - selectedSubArea():', selectedSubArea());
                                 setSelectedSubArea(subArea.id);
-                                console.log('[DEBUG] After update - selectedSubArea():', selectedSubArea());
                                 setShowSubAreaModal(false);
                                 
                                 // Persist to database

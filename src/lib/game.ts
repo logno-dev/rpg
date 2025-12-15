@@ -499,7 +499,14 @@ export async function startCombat(characterId: number, mobId: number, isDungeon:
   const mob = mobResult.rows[0] as Mob;
   if (!mob) throw new Error('Mob not found');
 
-  // Check if already in combat
+  // Clean up any stale combat sessions first (older than 1 hour or with invalid state)
+  const oneHourAgo = Math.floor(Date.now() / 1000) - 3600;
+  await db.execute({
+    sql: 'UPDATE combat_sessions SET status = ? WHERE character_id = ? AND status = ? AND started_at < ?',
+    args: ['stale', characterId, 'active', oneHourAgo],
+  });
+
+  // Check if already in combat (after cleanup)
   const existingCombat = await db.execute({
     sql: 'SELECT * FROM combat_sessions WHERE character_id = ? AND status = ?',
     args: [characterId, 'active'],
@@ -540,7 +547,14 @@ export async function startNamedMobCombat(characterId: number, namedMobId: numbe
   const namedMob = await getNamedMob(namedMobId);
   if (!namedMob) throw new Error('Named mob not found');
 
-  // Check if already in combat
+  // Clean up any stale combat sessions first (older than 1 hour or with invalid state)
+  const oneHourAgo = Math.floor(Date.now() / 1000) - 3600;
+  await db.execute({
+    sql: 'UPDATE combat_sessions SET status = ? WHERE character_id = ? AND status = ? AND started_at < ?',
+    args: ['stale', characterId, 'active', oneHourAgo],
+  });
+
+  // Check if already in combat (after cleanup)
   const existingCombat = await db.execute({
     sql: 'SELECT * FROM combat_sessions WHERE character_id = ? AND status = ?',
     args: [characterId, 'active'],

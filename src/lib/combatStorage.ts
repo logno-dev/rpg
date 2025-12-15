@@ -42,7 +42,6 @@ export function saveCombatState(state: StoredCombatState): void {
       timestamp: Date.now(),
     };
     localStorage.setItem(COMBAT_STORAGE_KEY, JSON.stringify(stateWithTimestamp));
-    console.log('[CombatStorage] State saved to localStorage');
   } catch (error) {
     console.error('[CombatStorage] Failed to save combat state:', error);
   }
@@ -64,12 +63,10 @@ export function loadCombatState(maxAgeMs: number = 30 * 60 * 1000): StoredCombat
     // Check if state is too old (default: 30 minutes)
     const age = Date.now() - state.timestamp;
     if (age > maxAgeMs) {
-      console.log('[CombatStorage] Stored state expired, clearing');
       clearCombatState();
       return null;
     }
     
-    console.log('[CombatStorage] State loaded from localStorage');
     return state;
   } catch (error) {
     console.error('[CombatStorage] Failed to load combat state:', error);
@@ -83,7 +80,6 @@ export function loadCombatState(maxAgeMs: number = 30 * 60 * 1000): StoredCombat
 export function clearCombatState(): void {
   try {
     localStorage.removeItem(COMBAT_STORAGE_KEY);
-    console.log('[CombatStorage] State cleared from localStorage');
   } catch (error) {
     console.error('[CombatStorage] Failed to clear combat state:', error);
   }
