@@ -124,3 +124,77 @@ export async function POST(event: APIEvent) {
     });
   }
 }
+
+export async function DELETE(event: APIEvent) {
+  try {
+    await requireGM();
+    
+    const url = new URL(event.request.url);
+    const questId = url.pathname.split('/').pop();
+    
+    console.log('[DELETE Quest] Attempting to delete quest:', questId);
+    
+    if (!questId || isNaN(Number(questId))) {
+      return new Response(JSON.stringify({ error: 'Invalid quest ID' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    
+    console.log('[DELETE Quest] Step 1: Getting character quests');
+    // Delete in order due to foreign key constraints
+    
+    // 1. First, get all character_quests for this quest to find character_quest_objectives
+    const characterQuestsResult = await db.execute({
+      sql: 'SELECT id FROM character_quests WHERE quest_id = ?',
+      args: [Number(questId)],
+    });
+    
+    console.log('[DELETE Quest] Found', characterQuestsResult.rows.length, 'character quests');
+    
+    // 2. Delete character_quest_objectives for each character_quest
+    for (const cq of characterQuestsResult.rows) {
+      await db.execute({
+        sql: 'DELETE FROM character_quest_objectives WHERE character_quest_id = ?',
+        args: [(cq as any).id],
+      });
+    }
+    
+    console.log('[DELETE Quest] Step 2: Deleting character quests');
+    // 3. Delete character_quests
+    await db.execute({
+      sql: 'DELETE FROM character_quests WHERE quest_id = ?',
+      args: [Number(questId)],
+    });
+    
+    // 4. Delete quest rewards
+    await db.execute({
+      sql: 'DELETE FROM quest_rewards WHERE quest_id = ?',
+      args: [Number(questId)],
+    });
+    
+    // 5. Delete quest objectives
+    await db.execute({
+      sql: 'DELETE FROM quest_objectives WHERE quest_id = ?',
+      args: [Number(questId)],
+    });
+    
+    console.log('[DELETE Quest] Step 3: Deleting quest itself');
+    // 6. Delete the quest itself
+    await db.execute({
+      sql: 'DELETE FROM quests WHERE id = ?',
+      args: [Number(questId)],
+    });
+    
+    console.log('[DELETE Quest] Successfully deleted quest', questId);
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (err: any) {
+    console.error('Error deleting quest:', err);
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: err.message.includes('Unauthorized') ? 403 : 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+}

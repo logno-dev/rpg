@@ -178,39 +178,43 @@ export async function DELETE(event: APIEvent) {
     
     const questId = event.params.id;
     
-    // Delete objectives first (foreign key)
-    await db.execute({
-      sql: `DELETE FROM quest_objectives WHERE quest_id = ?`,
+    // Delete in order due to foreign key constraints
+    
+    // 1. First, get all character_quests for this quest to find character_quest_objectives
+    const characterQuestsResult = await db.execute({
+      sql: 'SELECT id FROM character_quests WHERE quest_id = ?',
       args: [questId],
     });
     
-    // Delete rewards
+    // 2. Delete character_quest_objectives for each character_quest
+    for (const cq of characterQuestsResult.rows) {
+      await db.execute({
+        sql: 'DELETE FROM character_quest_objectives WHERE character_quest_id = ?',
+        args: [(cq as any).id],
+      });
+    }
+    
+    // 3. Delete character_quests
     await db.execute({
-      sql: `DELETE FROM quest_rewards WHERE quest_id = ?`,
+      sql: 'DELETE FROM character_quests WHERE quest_id = ?',
       args: [questId],
     });
     
-    // Delete quest progress
+    // 4. Delete quest rewards
     await db.execute({
-      sql: `DELETE FROM character_quest_progress WHERE quest_id = ?`,
+      sql: 'DELETE FROM quest_rewards WHERE quest_id = ?',
       args: [questId],
     });
     
-    // Delete active quests
+    // 5. Delete quest objectives
     await db.execute({
-      sql: `DELETE FROM character_quests WHERE quest_id = ?`,
+      sql: 'DELETE FROM quest_objectives WHERE quest_id = ?',
       args: [questId],
     });
     
-    // Delete quest history
+    // 6. Delete the quest itself
     await db.execute({
-      sql: `DELETE FROM quest_history WHERE quest_id = ?`,
-      args: [questId],
-    });
-    
-    // Finally delete the quest
-    await db.execute({
-      sql: `DELETE FROM quests WHERE id = ?`,
+      sql: 'DELETE FROM quests WHERE id = ?',
       args: [questId],
     });
     

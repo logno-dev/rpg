@@ -4137,7 +4137,9 @@ export default function GamePage() {
                                 <div style={{ "font-weight": "bold", "font-size": "1rem" }}>{item.name}</div>
                                 <div style={{ "font-size": "0.875rem", color: "var(--text-secondary)" }}>
                                   {item.type}
-                                  <Show when={item.slot}> • {item.slot}</Show>
+                                  <Show when={item.type === 'weapon' && item.weapon_type}> • {item.weapon_type}</Show>
+                                  <Show when={item.slot === 'offhand' && item.offhand_type}> • {item.offhand_type}</Show>
+                                  <Show when={item.slot && item.slot !== item.type && !(item.type === 'weapon') && item.slot !== 'offhand'}> • {item.slot}</Show>
                                   <Show when={item.damage_min}> • {item.damage_min}-{item.damage_max} Dmg</Show>
                                   <Show when={item.armor}> • {item.armor} Armor</Show>
                                   <Show when={item.health_restore}> • +{item.health_restore} HP</Show>

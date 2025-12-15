@@ -22,7 +22,7 @@ export function InventoryItemCard(props: InventoryItemCardProps) {
         <div>
           <h4 style={{ "margin-bottom": "0.25rem" }}>{invItem.name}</h4>
           <p style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "text-transform": "uppercase" }}>
-            {invItem.type} {invItem.slot && `• ${invItem.slot}`}
+            {invItem.type} {invItem.type === 'weapon' && invItem.weapon_type ? `• ${invItem.weapon_type}` : invItem.slot === 'offhand' && invItem.offhand_type ? `• ${invItem.offhand_type}` : invItem.slot && invItem.slot !== invItem.type ? `• ${invItem.slot}` : ''}
           </p>
         </div>
         <Show when={invItem.quantity > 1}>

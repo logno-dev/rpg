@@ -76,7 +76,7 @@ export function ItemDetailModal(props: ItemDetailModalProps) {
               {item.name}
             </h3>
             <p style={{ "font-size": "0.875rem", color: "var(--text-secondary)", "text-transform": "uppercase", margin: 0 }}>
-              {item.type} {item.slot && `• ${item.slot}`}
+              {item.type} {item.type === 'weapon' && item.weapon_type ? `• ${item.weapon_type}` : item.slot === 'offhand' && item.offhand_type ? `• ${item.offhand_type}` : item.slot && item.slot !== item.type ? `• ${item.slot}` : ''}
             </p>
           </div>
           <Show when={item.quantity > 1}>

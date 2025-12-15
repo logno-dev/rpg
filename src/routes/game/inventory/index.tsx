@@ -941,8 +941,8 @@ export default function InventoryPage() {
                       {(item) => (
                         <>
                           <div style={{ "font-weight": "bold", "margin-bottom": "0.25rem" }}>{item().name}</div>
-                          <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "margin-bottom": "0.5rem" }}>
-                            {item().rarity}
+                          <div style={{ "font-size": "0.75rem", color: "var(--text-secondary)", "margin-bottom": "0.5rem", "text-transform": "uppercase" }}>
+                            {item().type === 'weapon' && (item() as any).weapon_type ? (item() as any).weapon_type : item().slot === 'offhand' && (item() as any).offhand_type ? (item() as any).offhand_type : item().rarity}
                           </div>
                           <div style={{ "font-size": "0.75rem", "margin-bottom": "0.5rem" }}>
                             <Show when={item().damage_min && item().damage_max}>
